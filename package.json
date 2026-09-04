@@ -1,0 +1,39 @@
+{
+  "name": "vibe-coding-panel",
+  "version": "0.1.0",
+  "description": "A voice-first, mobile-ready control panel for local coding agents.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cifangyiquan/vibe-coding-panel.git"
+  },
+  "homepage": "https://github.com/cifangyiquan/vibe-coding-panel#readme",
+  "bugs": "https://github.com/cifangyiquan/vibe-coding-panel/issues",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c yellow,cyan \"node --watch server/index.js\" \"vite\"",
+    "build": "npm run check && vite build",
+    "start": "node server/index.js",
+    "share": "node scripts/share.mjs",
+    "check": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
+    "test": "node --test server/*.test.js"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "express": "latest",
+    "lucide-react": "latest",
+    "qrcode": "^1.5.4",
+    "react": "latest",
+    "react-dom": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@types/express": "latest",
+    "@types/node": "latest",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "concurrently": "latest",
+    "typescript": "latest"
+  }
+}
