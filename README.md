@@ -4,21 +4,16 @@ Vibe Coding Panel is a voice-first control surface for coding agents. It turns t
 
 The app is designed for a simple boundary: the panel is the client, while the coding agent runs on the computer you control. It supports a no-login demo mode, a local Codex CLI agent, and an advanced remote Bridge.
 
-## Screenshots
+## Runtime screenshots
 
-The selectable layouts are shaped by compact, voice-first hardware references. The app is a software panel and does not require any of these devices.
+These screenshots are captured from the running Vibe Panel app in demo-ready local mode.
 
 <p align="center">
-  <img src="docs/screenshots/trikey-reference.png" alt="TriKey three-key voice approve layout reference" width="31%" />
-  <img src="docs/screenshots/vibebar-reference.png" alt="VibeBar multi-key layout reference" width="31%" />
-  <img src="docs/screenshots/voice-keyboard-reference.png" alt="Voice-first coding keyboard reference" width="31%" />
+  <img src="docs/screenshots/app-desktop.png" alt="Vibe Panel desktop runtime" width="78%" />
 </p>
 <p align="center">
-  <img src="docs/screenshots/ahakey-reference.png" alt="AhaKey four-key layout reference" width="31%" />
-  <img src="docs/screenshots/codex-micro-reference.png" alt="Codex Micro compact control layout reference" width="31%" />
+  <img src="docs/screenshots/app-mobile.png" alt="Vibe Panel mobile runtime" width="28%" />
 </p>
-
-<sub>Reference images supplied for this project. They are shown for layout inspiration only and do not imply ownership, sponsorship, endorsement, or affiliation with any people, products, or brands shown.</sub>
 
 ## What is included
 
@@ -27,7 +22,7 @@ The selectable layouts are shaped by compact, voice-first hardware references. T
 - Voice input sent to local Whisper (`small` by default), with a system-recording fallback.
 - Image upload on every device; desktop screen capture where the browser supports it.
 - Directory browser for local or remote workspaces.
-- Eight key layouts, including five reference-hardware layouts, plus four independent color themes.
+- Eight selectable key layouts plus four independent color themes.
 - Installable HTTPS PWA for phone and desktop.
 - One-time pairing codes, expiring after 10 minutes, persistent device authorization, and device revocation.
 
