@@ -1,20 +1,27 @@
 import {
-  ArrowUp, Camera, Check, ChevronRight, CircleStop, Clock3, Copy, Folder, FolderOpen, History,
+  ArrowUp, ArrowDown, ArrowLeft, ArrowRight, BrainCircuit, Camera, Check, ChevronRight, CircleCheck, CircleX, CircleStop, Clock3, Copy, Folder, FolderOpen, Grid2X2, History, Split,
   FileAudio, FlaskConical, ImagePlus, Keyboard, Laptop, Link2, Maximize2, Mic, MicOff, Minimize2,
-  Palette, Play, Plus, RotateCw, Server, ShieldCheck, Smartphone, Sparkles, Terminal, Trash2, Wifi, X,
+  MessageCircle, Palette, Play, Plus, RotateCcw, RotateCw, Send, Server, ShieldCheck,
+  Smartphone, Sparkles, Terminal, Trash2, Wifi, X, Zap,
 } from 'lucide-react';
 import QRCode from 'qrcode';
+import { MIN_RECORDING_MS, recordingMimeTypes, validateRecording } from './recording';
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { defaultMicroKeys, microActions, microColors, microIconOptions, microKeycapAssets, readMicroConfiguration, updateMicroConfiguration, unavailableMicroAction, MicroVoiceGesture } from './micro';
+import type { MicroKeyId, MicroActionId, MicroIconId, MicroKeyConfig } from './micro';
 
 type JobStatus = 'idle' | 'queued' | 'running' | 'completed' | 'failed' | 'stopped';
 type ThemeId = 'signal' | 'smoke' | 'ice' | 'midnight';
 type LayoutId = 'console' | 'bar' | 'matrix' | 'hardware-tri' | 'hardware-vibebar' | 'hardware-five' | 'hardware-aha' | 'hardware-micro';
 type ConnectionMode = 'demo' | 'local' | 'remote';
 type ConnectionState = 'online' | 'checking' | 'offline' | 'unknown';
+type AgentProviderId = 'codex' | 'claude';
 type AgentConnection = { mode: ConnectionMode; url: string; token: string };
+type AgentProviderInfo = { id: AgentProviderId; label: string; available: boolean; authenticated: boolean; version?: string };
 type Activity = { id: number; at: number; type: string; text?: string; status?: string };
 type SavedJob = {
   id: string; prompt: string; cwd: string; status: JobStatus; result?: string;
+  agentProvider?: AgentProviderId;
   createdAt: number; startedAt?: number | null; finishedAt?: number | null; events?: Activity[];
 };
 type WorkspaceDirectory = { name: string; path: string };
@@ -22,6 +29,11 @@ type PairedDevice = { id: string; name: string; userAgent: string; createdAt: nu
 type PairingInfo = { code: string; expiresAt: number; pairingUrl: string };
 
 const ACTIVE_JOB_KEY = 'vibe-panel-active-job-id';
+const MICRO_KEYS_VERSION = '2';
+const agentOptions: { id: AgentProviderId; label: string; description: string }[] = [
+  { id: 'codex', label: 'Codex', description: 'OpenAI Codex CLI' },
+  { id: 'claude', label: 'Claude Code', description: 'Anthropic Claude Code' },
+];
 
 const statusLabels: Record<JobStatus, string> = {
   idle: '待命', queued: '连接中', running: '执行中', completed: '完成', failed: '异常', stopped: '已停止',
@@ -42,7 +54,7 @@ const layouts: { id: LayoutId; label: string; description: string; previewKeys: 
   { id: 'hardware-vibebar', label: 'VibeBar 6', description: '参考图二：左侧双键与底部四键布局', previewKeys: 6 },
   { id: 'hardware-five', label: 'Voice Five', description: '参考图三：横向五键布局', previewKeys: 5 },
   { id: 'hardware-aha', label: 'AhaKey 4', description: '参考图四：横向四键布局', previewKeys: 4 },
-  { id: 'hardware-micro', label: 'Codex Micro', description: '参考图五：方形多层键阵布局', previewKeys: 10 },
+  { id: 'hardware-micro', label: 'Codex Micro', description: '六个任务状态键与可自定义 Command Keys', previewKeys: 10 },
 ];
 
 function readTheme(): ThemeId {
@@ -72,6 +84,37 @@ function readHistory(): SavedJob[] {
   try { return JSON.parse(localStorage.getItem('vibe-panel-history') || '[]'); } catch { return []; }
 }
 
+function readAgentProvider(): AgentProviderId {
+  return localStorage.getItem('vibe-panel-agent-provider') === 'claude' ? 'claude' : 'codex';
+}
+
+function readMicroKeys(): MicroKeyConfig[] {
+  try {
+    return readMicroConfiguration(JSON.parse(localStorage.getItem('vibe-panel-micro-keys') || '[]'), localStorage.getItem('vibe-panel-micro-keys-version'));
+  } catch {
+    return defaultMicroKeys;
+  }
+}
+
+function renderMicroIcon(icon: MicroIconId, size = 22) {
+  const asset = microKeycapAssets[icon];
+  if (asset) return <i className="micro-keycap-glyph" data-keycap={icon} aria-hidden="true" style={{ width: size, height: size, maskImage: `url(${asset})`, WebkitMaskImage: `url(${asset})` }} />;
+  const props = { size, strokeWidth: 1.8, className: 'micro-keycap-glyph', 'aria-hidden': true as const };
+  if (icon === 'check') return <CircleCheck {...props} />;
+  if (icon === 'decline') return <CircleX {...props} />;
+  if (icon === 'fork') return <Split {...props} style={{ transform: 'rotate(90deg)' }} />;
+  if (icon === 'mic') return <Mic {...props} />;
+  if (icon === 'stop') return <CircleStop {...props} />;
+  if (icon === 'send') return <Send {...props} />;
+  if (icon === 'history') return <History {...props} />;
+  if (icon === 'folder') return <Folder {...props} />;
+  if (icon === 'capture') return <ImagePlus {...props} />;
+  if (icon === 'grid') return <Grid2X2 {...props} />;
+  if (icon === 'brain') return <BrainCircuit {...props} />;
+  if (icon === 'message') return <MessageCircle {...props} />;
+  return <Zap {...props} />;
+}
+
 function audioDataUrl(blob: Blob) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -99,7 +142,7 @@ function imageDataUrl(file: File) {
   });
 }
 
-function App() {
+function PanelApp() {
   const [prompt, setPrompt] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
   const [cwd, setCwd] = useState(localStorage.getItem('vibe-panel-cwd') || '.');
@@ -111,6 +154,7 @@ function App() {
   const [error, setError] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isPreparingVoice, setIsPreparingVoice] = useState(false);
+  const [isFinalizingVoice, setIsFinalizingVoice] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [canImportRecording, setCanImportRecording] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
@@ -118,6 +162,7 @@ function App() {
   const [capturePreview, setCapturePreview] = useState('');
   const [isAddingContext, setIsAddingContext] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => localStorage.getItem('vibe-panel-onboarding-dismissed') !== '1');
   const [showHistory, setShowHistory] = useState(false);
   const [showWorkspacePicker, setShowWorkspacePicker] = useState(false);
   const [workspacePath, setWorkspacePath] = useState('');
@@ -131,6 +176,13 @@ function App() {
   const [connection, setConnection] = useState<AgentConnection>(readConnection);
   const [connectionState, setConnectionState] = useState<ConnectionState>(() => readConnection().mode === 'local' ? 'online' : 'unknown');
   const [agentLabel, setAgentLabel] = useState('LOCAL AGENT');
+  const [agentProvider, setAgentProvider] = useState<AgentProviderId>(readAgentProvider);
+  const [providers, setProviders] = useState<AgentProviderInfo[]>([]);
+  const [microKeys, setMicroKeys] = useState<MicroKeyConfig[]>(readMicroKeys);
+  const [editingMicroKey, setEditingMicroKey] = useState<MicroKeyId | null>(null);
+  const [knobIndex, setKnobIndex] = useState<number | null>(null);
+  const [microNavigation, setMicroNavigation] = useState<string[]>([]);
+  const [microNavigationIndex, setMicroNavigationIndex] = useState(-1);
   const [history, setHistory] = useState<SavedJob[]>(readHistory);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -151,7 +203,7 @@ function App() {
   const speechBaseRef = useRef('');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const microphoneStreamRef = useRef<MediaStream | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const voiceFinalizingRef = useRef(false);
   const shouldTranscribeRef = useRef(false);
   const voiceSessionRef = useRef(0);
   const voiceStartPendingRef = useRef(false);
@@ -160,14 +212,30 @@ function App() {
   const recoveryStartedRef = useRef(false);
   const demoRunRef = useRef(0);
   const sessionInitRef = useRef(false);
+  const microVoiceRef = useRef(new MicroVoiceGesture());
+  const microReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const knobHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const knobHeldRef = useRef(false);
 
   const busy = status === 'queued' || status === 'running';
-  const voiceBusy = isPreparingVoice || isListening || isTranscribing;
-  const canExecute = Boolean(prompt.trim() || capturePath) && !busy && !voiceBusy;
+  const voiceBusy = isPreparingVoice || isListening || isFinalizingVoice || isTranscribing;
+  const canExecute = Boolean(prompt.trim() || capturePath) && !busy && !voiceBusy && !isAddingContext && !isRecoveringJob;
   const latestProgress = [...activity].reverse().find((item) => item.text && item.type !== 'status')?.text
     || (busy ? '正在理解任务' : '等待下一条指令');
   const recentActivity = activity.filter((item) => item.type !== 'message').slice(-4);
   const activeLayout = layouts.find((item) => item.id === layout) || layouts[0];
+  const activeAgent = agentOptions.find((item) => item.id === agentProvider) || agentOptions[0];
+  const readyProviderCount = providers.filter((provider) => provider.available && provider.authenticated).length;
+  const onboardingReady = connectionState === 'online' && (connection.mode === 'demo' || readyProviderCount > 0);
+  const currentMicroJob: SavedJob | null = jobId ? {
+    id: jobId, prompt: taskTitle || prompt || '当前任务', cwd, status, result,
+    agentProvider, createdAt: history.find((job) => job.id === jobId)?.createdAt || startedAt || 0, startedAt, events: activity,
+  } : null;
+  const microTaskSlots = [
+    ...(currentMicroJob ? [currentMicroJob] : []),
+    ...history.filter((job) => job.id !== jobId),
+  ].sort((a, b) => (b.createdAt - a.createdAt) || a.id.localeCompare(b.id)).slice(0, 6);
+  const activeMicroKey = microKeys.find((key) => key.id === editingMicroKey) || null;
   const connectionPayload = connection.mode === 'remote' ? connection : { mode: 'local' as const };
   const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
     || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
@@ -180,6 +248,26 @@ function App() {
     sessionStorage.setItem('vibe-panel-remote-token', next.token);
     setConnectionState(next.mode === 'remote' ? 'unknown' : 'online');
     setAgentLabel(next.mode === 'demo' ? 'DEMO MODE' : next.mode === 'local' ? 'LOCAL AGENT' : 'REMOTE AGENT');
+  }
+
+  function dismissOnboarding(openSettings = false) {
+    localStorage.setItem('vibe-panel-onboarding-dismissed', '1');
+    setShowOnboarding(false);
+    if (openSettings) setShowSettings(true);
+  }
+
+  function selectAgentProvider(provider: AgentProviderId) {
+    setAgentProvider(provider);
+    localStorage.setItem('vibe-panel-agent-provider', provider);
+  }
+
+  function updateProviders(nextProviders: AgentProviderInfo[]) {
+    if (!Array.isArray(nextProviders)) return;
+    setProviders(nextProviders);
+    const selected = nextProviders.find((provider) => provider.id === agentProvider);
+    if (selected?.available && selected.authenticated) return;
+    const ready = nextProviders.find((provider) => provider.available && provider.authenticated);
+    if (ready) selectAgentProvider(ready.id);
   }
 
   async function connectWithCode(codeInput: string, quiet = false) {
@@ -267,6 +355,7 @@ function App() {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Agent 连接失败');
+      updateProviders(payload.providers || []);
       setConnectionState('online');
       setAgentLabel(connection.mode === 'remote' ? payload.name || 'REMOTE AGENT' : 'LOCAL AGENT');
     } catch (reason) {
@@ -285,6 +374,23 @@ function App() {
     localStorage.setItem('vibe-panel-layout', nextLayout);
   }
 
+  function updateMicroKey(id: MicroKeyId, patch: Partial<MicroKeyConfig>) {
+    setMicroKeys((items) => {
+      const next = updateMicroConfiguration(items, id, patch);
+      localStorage.setItem('vibe-panel-micro-keys', JSON.stringify(next));
+      localStorage.setItem('vibe-panel-micro-keys-version', MICRO_KEYS_VERSION);
+      return next;
+    });
+  }
+
+  function resetMicroKeys() {
+    const defaults = defaultMicroKeys.map((item) => ({ ...item }));
+    setMicroKeys(defaults);
+    setEditingMicroKey(null);
+    localStorage.setItem('vibe-panel-micro-keys', JSON.stringify(defaults));
+    localStorage.setItem('vibe-panel-micro-keys-version', MICRO_KEYS_VERSION);
+  }
+
   useEffect(() => {
     if (!busy || !startedAt) return;
     const tick = () => setElapsed(Date.now() - startedAt);
@@ -294,6 +400,22 @@ function App() {
   }, [busy, startedAt]);
 
   useEffect(() => { latestPromptRef.current = prompt; }, [prompt]);
+
+  useEffect(() => {
+    if (layout !== 'hardware-micro' || knobIndex === null) return;
+    const target = document.querySelector(composerTargets[knobIndex]);
+    target?.classList.add('micro-knob-target');
+    return () => target?.classList.remove('micro-knob-target');
+  }, [knobIndex, layout, result]);
+
+  useEffect(() => {
+    if (layout !== 'hardware-micro') return;
+    const cancel = () => { cancelMicroVoice(); if (knobHoldTimerRef.current) clearTimeout(knobHoldTimerRef.current); };
+    const hidden = () => { if (document.hidden) cancel(); };
+    window.addEventListener('blur', cancel);
+    document.addEventListener('visibilitychange', hidden);
+    return () => { window.removeEventListener('blur', cancel); document.removeEventListener('visibilitychange', hidden); cancel(); };
+  }, [layout]);
 
   useEffect(() => {
     if (showSettings) void loadDevices();
@@ -309,6 +431,11 @@ function App() {
         const response = await fetch('/api/health');
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || '无法连接控制面板');
+        if (payload.publicUrl) {
+          setPublicUrl(payload.publicUrl);
+          localStorage.setItem('vibe-panel-public-url', payload.publicUrl);
+        }
+        updateProviders(payload.providers || []);
         setPairedDevice(payload.device || null);
         if (payload.pairingRequired && !payload.paired) {
           const code = new URL(window.location.href).searchParams.get('pair') || '';
@@ -390,11 +517,20 @@ function App() {
         }
       }
     };
-    stream.onerror = () => setError('实时连接中断，刷新页面可重新连接');
+    stream.onerror = () => setError((current) => current || '实时连接中断，正在自动恢复进度');
     return () => stream.close();
   // Follow-ups keep the same job id, so streamVersion explicitly starts a new subscription.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId, streamVersion, busy, isRecoveringJob, connection.mode]);
+
+  // Polling keeps progress visible when a mobile network or reverse proxy drops SSE.
+  useEffect(() => {
+    if (!jobId || !busy || isRecoveringJob || connection.mode === 'demo') return;
+    const timer = window.setInterval(() => { void refreshJob(jobId); }, 2000);
+    return () => window.clearInterval(timer);
+  // refreshJob is stable for the lifetime of this component.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId, busy, isRecoveringJob, connection.mode, streamVersion]);
 
   const duration = useMemo(() => {
     const seconds = Math.max(0, Math.floor(elapsed / 1000));
@@ -410,6 +546,7 @@ function App() {
       }
       if (!response.ok) return;
       const job = await response.json() as SavedJob;
+      setError((current) => current === '实时连接中断，正在自动恢复进度' ? '' : current);
       setStatus(job.status);
       setActivity(Array.isArray(job.events) ? job.events : []);
       setResult(job.result || '');
@@ -431,6 +568,7 @@ function App() {
     setPrompt('');
     setTaskTitle(job.prompt);
     setCwd(job.cwd);
+    if (job.agentProvider) selectAgentProvider(job.agentProvider);
     setStatus(job.status);
     setActivity(Array.isArray(job.events) ? job.events : []);
     setResult(job.result || '');
@@ -448,13 +586,13 @@ function App() {
     const captureInstruction = connection.mode === 'demo'
       ? '结合已添加的图片上下文完成任务。'
       : `查看图片上下文 ${capturePath}，结合画面完成任务。`;
-    return text ? `${text}\n\n${captureInstruction}` : captureInstruction;
+    return [text, captureInstruction].filter(Boolean).join('\n\n');
   }
 
   async function execute(event?: FormEvent) {
     event?.preventDefault();
     const command = buildCommand();
-    if (!command || busy) return;
+    if (!command || !canExecute) return;
     if (connection.mode === 'demo') {
       await runDemo(command);
       return;
@@ -499,17 +637,17 @@ function App() {
     });
   }
 
-  async function submit(command: string) {
+  async function submit(command: string, title = prompt.trim() || '分析图片') {
     setError(''); setActivity([]); setResult(''); setStatus('queued'); setStartedAt(Date.now());
     localStorage.setItem('vibe-panel-cwd', cwd);
     try {
       const response = await fetch('/api/jobs', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: command, cwd, connection: connectionPayload }),
+        body: JSON.stringify({ prompt: command, cwd, agentProvider, connection: connectionPayload }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || '任务启动失败');
-      setTaskTitle(prompt.trim() || '分析图片');
+      setTaskTitle(title);
       setPrompt(''); setCapturePath(''); setCapturePreview(''); setJobId(payload.id);
       localStorage.setItem(ACTIVE_JOB_KEY, payload.id);
     } catch (reason) {
@@ -549,6 +687,7 @@ function App() {
   }
 
   function reset() {
+    if (busy || voiceBusy || isAddingContext || isRecoveringJob) return;
     demoRunRef.current += 1;
     voiceSessionRef.current += 1;
     voiceStartPendingRef.current = false;
@@ -562,9 +701,18 @@ function App() {
   }
 
   function stopListening(transcribe = true) {
+    if (voiceStartPendingRef.current && !mediaRecorderRef.current) {
+      voiceSessionRef.current += 1;
+      voiceStartPendingRef.current = false;
+      setIsPreparingVoice(false);
+    }
     shouldTranscribeRef.current = transcribe;
-    if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
-    else microphoneStreamRef.current?.getTracks().forEach((track) => track.stop());
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== 'inactive') {
+      voiceFinalizingRef.current = true;
+      setIsFinalizingVoice(true);
+      recorder.stop();
+    }
     setIsListening(false);
   }
 
@@ -596,7 +744,10 @@ function App() {
       latestPromptRef.current = nextPrompt;
       setPrompt(nextPrompt);
     } catch (reason) {
-      if (voiceSession === voiceSessionRef.current) setError(reason instanceof Error ? reason.message : '录音转写失败');
+      if (voiceSession === voiceSessionRef.current) {
+        setCanImportRecording(true);
+        setError(reason instanceof Error ? reason.message : '录音转写失败');
+      }
     } finally {
       if (voiceSession === voiceSessionRef.current) setIsTranscribing(false);
     }
@@ -607,7 +758,7 @@ function App() {
       setError('演示模式不上传录音。与电脑完成配对后可使用本机 Whisper 语音输入');
       return;
     }
-    if (voiceStartPendingRef.current) return;
+    if (voiceStartPendingRef.current || voiceFinalizingRef.current || mediaRecorderRef.current || isTranscribing) return;
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
       setError('当前浏览器不支持录音，请使用最新版 Chrome、Edge 或 Safari');
       return;
@@ -630,41 +781,64 @@ function App() {
         stream.getTracks().forEach((track) => track.stop());
         return;
       }
-      const preferredTypes = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/ogg;codecs=opus'];
+      const preferredTypes = recordingMimeTypes(navigator.userAgent, navigator.maxTouchPoints);
       const mimeType = preferredTypes.find((type) => MediaRecorder.isTypeSupported(type));
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-      audioChunksRef.current = [];
+      const chunks: Blob[] = [];
+      const recordingStream = stream;
+      let startedAt = 0;
+      let recordingFailed = false;
       speechBaseRef.current = latestPromptRef.current.trim();
       shouldTranscribeRef.current = true;
       microphoneStreamRef.current = stream;
       mediaRecorderRef.current = recorder;
-      recorder.ondataavailable = (event) => { if (event.data.size) audioChunksRef.current.push(event.data); };
+      recorder.onstart = () => { startedAt = performance.now(); };
+      recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
       recorder.onerror = () => {
+        recordingFailed = true;
         setCanImportRecording(true);
         setError('录音被浏览器中断，请重试');
         stopListening(false);
       };
-      recorder.onstop = () => {
-        const shouldTranscribe = shouldTranscribeRef.current;
-        const chunks = audioChunksRef.current;
-        const recordedType = recorder.mimeType || chunks[0]?.type || 'audio/webm';
-        microphoneStreamRef.current?.getTracks().forEach((track) => track.stop());
-        microphoneStreamRef.current = null;
-        mediaRecorderRef.current = null;
-        audioChunksRef.current = [];
-        if (!shouldTranscribe) return;
-        const recording = new Blob(chunks, { type: recordedType });
-        if (recording.size) void transcribeRecording(recording, voiceSession);
-        else setError('没有录到声音，请重试');
+      recorder.onstop = async () => {
+        voiceFinalizingRef.current = true;
+        setIsFinalizingVoice(true);
+        const shouldTranscribe = shouldTranscribeRef.current && !recordingFailed;
+        recordingStream.getTracks().forEach((track) => track.stop());
+        if (mediaRecorderRef.current === recorder) {
+          microphoneStreamRef.current = null;
+          mediaRecorderRef.current = null;
+        }
+        try {
+          if (!shouldTranscribe || voiceSession !== voiceSessionRef.current) return;
+          setIsListening(false);
+          if (!startedAt || performance.now() - startedAt < MIN_RECORDING_MS) {
+            throw new Error('录音太短，请等待录音开始后说完一句话，再结束录音');
+          }
+          const recordedType = chunks[0]?.type || recorder.mimeType || mimeType || 'audio/webm';
+          const recording = new Blob(chunks, { type: recordedType });
+          await validateRecording(recording);
+          if (voiceSession === voiceSessionRef.current) await transcribeRecording(recording, voiceSession);
+        } catch (error) {
+          if (voiceSession === voiceSessionRef.current) {
+            setCanImportRecording(true);
+            setError(error instanceof Error ? error.message : '录音无法读取，请重试');
+          }
+        } finally {
+          voiceFinalizingRef.current = false;
+          setIsFinalizingVoice(false);
+        }
       };
       setError('');
       setCanImportRecording(false);
       setIsListening(true);
-      // Keep short commands in one final blob so the upload has no fragment boundaries.
-      recorder.start();
+      // Keep every chunk, including the final dataavailable fired before stop.
+      recorder.start(1000);
     } catch (reason) {
       stream?.getTracks().forEach((track) => track.stop());
       if (voiceSession === voiceSessionRef.current) {
+        mediaRecorderRef.current = null;
+        microphoneStreamRef.current = null;
         setIsListening(false);
         setCanImportRecording(true);
         setError(microphoneErrorMessage(reason));
@@ -821,10 +995,122 @@ function App() {
   }
 
   function loadJob(job: SavedJob) {
+    if (busy || voiceBusy || isRecoveringJob || isAddingContext) return;
+    if (jobId !== job.id) {
+      const previous = microNavigation.length ? microNavigation.slice(0, microNavigationIndex + 1) : jobId ? [jobId] : [];
+      const next = [...previous, job.id];
+      setMicroNavigation(next);
+      setMicroNavigationIndex(next.length - 1);
+    }
     setStreamVersion((version) => version + 1);
     restoreJob(job);
     setShowHistory(false);
     if (!job.id.startsWith('demo-')) void refreshJob(job.id);
+  }
+
+  function triggerMicroAction(key: MicroKeyConfig) {
+    const unavailable = unavailableMicroAction(key.action);
+    if (unavailable) { setError(unavailable); return; }
+    if (microActionDisabled(key)) return;
+    if (key.action === 'voice') void toggleSpeech();
+    else if (key.action === 'execute') void execute();
+    else if (key.action === 'stop') void stop();
+    else if (key.action === 'new') reset();
+    else if (key.action === 'history') setShowHistory(true);
+    else if (key.action === 'workspace') openWorkspacePicker();
+    else if (key.action === 'capture') addVisualContext();
+    else if (key.action === 'fullscreen') void togglePanelMode();
+    else if (key.action === 'settings') setShowSettings(true);
+    else if (key.action === 'prompt') { setPrompt(key.prompt.trim()); promptRef.current?.focus(); }
+  }
+
+  function microActionDisabled(key: MicroKeyConfig) {
+    if (unavailableMicroAction(key.action)) return true;
+    if (key.action === 'stop') return !busy;
+    if (key.action === 'execute') return !canExecute;
+    if (key.action === 'voice') return busy || isFinalizingVoice || isTranscribing || isAddingContext || isRecoveringJob;
+    if (key.action === 'history' || key.action === 'fullscreen' || key.action === 'settings') return false;
+    return busy || voiceBusy || isAddingContext || isRecoveringJob || (key.action === 'prompt' && !key.prompt.trim());
+  }
+
+  function clearMicroReleaseTimer() {
+    if (microReleaseTimerRef.current) clearTimeout(microReleaseTimerRef.current);
+    microReleaseTimerRef.current = null;
+  }
+
+  function pressMicroVoice() {
+    clearMicroReleaseTimer();
+    const action = microVoiceRef.current.press(performance.now());
+    if (action === 'stop') stopListening(true);
+    if (action === 'start') void startListening();
+  }
+
+  function releaseMicroVoice() {
+    const action = microVoiceRef.current.release(performance.now());
+    if (action === 'stop') stopListening(true);
+    if (action === 'defer') {
+      const delay = Math.max(0, 350 - (performance.now() - (microVoiceRef.current.lastTapAt ?? 0)));
+      microReleaseTimerRef.current = setTimeout(() => {
+        microReleaseTimerRef.current = null;
+        microVoiceRef.current.reset();
+        stopListening(true);
+      }, delay);
+    }
+  }
+
+  function cancelMicroVoice() {
+    clearMicroReleaseTimer();
+    microVoiceRef.current.reset();
+    stopListening(false);
+  }
+
+  const composerTargets = ['#command', '.context-action', '.workspace-readout'];
+  function turnMicroKnob(direction: number) {
+    setKnobIndex((index) => ((index ?? (direction > 0 ? -1 : 0)) + direction + composerTargets.length) % composerTargets.length);
+  }
+  function selectMicroKnob() {
+    if (knobHeldRef.current) { knobHeldRef.current = false; return; }
+    const target = document.querySelector<HTMLButtonElement | HTMLTextAreaElement>(composerTargets[knobIndex ?? 0]);
+    if (!target || target.disabled) return;
+    if (target instanceof HTMLTextAreaElement) target.focus();
+    else target.click();
+  }
+  function navigateMicro(direction: number) {
+    if (busy || voiceBusy || isRecoveringJob || isAddingContext) return;
+    const next = microNavigationIndex + direction;
+    const task = history.find((job) => job.id === microNavigation[next]);
+    if (!task) return;
+    setMicroNavigationIndex(next);
+    restoreJob(task);
+    setStreamVersion((version) => version + 1);
+    if (!task.id.startsWith('demo-')) void refreshJob(task.id);
+  }
+
+  function renderMicroAgentKey(index: number) {
+    const task = microTaskSlots[index];
+    const slotState = task?.status === 'completed' && task.id === jobId ? 'idle' : task?.status || 'empty';
+    const title = task ? `${statusLabels[task.status]} · ${task.prompt}` : '空任务槽 · 新建任务';
+    const cancel = index === 0 && knobIndex !== null;
+    return <button type="button" key={`agent-${index}`} className={`micro-agent-key slot-${index + 1} ${slotState} ${task?.id === jobId ? 'selected' : ''} ${cancel ? 'cancel' : ''}`} disabled={!cancel && (busy || voiceBusy || isRecoveringJob || isAddingContext)} onClick={() => { if (cancel) { setKnobIndex(null); return; } task ? loadJob(task) : reset(); }} title={cancel ? '取消旋钮选择' : title} aria-label={cancel ? '取消旋钮选择' : `任务槽 ${index + 1}：${title}`}><i /><span>{index + 1}</span></button>;
+  }
+
+  function renderMicroCommandKey(key: MicroKeyConfig) {
+    const voice = key.action === 'voice';
+    const unavailable = unavailableMicroAction(key.action);
+    const label = `${key.label} · ${unavailable || microActions.find((action) => action.id === key.action)?.label || ''}`;
+    return <button type="button" key={key.id} className={`micro-command-key micro-${key.id} micro-color-${key.color} ${voice && isListening ? 'listening' : ''} ${voice && (isPreparingVoice || isTranscribing) ? 'transcribing' : ''} ${unavailable ? 'unavailable' : ''}`}
+      aria-label={label} aria-disabled={Boolean(unavailable) || undefined} title={label}
+      disabled={!unavailable && microActionDisabled(key)}
+      onPointerDown={voice ? (event) => { if (event.button !== 0) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); pressMicroVoice(); } : undefined}
+      onPointerUp={voice ? () => releaseMicroVoice() : undefined}
+      onPointerCancel={voice ? cancelMicroVoice : undefined}
+      onLostPointerCapture={voice ? () => { if (microVoiceRef.current.downAt !== null) cancelMicroVoice(); } : undefined}
+      onContextMenu={voice ? (event) => event.preventDefault() : undefined}
+      onKeyDown={voice ? (event) => { if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) { event.preventDefault(); pressMicroVoice(); } } : undefined}
+      onKeyUp={voice ? (event) => { if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); releaseMicroVoice(); } } : undefined}
+      onClick={(event) => { if (!voice) triggerMicroAction(key); else if (event.detail === 0) { if (isListening) { microVoiceRef.current.reset(); stopListening(true); } else { microVoiceRef.current.latched = true; void startListening(); } } }}>
+      {renderMicroIcon(key.icon, 24)}<span>{key.label || 'KEY'}</span>
+    </button>;
   }
 
   function renderStopKey(className = '') {
@@ -837,7 +1123,7 @@ function App() {
 
   function renderVoiceKey(className = '', approve = false) {
     const shouldApprove = approve && canExecute;
-    return <button type="button" className={`console-key voice-key ${isListening ? 'listening' : ''} ${className}`} onClick={shouldApprove ? () => void execute() : toggleSpeech} disabled={busy || isPreparingVoice || isTranscribing}>{shouldApprove ? <Check size={29} /> : isListening ? <MicOff size={31} /> : isPreparingVoice || isTranscribing ? <RotateCw className="spin" size={31} /> : <Mic size={31} />}<span>{shouldApprove ? 'APPROVE' : isListening ? 'LISTENING' : isPreparingVoice ? 'STARTING' : isTranscribing ? 'TRANSCRIBING' : approve ? 'VOICE APPROVE' : 'VOICE INPUT'}</span><small>{shouldApprove ? '批准执行' : isListening ? '再次按下结束' : isPreparingVoice ? '正在打开麦克风' : isTranscribing ? '正在转成文字' : '点按开始'}</small></button>;
+    return <button type="button" className={`console-key voice-key ${isListening ? 'listening' : ''} ${className}`} onClick={shouldApprove ? () => void execute() : toggleSpeech} disabled={busy || isPreparingVoice || isFinalizingVoice || isTranscribing}>{shouldApprove ? <Check size={29} /> : isListening ? <MicOff size={31} /> : isPreparingVoice || isFinalizingVoice || isTranscribing ? <RotateCw className="spin" size={31} /> : <Mic size={31} />}<span>{shouldApprove ? 'APPROVE' : isListening ? 'LISTENING' : isPreparingVoice ? 'STARTING' : isFinalizingVoice ? 'PROCESSING' : isTranscribing ? 'TRANSCRIBING' : approve ? 'VOICE APPROVE' : 'VOICE INPUT'}</span><small>{shouldApprove ? '批准执行' : isListening ? '再次按下结束' : isPreparingVoice ? '正在打开麦克风' : isFinalizingVoice ? '正在完成录音' : isTranscribing ? '正在转成文字' : '点按开始'}</small></button>;
   }
 
   function renderExecuteKey(className = '', approve = false) {
@@ -878,9 +1164,26 @@ function App() {
       {renderVoiceKey('aha-key-one')}{renderExecuteKey('aha-key-two', true)}{renderStopKey('aha-key-three')}{renderCaptureKey('aha-key-four')}
     </>;
     if (layout === 'hardware-micro') return <>
-      {renderSettingsKey('micro-top-key')}{renderWorkspaceKey('micro-top-key')}{renderHistoryKey('micro-top-key')}{renderFullscreenKey('micro-top-key')}
-      {renderCaptureKey('micro-action-key')}{renderNewTaskKey('micro-action-key')}{renderStopKey('micro-action-key')}{renderExecuteKey('micro-action-key')}
-      <div className="micro-dial" aria-hidden="true"><i /></div>{renderVoiceKey('micro-voice-key')}{renderSettingsKey('micro-brain-key')}
+      <div className="micro-control-knob" role="group" aria-label="旋钮：输入区导航" onWheel={(event) => turnMicroKnob(event.deltaY >= 0 ? 1 : -1)}>
+        <button type="button" className="knob-left" onClick={() => turnMicroKnob(-1)} title="逆时针：上一项" aria-label="旋钮逆时针"><RotateCcw size={13} /></button>
+        <button type="button" className="knob-push" aria-label="按下旋钮选择，长按打开设置" title="选择输入区控件；长按打开设置"
+          onPointerDown={(event) => { if (event.button !== 0) return; event.currentTarget.setPointerCapture(event.pointerId); knobHeldRef.current = false; knobHoldTimerRef.current = setTimeout(() => { knobHeldRef.current = true; setShowSettings(true); }, 600); }}
+          onPointerUp={() => { if (knobHoldTimerRef.current) clearTimeout(knobHoldTimerRef.current); }}
+          onPointerCancel={() => { if (knobHoldTimerRef.current) clearTimeout(knobHoldTimerRef.current); knobHeldRef.current = true; }}
+          onClick={selectMicroKnob}><span /></button>
+        <button type="button" className="knob-right" onClick={() => turnMicroKnob(1)} title="顺时针：下一项" aria-label="旋钮顺时针"><RotateCw size={13} /></button>
+      </div>
+      {Array.from({ length: 6 }, (_, index) => renderMicroAgentKey(index))}
+      <div className="micro-joystick" role="group" aria-label="摇杆">
+        <span className="joystick-cap" aria-hidden="true" />
+        <button type="button" className="joystick-up" aria-disabled="true" aria-label="摇杆向上：计划模式（Bridge 未支持）" title="计划模式（Bridge 未支持）" onClick={() => setError('当前 Bridge 尚未支持原生计划模式')}><ArrowUp size={14} /></button>
+        <button type="button" className="joystick-right" disabled={busy || voiceBusy || microNavigationIndex >= microNavigation.length - 1} aria-label="摇杆向右：前进" title="前进" onClick={() => navigateMicro(1)}><ArrowRight size={14} /></button>
+        <button type="button" className="joystick-down" aria-label="摇杆向下：切换任务侧栏" title="切换任务侧栏" onClick={() => setShowHistory((open) => !open)}><ArrowDown size={14} /></button>
+        <button type="button" className="joystick-left" disabled={busy || voiceBusy || microNavigationIndex <= 0} aria-label="摇杆向左：后退" title="后退" onClick={() => navigateMicro(-1)}><ArrowLeft size={14} /></button>
+      </div>
+      {microKeys.slice(0, 4).map(renderMicroCommandKey)}
+      <div className={`micro-connection ${connectionState}`}><span className="micro-connection-leds" aria-hidden="true"><i /><i /><i /></span><button type="button" onClick={() => setShowSettings(true)} title="连接与配对" aria-label="连接与配对" /></div>
+      {microKeys.slice(4).map(renderMicroCommandKey)}
     </>;
     return <>{renderStopKey()}{renderCaptureKey()}{renderVoiceKey()}{renderExecuteKey()}</>;
   }
@@ -905,6 +1208,16 @@ function App() {
         {connection.mode !== 'demo' && <button type="button" className={`test-connection ${connectionState}`} onClick={() => void testConnection()} disabled={connectionState === 'checking'}><Wifi size={15} />{connectionState === 'checking' ? '正在连接' : connectionState === 'online' ? '连接正常' : '测试连接'}</button>}
       </fieldset>
 
+      {connection.mode !== 'demo' && <fieldset className="agent-fieldset">
+        <legend>执行 Agent</legend>
+        <div className="agent-options">{agentOptions.map((option) => {
+          const state = providers.find((provider) => provider.id === option.id);
+          const ready = state?.available && state.authenticated;
+          const stateLabel = !state ? '等待检测' : !state.available ? '未安装' : !state.authenticated ? '未登录' : '可用';
+          return <button type="button" key={option.id} aria-pressed={agentProvider === option.id} onClick={() => selectAgentProvider(option.id)} disabled={busy || Boolean(state && !ready)} title={state?.version || option.description}><Terminal size={16} /><span><strong>{option.label}</strong><small className={ready ? 'ready' : ''}>{stateLabel}</small></span></button>;
+        })}</div>
+      </fieldset>}
+
       {!pairingAdmin && <fieldset className="pairing-fieldset">
         <legend>连接这台电脑</legend>
         {pairedDevice ? <div className="paired-device"><ShieldCheck size={17} /><span><strong>已安全配对</strong><small>{pairedDevice.name}</small></span></div> : <div className="pair-code-entry"><input aria-label="一次性配对码" value={pairCode} onChange={(event) => setPairCode(event.target.value.toUpperCase())} placeholder="ABCD-EFGH" autoComplete="one-time-code" /><button type="button" onClick={() => void connectWithCode(pairCode)} disabled={pairingBusy || !pairCode.trim()}>{pairingBusy ? <RotateCw className="spin" size={16} /> : <Link2 size={16} />}配对</button></div>}
@@ -920,8 +1233,30 @@ function App() {
       </fieldset>}
 
       <fieldset className="layout-fieldset"><legend>面板结构</legend><div className="layout-options">{layouts.map((item) => <button type="button" key={item.id} className={`layout-option ${item.id}`} aria-pressed={layout === item.id} onClick={() => selectLayout(item.id)} title={item.description}><i aria-hidden="true"><span /><b>{Array.from({ length: item.previewKeys }, (_, index) => <em key={index} />)}</b></i><strong>{item.label}</strong></button>)}</div></fieldset>
+      {layout === 'hardware-micro' && <fieldset className="micro-customizer">
+        <legend>自定义键帽</legend>
+        <div className="micro-customizer-heading"><span>COMMAND KEYS</span><button type="button" onClick={resetMicroKeys} title="恢复默认键帽"><RotateCcw size={14} />重置</button></div>
+        <div className="micro-keycap-list">
+          <span className="micro-preview-knob" title="旋钮" aria-label="旋钮"><RotateCw size={18} /></span>
+          {Array.from({ length: 6 }, (_, index) => <span key={index} className={`micro-preview-agent slot-${index + 1}`}>{index + 1}</span>)}
+          <span className="micro-preview-joystick" title="摇杆" aria-label="摇杆"><Plus size={18} /></span>
+          {microKeys.map((key) => <button type="button" key={key.id} className={`micro-keycap-option micro-${key.id} micro-color-${key.color}`} aria-pressed={editingMicroKey === key.id} onClick={() => setEditingMicroKey(key.id)} title={`编辑 ${key.label}`} aria-label={`编辑键位 ${key.id}`}>{renderMicroIcon(key.icon, 19)}<span>{key.label || 'KEY'}</span></button>)}
+          <span className="micro-preview-connection" title="连接触控区" aria-label="连接触控区"><i /></span>
+        </div>
+        {activeMicroKey && <div className="micro-key-editor">
+          <label htmlFor="micro-key-label">键帽文字</label>
+          <input id="micro-key-label" value={activeMicroKey.label} maxLength={12} onChange={(event) => updateMicroKey(activeMicroKey.id, { label: event.target.value.toUpperCase() })} />
+          <label htmlFor="micro-key-action">按键动作</label>
+          <select id="micro-key-action" value={activeMicroKey.action} onChange={(event) => updateMicroKey(activeMicroKey.id, { action: event.target.value as MicroActionId })}>{microActions.map((action) => <option key={action.id} value={action.id}>{action.label}</option>)}</select>
+          {activeMicroKey.action === 'prompt' && <><label htmlFor="micro-key-prompt">快捷指令</label><textarea id="micro-key-prompt" rows={3} maxLength={1000} value={activeMicroKey.prompt} onChange={(event) => updateMicroKey(activeMicroKey.id, { prompt: event.target.value })} /></>}
+          <span className="micro-editor-label">键帽图标</span>
+          <div className="micro-icon-options">{microIconOptions.map((icon) => <button type="button" key={icon.id} aria-pressed={activeMicroKey.icon === icon.id} onClick={() => updateMicroKey(activeMicroKey.id, { icon: icon.id })} title={icon.label} aria-label={icon.label}>{renderMicroIcon(icon.id, 18)}</button>)}</div>
+          <span className="micro-editor-label">灯光颜色</span>
+          <div className="micro-color-options">{microColors.map((color) => <button type="button" key={color.id} className={`micro-color-${color.id}`} aria-pressed={activeMicroKey.color === color.id} onClick={() => updateMicroKey(activeMicroKey.id, { color: color.id })} title={color.label} aria-label={color.label}><i /></button>)}</div>
+        </div>}
+      </fieldset>}
       <fieldset className="theme-fieldset"><legend>外观配色</legend><div className="theme-options">{themes.map((item) => <button type="button" key={item.id} className={`theme-option ${item.id}`} aria-pressed={theme === item.id} onClick={() => selectTheme(item.id)} title={item.description}><i aria-hidden="true"><span /></i><strong>{item.label}</strong></button>)}</div></fieldset>
-      {connection.mode !== 'demo' && <><label htmlFor="cwd">{connection.mode === 'remote' ? '远程工作目录' : '工作目录'}</label><input id="cwd" value={cwd} onChange={(event) => setCwd(event.target.value)} placeholder={connection.mode === 'remote' ? '/home/user/project' : '/path/to/project'} /></>}
+      {connection.mode !== 'demo' && <><label htmlFor="cwd">{connection.mode === 'remote' ? '远程工作目录' : '工作目录'}</label><input id="cwd" value={cwd} onChange={(event) => setCwd(event.target.value)} placeholder={connection.mode === 'remote' ? '/home/user/project' : 'C:\\path\\to\\project 或 /path/to/project'} /></>}
       <p className="privacy-note"><ShieldCheck size={14} />项目本身不收集任务、录音或代码。启用第三方 HTTPS Tunnel 时，流量还受该服务商的隐私条款约束。</p>
     </div>;
   }
@@ -929,8 +1264,8 @@ function App() {
   return (
     <div className={`app-shell layout-${layout} ${isPanelMode ? 'panel-mode' : ''}`} data-theme={theme}>
       <header className="topbar">
-        <button className="brand" onClick={reset} aria-label="新建任务"><span className="brand-mark"><Sparkles size={17} /></span><span>VIBE PANEL</span><small>CODEX CONTROLLER</small></button>
-        <div className="topbar-actions"><button className="connection" onClick={() => setShowSettings(true)} title="Agent 连接设置"><i className={connectionState} /><span>{connectionState === 'checking' ? 'CONNECTING' : agentLabel}</span></button><button className="header-button" onClick={() => setShowHistory(true)}><History size={18} /><span>历史</span></button><button className="header-button primary" onClick={reset}><Plus size={18} /><span>新任务</span></button></div>
+        <a className="brand" href="/" title="返回项目首页" aria-label="返回项目首页"><span className="brand-mark"><Sparkles size={17} /></span><span>VIBE PANEL</span><small>AGENT CONTROLLER</small></a>
+        <div className="topbar-actions"><button className="connection" onClick={() => setShowSettings(true)} title={`${agentLabel} / Agent 连接设置`}><i className={connectionState} /><span>{connectionState === 'checking' ? 'CONNECTING' : connection.mode === 'demo' ? agentLabel : activeAgent.label.toUpperCase()}</span></button><button className="header-button" onClick={() => setShowHistory(true)}><History size={18} /><span>历史</span></button><button className="header-button primary" onClick={reset}><Plus size={18} /><span>新任务</span></button></div>
       </header>
 
       <main>
@@ -942,7 +1277,7 @@ function App() {
 
             <div className="display-bezel"><div className="display">
               <div className="display-main">
-                <div className="display-status"><span className={`status-light ${status}`} /><span>CODEX / {isRecoveringJob ? '恢复中' : statusLabels[status]}</span><div className="display-quick-actions"><button type="button" className="new-task-action" onClick={reset} disabled={busy || voiceBusy || isAddingContext || isRecoveringJob} title="新建任务" aria-label="新建任务"><Plus size={16} /></button><button type="button" className="context-action" onClick={() => imageInputRef.current?.click()} disabled={busy || voiceBusy || isAddingContext || isRecoveringJob} title="添加图片上下文" aria-label="添加图片上下文">{isAddingContext ? <RotateCw className="spin" size={16} /> : <ImagePlus size={16} />}</button><button type="button" className="history-action" onClick={() => setShowHistory(true)} title="任务记录" aria-label="任务记录"><History size={16} /></button></div><span className="display-time"><Clock3 size={13} /> {busy ? duration : 'READY'}</span></div>
+                <div className="display-status"><span className={`status-light ${status}`} /><span>{activeAgent.label.toUpperCase()} / {isRecoveringJob ? '恢复中' : statusLabels[status]}</span><div className="display-quick-actions"><button type="button" className="new-task-action" onClick={reset} disabled={busy || voiceBusy || isAddingContext || isRecoveringJob} title="新建任务" aria-label="新建任务"><Plus size={16} /></button><button type="button" className="context-action" onClick={() => imageInputRef.current?.click()} disabled={busy || voiceBusy || isAddingContext || isRecoveringJob} title="添加图片上下文" aria-label="添加图片上下文">{isAddingContext ? <RotateCw className="spin" size={16} /> : <ImagePlus size={16} />}</button><button type="button" className="history-action" onClick={() => setShowHistory(true)} title="任务记录" aria-label="任务记录"><History size={16} /></button></div><span className="display-time"><Clock3 size={13} /> {busy ? duration : 'READY'}</span></div>
                 <div className={`display-content ${isListening ? 'listening' : ''}`}>
                   {capturePreview && !busy && !result ? <div className="capture-preview"><img src={capturePreview} alt="已添加的图片上下文" /><div><span>VISUAL CONTEXT</span><strong>图片已装载</strong></div><button type="button" onClick={() => { setCapturePath(''); setCapturePreview(''); }} aria-label="移除图片"><X size={16} /></button></div>
                     : result && !busy ? <div className="result-screen"><span className="screen-label">TASK COMPLETE</span><strong>{taskTitle}</strong><p>{result}</p><button onClick={async () => { await navigator.clipboard.writeText(result); setCopied(true); window.setTimeout(() => setCopied(false), 1500); }}>{copied ? <Check size={14} /> : <Copy size={14} />}{copied ? '已复制' : '复制结果'}</button></div>
@@ -950,9 +1285,10 @@ function App() {
                     : isRecoveringJob ? <div className="running-screen recovering-screen"><span className="screen-label">RESTORING SESSION</span><strong>正在恢复上次任务</strong><p>正在连接 Agent 并读取最新进度</p><div className="progress-track"><i /></div></div>
                     : <div className="command-screen">{isListening && <div className="waveform" aria-hidden="true">{Array.from({ length: 28 }, (_, index) => <i key={index} />)}</div>}<div className="screen-label">{isListening ? 'LISTENING' : isTranscribing ? 'TRANSCRIBING' : 'COMMAND DRAFT'}</div><label htmlFor="command">任务指令</label><textarea id="command" ref={promptRef} value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void execute(); } }} rows={3} maxLength={3000} placeholder={isListening ? '正在录音，再按一次结束…' : isTranscribing ? '正在把语音转成文字…' : '按下语音键，或在这里输入…'} /></div>}
                 </div>
+                {layout === 'hardware-micro' && result && !busy && <textarea id="command" className="micro-followup" ref={promptRef} aria-label="继续当前任务" rows={2} value={prompt} maxLength={3000} placeholder={isListening ? '正在录音…' : isTranscribing ? '正在转写…' : '继续当前任务…'} onChange={(event) => setPrompt(event.target.value)} />}
                 <div className="activity-strip">{recentActivity.length ? recentActivity.map((item) => <div key={item.id}><span>{item.type === 'tool' ? 'CMD' : item.type === 'status' ? 'SYS' : 'AI'}</span><p>{item.text}</p></div>) : <div><span>SYS</span><p>{capturePath ? '图片上下文已准备' : '等待输入'}</p></div>}</div>
               </div>
-              <div className="display-side"><div className="counter"><strong>{busy ? '1' : '0'}</strong><span>运行中</span></div><div className="counter"><strong>{history.length}</strong><span>已完成</span></div><button type="button" className="workspace-readout" onClick={openWorkspacePicker} disabled={busy} title="切换 Workspace"><Folder size={15} /><span>{connection.mode === 'remote' ? 'REMOTE WORKSPACE' : 'WORKSPACE'} / 点击切换</span><strong>{cwd.split('/').filter(Boolean).pop() || '/'}</strong></button><div className={`signal-bars ${connectionState}`} aria-label={`Agent ${connectionState === 'online' ? '连接正常' : '等待连接'}`}><i /><i /><i /><i /></div></div>
+              <div className="display-side"><div className="counter"><strong>{busy ? '1' : '0'}</strong><span>运行中</span></div><div className="counter"><strong>{history.length}</strong><span>已完成</span></div><button type="button" className="workspace-readout" onClick={openWorkspacePicker} disabled={busy} title="切换 Workspace"><Folder size={15} /><span>{connection.mode === 'remote' ? 'REMOTE WORKSPACE' : 'WORKSPACE'} / 点击切换</span><strong>{cwd.split(/[\\/]/).filter(Boolean).pop() || cwd || '/'}</strong></button><div className={`signal-bars ${connectionState}`} aria-label={`Agent ${connectionState === 'online' ? '连接正常' : '等待连接'}`}><i /><i /><i /><i /></div></div>
             </div></div>
             <input ref={imageInputRef} hidden type="file" accept="image/*" tabIndex={-1} aria-hidden="true" onChange={(event) => void addImageContext(event)} />
             <input ref={audioInputRef} hidden type="file" accept="audio/*" capture="user" tabIndex={-1} aria-hidden="true" onChange={(event) => void importAudioRecording(event)} />
@@ -967,8 +1303,20 @@ function App() {
           {error && <div className="error-banner"><Terminal size={16} /><span>{error}</span>{canImportRecording && <button type="button" className="audio-import-action" onClick={() => audioInputRef.current?.click()}><FileAudio size={15} />系统录音</button>}<button onClick={() => { setError(''); setCanImportRecording(false); }} aria-label="关闭"><X size={15} /></button></div>}
         </section>
 
-        <section className="control-legend" aria-label="控制说明"><div><span>01</span><strong>说</strong><p>语音成为任务草稿</p></div><div><span>02</span><strong>看</strong><p>捕获当前屏幕上下文</p></div><div><span>03</span><strong>执行</strong><p>Codex 在项目中完成工作</p></div></section>
+        <section className="control-legend" aria-label="控制说明"><div><span>01</span><strong>说</strong><p>语音成为任务草稿</p></div><div><span>02</span><strong>看</strong><p>捕获当前屏幕上下文</p></div><div><span>03</span><strong>执行</strong><p>{activeAgent.label} 在项目中完成工作</p></div></section>
       </main>
+
+      {showOnboarding && <div className="onboarding-backdrop" role="presentation"><section className="onboarding-card" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+        <div className="onboarding-heading"><div><span>FIRST RUN</span><h2 id="onboarding-title">先把电脑连上</h2></div><button type="button" onClick={() => dismissOnboarding()} aria-label="稍后设置"><X size={18} /></button></div>
+        <p className="onboarding-copy">手机只是控制面板，Agent 和项目仍运行在你的电脑上。完成下面的检查后，就可以直接说话或输入任务。</p>
+        <div className="onboarding-checks">
+          <div className={connectionState === 'online' ? 'ready' : connectionState === 'checking' ? 'checking' : ''}><i>{connectionState === 'online' ? <Check size={15} /> : <Wifi size={15} />}</i><span><strong>连接状态</strong><small>{connectionState === 'online' ? '面板已连接' : connectionState === 'checking' ? '正在检测' : '等待连接'}</small></span></div>
+          <div className={connection.mode === 'demo' || readyProviderCount > 0 ? 'ready' : ''}><i>{connection.mode === 'demo' || readyProviderCount > 0 ? <Check size={15} /> : <Terminal size={15} />}</i><span><strong>{connection.mode === 'demo' ? '演示模式' : '执行 Agent'}</strong><small>{connection.mode === 'demo' ? '不会修改电脑文件' : readyProviderCount ? `${readyProviderCount} 个 Agent 可用` : '尚未检测到已登录 Agent'}</small></span></div>
+          <div className={cwd && cwd !== '.' ? 'ready' : ''}><i>{cwd && cwd !== '.' ? <Check size={15} /> : <Folder size={15} />}</i><span><strong>工作区</strong><small>{cwd && cwd !== '.' ? cwd : '稍后选择项目目录'}</small></span></div>
+        </div>
+        <div className="onboarding-actions"><button type="button" onClick={() => { updateConnection({ mode: 'demo' }); dismissOnboarding(); }}>先体验演示</button><button type="button" className="onboarding-primary" onClick={() => dismissOnboarding(true)}><Laptop size={16} />配置电脑连接</button></div>
+        <div className={`onboarding-foot ${onboardingReady ? 'ready' : ''}`}>{onboardingReady ? '可以开始创建任务' : '连接完成后这里会显示“可以开始创建任务”'}</div>
+      </section></div>}
 
       {showHistory && <div className="drawer-backdrop" onMouseDown={() => setShowHistory(false)}><aside className="history-drawer" onMouseDown={(event) => event.stopPropagation()}><div className="drawer-heading"><div><span>HISTORY</span><h2>任务记录</h2></div><button className="icon-button" onClick={() => setShowHistory(false)} aria-label="关闭"><X size={20} /></button></div><div className="history-list">{history.length === 0 ? <div className="history-empty"><History size={26} /><p>还没有完成的任务</p></div> : history.map((job) => <button key={job.id} onClick={() => loadJob(job)} className="history-item"><span className={`history-status ${job.status}`}><Check size={13} /></span><span className="history-copy"><strong>{job.prompt}</strong><small>{job.cwd}<br />{new Date(job.createdAt).toLocaleString('zh-CN')}</small></span></button>)}</div></aside></div>}
 
@@ -977,6 +1325,35 @@ function App() {
       <footer><span>VIBE PANEL / 2026</span><span>BREAK THE KEYBOARD. JUST BUILD.</span></footer>
     </div>
   );
+}
+
+function LandingPage() {
+  return <div className="site-shell">
+    <header className="site-nav"><a className="site-brand" href="/"><span className="site-mark"><Sparkles size={16} /></span><span>VIBE PANEL</span></a><nav><a href="#how-it-works">怎么工作</a><a href="/download">下载 Connector</a><a className="site-nav-action" href="/app">打开面板 <ChevronRight size={15} /></a></nav></header>
+    <main>
+      <section className="site-hero"><div className="site-hero-copy"><p className="site-kicker">A CONTROL SURFACE FOR YOUR AGENT</p><h1>把 Agent，<br /><em>握在手里。</em></h1><p>不用买外设。用手机的语音和几个关键按键，控制电脑上的 Codex 或 Claude Code。</p><div className="site-hero-actions"><a className="site-primary-action" href="/app">打开控制面板 <ArrowRight size={17} /></a><a className="site-secondary-action" href="/download">下载电脑 Connector</a></div><span className="site-note"><ShieldCheck size={14} />任务、代码和录音留在你的电脑上</span></div><div className="site-hero-device"><div className="site-device-label">VIBE PANEL / CODEX MICRO</div><img src="/screenshots/runtime/panel-desktop.png" alt="Vibe Panel 控制面板运行截图" /></div></section>
+      <section className="site-proof"><div><strong>01</strong><span>说</span><p>按住语音键，说出你的想法</p></div><div><strong>02</strong><span>看</span><p>添加屏幕或图片上下文</p></div><div><strong>03</strong><span>做</span><p>Agent 在你的项目里完成任务</p></div></section>
+      <section className="site-how" id="how-it-works"><div><p className="site-kicker">THREE STEPS</p><h2>从打开到完成，<br />只需要一条连接。</h2></div><div className="site-steps"><div><b>1</b><strong>在电脑启动 Connector</strong><p>macOS 或 Windows 双击启动文件，自动检测 Agent、Whisper 和 ffmpeg。</p></div><div><b>2</b><strong>手机打开配对链接</strong><p>Connector 会生成一次性链接，不需要注册账号。</p></div><div><b>3</b><strong>选择项目，开始下令</strong><p>选择 Codex 或 Claude Code，然后用语音或文字创建任务。</p></div></div></section>
+      <section className="site-cta"><p className="site-kicker">READY WHEN YOU ARE</p><h2>先在浏览器里试一次。</h2><p>演示模式不会读取文件，也不会运行命令。</p><a className="site-primary-action" href="/app">进入 Vibe Panel <ArrowRight size={17} /></a></section>
+    </main>
+    <footer className="site-footer"><span>VIBE PANEL / 2026</span><span><a href="/download">下载</a><a href="https://github.com/x2v-co/vibe-coding-panel">GitHub</a></span></footer>
+  </div>;
+}
+
+function DownloadPage() {
+  return <div className="site-shell download-shell">
+    <header className="site-nav"><a className="site-brand" href="/"><span className="site-mark"><Sparkles size={16} /></span><span>VIBE PANEL</span></a><nav><a href="/">项目介绍</a><a className="site-nav-action" href="/app">打开面板 <ChevronRight size={15} /></a></nav></header>
+    <main className="download-main"><div className="download-heading"><p className="site-kicker">GET STARTED ON DESKTOP</p><h1>下载 Connector。</h1><p>Connector 运行在你的电脑上，把手机面板安全地连接到本机的 Codex 或 Claude Code。</p></div><div className="download-card"><div className="download-card-icon"><Laptop size={24} /></div><div><h2>Vibe Panel Connector</h2><p>支持 macOS、Windows 10/11 和 Linux · 需要 Node.js 24 LTS</p><a className="site-primary-action" href="https://github.com/x2v-co/vibe-coding-panel/archive/refs/heads/main.zip">下载 Connector ZIP <ArrowRight size={17} /></a></div></div><div className="download-guide"><h2>三步开始</h2><ol><li><b>下载并解压</b><span>先安装 Node.js 24 LTS，并确认 Codex 或 Claude Code 已登录且能正常回复。</span></li><li><b>启动 Connector</b><span>macOS 双击 <code>Vibe Panel.command</code>；Windows 双击 <code>Vibe Panel.bat</code>；Linux 运行 <code>npm install</code> 后再运行 <code>npm run connect</code></span></li><li><b>手机扫描二维码</b><span>等待终端显示已连接，用手机相机扫描二维码。保持窗口运行和电脑唤醒。</span></li></ol></div><div className="download-help"><ShieldCheck size={17} /><span><a href="https://github.com/x2v-co/vibe-coding-panel/blob/main/README.zh-CN.md">完整安装说明</a> · <a href="https://github.com/x2v-co/vibe-coding-panel/blob/main/docs/install-for-agents.md">让 Agent 安装</a> · 还没安装 Agent？<a href="/app">先用演示模式体验</a>。</span></div></main>
+    <footer className="site-footer"><span>VIBE PANEL / 2026</span><span><a href="/">项目介绍</a><a href="/app">打开面板</a></span></footer>
+  </div>;
+}
+
+function App() {
+  const url = new URL(window.location.href);
+  const isPanelRoute = url.pathname === '/app' || url.pathname.startsWith('/app/') || url.searchParams.has('relay') || url.searchParams.has('pair');
+  if (url.pathname === '/download') return <DownloadPage />;
+  if (!isPanelRoute && url.pathname === '/') return <LandingPage />;
+  return <PanelApp />;
 }
 
 export default App;

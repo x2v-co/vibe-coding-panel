@@ -1,0 +1,40 @@
+services:
+  relay:
+    build:
+      context: .
+      dockerfile: Dockerfile.relay
+    restart: unless-stopped
+    environment:
+      PANEL_RELAY_HOST: 0.0.0.0
+      PANEL_RELAY_PORT: 8789
+      PANEL_RELAY_PUBLIC_URL: https://${PANEL_RELAY_DOMAIN}
+      PANEL_RELAY_MAX_CONNECTORS: ${PANEL_RELAY_MAX_CONNECTORS:-100}
+      PANEL_RELAY_MAX_INFLIGHT: ${PANEL_RELAY_MAX_INFLIGHT:-100}
+    expose:
+      - "8789"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8789/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      relay:
+        condition: service_healthy
+    environment:
+      PANEL_RELAY_DOMAIN: ${PANEL_RELAY_DOMAIN:?set PANEL_RELAY_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

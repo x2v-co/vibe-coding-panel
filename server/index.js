@@ -1,12 +1,16 @@
 import express from 'express';
 import { spawn } from 'node:child_process';
+import spawnAgent from 'cross-spawn';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
-import { access, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { access, copyFile, link, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { homedir, hostname, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PairingStore, isLoopbackRequest, readCookie } from './pairing.js';
 import { buildWhisperArgs, resolveWhisperModel, resolveWhisperTimeout } from './whisper-options.js';
+import { resolveFfmpeg } from './ffmpeg.js';
+import { decodeRecording } from './audio-decode.js';
+import { agentProviders, defaultAgentProvider, probeAgentProviders, buildAgentInvocation, normalizeAgentProvider, parseAgentLine } from './agent-providers.js';
 
 const app = express();
 const port = Number(process.env.PANEL_API_PORT || 8787);
@@ -14,6 +18,17 @@ const bridgePort = Number(process.env.PANEL_BRIDGE_PORT || 8788);
 const bridgeHost = process.env.PANEL_BRIDGE_HOST || '127.0.0.1';
 const bridgeToken = process.env.PANEL_BRIDGE_TOKEN || '';
 const agentName = process.env.PANEL_AGENT_NAME || hostname();
+const defaultProvider = defaultAgentProvider();
+const defaultAgentLabel = agentProviders[defaultProvider].label;
+let providerCache;
+let providerCacheAt = 0;
+function availableProviders() {
+  if (!providerCache || Date.now() - providerCacheAt > 30000) {
+    providerCache = probeAgentProviders();
+    providerCacheAt = Date.now();
+  }
+  return providerCache;
+}
 const pairingRequired = ['1', 'true', 'yes'].includes(String(process.env.PANEL_REQUIRE_PAIRING || '').toLowerCase());
 const jobs = new Map();
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -61,8 +76,13 @@ function parsePublicUrl(input) {
   const url = new URL(String(input || '').trim());
   const localHttp = url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
   if (url.protocol !== 'https:' && !localHttp) throw new Error('手机入口必须使用 HTTPS');
-  url.pathname = '/';
+  const relay = url.searchParams.get('relay');
+  url.pathname = relay ? '/app' : '/';
   url.search = '';
+  if (relay) {
+    if (!/^[A-Za-z0-9_-]{43}$/.test(relay)) throw new Error('无效的 Connector ID');
+    url.searchParams.set('relay', relay);
+  }
   url.hash = '';
   return url.toString();
 }
@@ -78,31 +98,6 @@ function push(job, event) {
   for (const listener of job.listeners) listener(entry);
 }
 
-function parseCodexLine(job, line) {
-  if (!line.trim()) return;
-  try {
-    const data = JSON.parse(line);
-    if (data.thread_id && !job.threadId) job.threadId = data.thread_id;
-    if (data.type === 'thread.started') job.threadId = data.thread_id;
-    const item = data.item || {};
-    const type = item.type || data.type || 'event';
-    if (type === 'agent_message') {
-      const text = item.text || item.content || '';
-      job.result = text;
-      push(job, { type: 'message', text });
-    } else if (type === 'reasoning') {
-      push(job, { type: 'progress', text: item.text || '正在思考下一步' });
-    } else if (type === 'command_execution') {
-      const phase = item.status === 'completed' ? '已完成命令' : '正在执行命令';
-      push(job, { type: 'tool', text: `${phase}: ${item.command || ''}`, status: item.status });
-    } else if (data.type === 'turn.completed') {
-      push(job, { type: 'progress', text: '正在整理结果' });
-    }
-  } catch {
-    push(job, { type: 'log', text: line });
-  }
-}
-
 function shouldShowStderr(line) {
   return line.trim() && !line.includes(' WARN ')
     && line.trim() !== 'Reading additional input from stdin...';
@@ -110,52 +105,62 @@ function shouldShowStderr(line) {
 
 function createJob(prompt, cwd) {
   return {
-    id: randomUUID(), cwd, prompt, status: 'queued', threadId: null,
+    id: randomUUID(), cwd, prompt, provider: defaultProvider, status: 'queued', threadId: null,
     events: [], listeners: new Set(), sequence: 0, process: null, remote: null,
     createdAt: Date.now(), startedAt: null, finishedAt: null, result: '',
   };
 }
 
 function launch(job, prompt, resume = false) {
-  const args = resume
-    ? ['exec', 'resume', job.threadId, prompt, '--json', '--skip-git-repo-check']
-    : ['exec', prompt, '--json', '--skip-git-repo-check', '--approve-for-me', '--cd', job.cwd];
+  const invocation = buildAgentInvocation(job.provider, {
+    prompt, cwd: job.cwd, threadId: job.threadId, resume,
+  });
   job.status = 'running';
   job.startedAt = Date.now();
   job.finishedAt = null;
   job.result = '';
+  job.agentError = null;
+  job.authError = null;
   push(job, { type: 'status', status: 'running', text: resume ? '正在继续任务' : 'Agent 已开始工作' });
 
-  const child = spawn('codex', args, { cwd: job.cwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawnAgent(invocation.command, invocation.args, { cwd: invocation.cwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
   job.process = child;
   let stdoutBuffer = '';
   let stderrBuffer = '';
+  function logStderr(line) {
+    if (!shouldShowStderr(line)) return;
+    if (line.includes('Authorization validation failed')) {
+      job.authError = '模型服务拒绝了当前认证，请检查 Codex 所选 provider 的认证配置；手机配对无需重做。';
+    }
+    push(job, { type: 'log', text: line });
+  }
   child.stdout.on('data', (chunk) => {
     stdoutBuffer += chunk.toString();
     const lines = stdoutBuffer.split(/\r?\n/);
     stdoutBuffer = lines.pop() || '';
-    for (const line of lines) parseCodexLine(job, line);
+    for (const line of lines) parseAgentLine(job.provider, job, line, (event) => push(job, event));
   });
   child.stderr.on('data', (chunk) => {
     stderrBuffer += chunk.toString();
     const lines = stderrBuffer.split(/\r?\n/);
     stderrBuffer = lines.pop() || '';
-    for (const line of lines) if (shouldShowStderr(line)) push(job, { type: 'log', text: line });
+    for (const line of lines) logStderr(line);
   });
   child.on('error', (error) => {
+    job.agentError = error.message;
     job.status = 'failed';
     job.finishedAt = Date.now();
     push(job, { type: 'status', status: 'failed', text: error.message });
   });
   child.on('close', (code, signal) => {
-    if (stdoutBuffer) parseCodexLine(job, stdoutBuffer);
-    if (shouldShowStderr(stderrBuffer)) push(job, { type: 'log', text: stderrBuffer });
+    if (stdoutBuffer) parseAgentLine(job.provider, job, stdoutBuffer, (event) => push(job, event));
+    logStderr(stderrBuffer);
     job.process = null;
     job.finishedAt = Date.now();
-    job.status = signal ? 'stopped' : code === 0 ? 'completed' : 'failed';
+    job.status = signal ? 'stopped' : code === 0 && !job.agentError ? 'completed' : 'failed';
     push(job, {
       type: 'status', status: job.status,
-      text: job.status === 'completed' ? '任务完成' : job.status === 'stopped' ? '任务已停止' : `任务失败（退出码 ${code}）`,
+      text: job.status === 'completed' ? '任务完成' : job.status === 'stopped' ? '任务已停止' : job.authError || job.agentError || `任务失败（退出码 ${code}）`,
     });
   });
 }
@@ -290,11 +295,13 @@ function runProcess(command, args, timeoutMs = 120000, env = process.env) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { env, stdio: ['ignore', 'pipe', 'pipe'] });
     let stderr = '';
+    let stdout = '';
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
       reject(new Error('语音转写超时；首次使用可能仍在下载模型，请重试'));
     }, timeoutMs);
-    child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
+    child.stderr.on('data', (chunk) => { stderr = (stderr + chunk.toString()).slice(-8000); });
+    child.stdout.on('data', (chunk) => { stdout = (stdout + chunk.toString()).slice(-8000); });
     child.on('error', (error) => {
       clearTimeout(timer);
       reject(error.code === 'ENOENT'
@@ -303,7 +310,7 @@ function runProcess(command, args, timeoutMs = 120000, env = process.env) {
     });
     child.on('close', (code) => {
       clearTimeout(timer);
-      if (code === 0) resolve();
+      if (code === 0) resolve({ stdout, stderr });
       else reject(new Error(stderr.trim().split(/\r?\n/).pop() || `Whisper 退出码 ${code}`));
     });
   });
@@ -326,11 +333,33 @@ function readProcess(command, args, timeoutMs = 10000) {
 
 let bundledFfmpegPromise;
 function findBundledFfmpeg() {
-  if (process.env.PANEL_FFMPEG_BIN) return Promise.resolve(process.env.PANEL_FFMPEG_BIN);
-  bundledFfmpegPromise ||= readProcess(process.env.PANEL_PYTHON_BIN || 'python3', [
-    '-c', 'import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())',
-  ]).catch(() => '');
+  const configured = String(process.env.PANEL_FFMPEG_BIN || '').trim();
+  const pythonCandidates = [
+    process.env.PANEL_PYTHON_BIN,
+    process.env.CONDA_PYTHON_EXE,
+    process.platform === 'win32' ? path.join(appRoot, '.venv', 'Scripts', 'python.exe') : path.join(appRoot, '.venv', 'bin', 'python'),
+    process.env.CONDA_PREFIX && process.platform === 'win32' ? path.join(process.env.CONDA_PREFIX, 'python.exe') : '',
+    process.env.CONDA_PREFIX && process.platform !== 'win32' ? path.join(process.env.CONDA_PREFIX, 'bin', 'python3') : '',
+    process.platform === 'win32' ? 'python' : 'python3',
+    process.platform === 'win32' ? 'py' : 'python',
+  ].filter(Boolean);
+  bundledFfmpegPromise ||= resolveFfmpeg({ configured, pythonCandidates, readProcess })
+    .catch((error) => { bundledFfmpegPromise = null; throw error; });
   return bundledFfmpegPromise;
+}
+
+async function exposeFfmpeg(ffmpegPath, workDir) {
+  const stagedPath = path.join(workDir, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+  if (process.platform !== 'win32') {
+    await symlink(ffmpegPath, stagedPath);
+    return;
+  }
+  try {
+    await link(ffmpegPath, stagedPath);
+  } catch {
+    // Windows symlinks may require administrator privileges; copying is reliable for a temp binary.
+    await copyFile(ffmpegPath, stagedPath);
+  }
 }
 
 async function transcribeAudio(audioInput, languageInput) {
@@ -349,21 +378,29 @@ async function transcribeAudio(audioInput, languageInput) {
     const model = resolveWhisperModel();
     const language = String(languageInput || 'zh').replace(/[^A-Za-z-]/g, '') || 'zh';
     const bundledFfmpeg = await findBundledFfmpeg();
+    const decodedPath = path.join(workDir, 'speech.wav');
+    // The browser MIME type/extension is a hint; ffmpeg detects the real container.
+    const normalizedPath = inputPath === decodedPath ? path.join(workDir, 'normalized.wav') : decodedPath;
+    await decodeRecording(bundledFfmpeg, inputPath, normalizedPath);
     let whisperEnv = process.env;
-    if (bundledFfmpeg) {
-      await symlink(bundledFfmpeg, path.join(workDir, 'ffmpeg'));
+    if (path.isAbsolute(bundledFfmpeg)) {
+      await exposeFfmpeg(bundledFfmpeg, workDir);
       whisperEnv = { ...process.env, PATH: `${workDir}${path.delimiter}${process.env.PATH || ''}` };
     }
-    await runProcess(
+    const diagnostics = await runProcess(
       whisperBin,
-      buildWhisperArgs(inputPath, model, language, workDir),
+      buildWhisperArgs(normalizedPath, model, language, workDir),
       resolveWhisperTimeout(),
       whisperEnv,
     );
     try {
-      return (await readFile(path.join(workDir, 'speech.txt'), 'utf8')).trim();
-    } catch {
-      throw new Error('Whisper 未生成转写结果，请检查本机 ffmpeg 配置');
+      return (await readFile(path.join(workDir, `${path.parse(normalizedPath).name}.txt`), 'utf8')).trim();
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+      // Whisper catches per-file errors and can exit 0 without writing a result.
+      const detail = (diagnostics.stdout + '\n' + diagnostics.stderr).split(/\r?\n/)
+        .filter((line) => line.trim()).slice(-3).join(' ').replaceAll(workDir, '[录音临时目录]').slice(-800);
+      throw new Error(`Whisper 未生成转写结果${detail ? `：${detail}` : '，请查看电脑上的 Whisper 安装配置'}`);
     }
   } finally {
     await rm(workDir, { recursive: true, force: true });
@@ -389,6 +426,7 @@ async function localCreateJobHandler(req, res) {
     return res.status(400).json({ error: '工作目录不存在' });
   }
   const job = createJob(prompt, cwd);
+  job.provider = normalizeAgentProvider(req.body?.agentProvider ?? req.body?.provider, job.provider);
   jobs.set(job.id, job);
   launch(job, prompt);
   res.status(201).json({ id: job.id });
@@ -398,7 +436,7 @@ function getJobHandler(req, res) {
   const job = jobs.get(req.params.id);
   if (!job) return res.status(404).json({ error: '任务不存在' });
   const { process: _process, listeners: _listeners, remote: _remote, ...safeJob } = job;
-  res.json(safeJob);
+  res.json({ ...safeJob, agentProvider: job.provider });
 }
 
 function eventsHandler(req, res) {
@@ -444,7 +482,10 @@ app.get('/api/health', async (req, res) => {
   const device = local ? null : await authenticatedDevice(req);
   res.json({
     ok: true,
-    agent: 'Codex CLI',
+    agent: defaultAgentLabel,
+    defaultProvider,
+    providers: availableProviders(),
+    publicUrl: process.env.PANEL_PUBLIC_URL || '',
     mode: 'local',
     name: agentName,
     pairingRequired: pairingRequired && !local,
@@ -529,7 +570,7 @@ app.post('/api/workspaces', async (req, res) => {
 app.post('/api/connections/test', async (req, res) => {
   try {
     const remote = parseRemoteConnection(req.body?.connection);
-    if (!remote) return res.json({ ok: true, mode: 'local', name: agentName, agent: 'Codex CLI' });
+    if (!remote) return res.json({ ok: true, mode: 'local', name: agentName, agent: defaultAgentLabel, defaultProvider, providers: availableProviders() });
     const health = await remoteJson(remote, '/bridge/health', {}, 6000);
     res.json({ ok: true, mode: 'remote', name: health.name || 'Remote Agent', agent: health.agent || 'Codex CLI' });
   } catch (error) {
@@ -559,7 +600,7 @@ app.post('/api/jobs', async (req, res) => {
     const cwd = String(req.body?.cwd || '').trim();
     if (!cwd) return res.status(400).json({ error: '请输入远程工作目录' });
     const payload = await remoteJson(remote, '/bridge/jobs', {
-      method: 'POST', body: JSON.stringify({ prompt, cwd }),
+      method: 'POST', body: JSON.stringify({ prompt, cwd, agentProvider: req.body?.agentProvider ?? req.body?.provider }),
     }, 30000);
     const job = createJob(prompt, cwd);
     job.remote = { ...remote, id: payload.id };
@@ -616,7 +657,7 @@ app.use((req, res, next) => {
   res.sendFile(path.join(appRoot, 'dist', 'index.html'));
 });
 
-app.listen(port, '127.0.0.1', () => console.log(`Vibe Panel API: http://127.0.0.1:${port}`));
+const apiServer = app.listen(port, '127.0.0.1', () => console.log(`Vibe Panel API: http://127.0.0.1:${apiServer.address().port}`));
 
 function tokenMatches(candidate) {
   const expected = Buffer.from(bridgeToken);
@@ -632,7 +673,7 @@ if (bridgeToken) {
     if (!tokenMatches(authorization.replace(/^Bearer\s+/i, ''))) return res.status(401).json({ error: '远程配对令牌无效' });
     next();
   });
-  bridge.get('/bridge/health', (_req, res) => res.json({ ok: true, name: agentName, agent: 'Codex CLI' }));
+  bridge.get('/bridge/health', (_req, res) => res.json({ ok: true, name: agentName, agent: defaultAgentLabel, defaultProvider }));
   bridge.post('/bridge/workspaces', localWorkspaceHandler);
   bridge.post('/bridge/captures', localCaptureHandler);
   bridge.post('/bridge/jobs', localCreateJobHandler);
