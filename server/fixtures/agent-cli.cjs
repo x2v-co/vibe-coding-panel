@@ -16,3 +16,4 @@ if (args.includes('auth-failure')) {
   emit({ type: 'item.completed', item: { type: 'agent_message', text: result } });
   emit({ type: 'turn.completed' });
 }
+if (args.includes('wait-for-stop')) setInterval(() => {}, 1000);

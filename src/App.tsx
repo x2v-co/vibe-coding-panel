@@ -18,10 +18,11 @@ type ConnectionState = 'online' | 'checking' | 'offline' | 'unknown';
 type AgentProviderId = 'codex' | 'claude';
 type AgentConnection = { mode: ConnectionMode; url: string; token: string };
 type AgentProviderInfo = { id: AgentProviderId; label: string; available: boolean; authenticated: boolean; version?: string };
-type Activity = { id: number; at: number; type: string; text?: string; status?: string };
+type Activity = { id: number; revision?: number; at: number; type: string; text?: string; status?: string };
 type SavedJob = {
   id: string; prompt: string; cwd: string; status: JobStatus; result?: string;
   agentProvider?: AgentProviderId;
+  revision?: number;
   createdAt: number; startedAt?: number | null; finishedAt?: number | null; events?: Activity[];
 };
 type WorkspaceDirectory = { name: string; path: string };
@@ -183,7 +184,7 @@ function PanelApp() {
   const [knobIndex, setKnobIndex] = useState<number | null>(null);
   const [microNavigation, setMicroNavigation] = useState<string[]>([]);
   const [microNavigationIndex, setMicroNavigationIndex] = useState(-1);
-  const [history, setHistory] = useState<SavedJob[]>(readHistory);
+  const [history, setHistory] = useState<SavedJob[]>(() => readConnection().mode === 'demo' ? readHistory() : []);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -216,6 +217,16 @@ function PanelApp() {
   const microReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const knobHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const knobHeldRef = useRef(false);
+  const selectedJobRef = useRef<string | null>(null);
+  const jobRevisionRef = useRef(0);
+  const jobMutationRef = useRef(0);
+
+  function selectJob(id: string | null) {
+    selectedJobRef.current = id;
+    jobRevisionRef.current = 0;
+    jobMutationRef.current += 1;
+    setJobId(id);
+  }
 
   const busy = status === 'queued' || status === 'running';
   const voiceBusy = isPreparingVoice || isListening || isFinalizingVoice || isTranscribing;
@@ -235,6 +246,8 @@ function PanelApp() {
     ...(currentMicroJob ? [currentMicroJob] : []),
     ...history.filter((job) => job.id !== jobId),
   ].sort((a, b) => (b.createdAt - a.createdAt) || a.id.localeCompare(b.id)).slice(0, 6);
+  const runningTaskCount = history.filter((job) => job.status === 'running' || job.status === 'queued').length;
+  const completedTaskCount = history.filter((job) => job.status === 'completed').length;
   const activeMicroKey = microKeys.find((key) => key.id === editingMicroKey) || null;
   const connectionPayload = connection.mode === 'remote' ? connection : { mode: 'local' as const };
   const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
@@ -458,6 +471,47 @@ function PanelApp() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Discover tasks from other paired browsers, even when our selected task is
+  // finished. Selection and drafts stay local; task state comes from Connector.
+  useEffect(() => {
+    if (!authReady || connection.mode === 'demo') return;
+    let cancelled = false;
+    let pending = false;
+    const controller = new AbortController();
+    const sync = async () => {
+      if (pending || document.hidden) return;
+      pending = true;
+      try {
+        const response = await fetch('/api/jobs', { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]), cache: 'no-store' });
+        if (!response.ok) return;
+        const payload = await response.json() as { jobs?: SavedJob[] };
+        if (cancelled || !Array.isArray(payload.jobs)) return;
+        // Replace browser history with this Connector's list. Do not mix task
+        // records from another computer or demo into a newly paired session.
+        setHistory(payload.jobs);
+        const selected = selectedJobRef.current && payload.jobs.find((job) => job.id === selectedJobRef.current);
+        if (selected && selected.revision !== undefined && selected.revision >= jobRevisionRef.current) {
+          jobRevisionRef.current = selected.revision;
+          setStatus(selected.status);
+          if (selected.startedAt) setStartedAt(selected.startedAt);
+          if (['completed', 'failed', 'stopped'].includes(selected.status)) void refreshJob(selected.id);
+        }
+      } catch { /* Keep the last list during a temporary disconnect. */ }
+      finally { pending = false; }
+    };
+    void sync();
+    const timer = window.setInterval(() => { void sync(); }, 2000);
+    window.addEventListener('focus', sync);
+    document.addEventListener('visibilitychange', sync);
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearInterval(timer);
+      window.removeEventListener('focus', sync);
+      document.removeEventListener('visibilitychange', sync);
+    };
+  }, [authReady, connection.mode]);
+
   useEffect(() => {
     if (!authReady) return;
     if (connection.mode === 'demo') {
@@ -506,6 +560,9 @@ function PanelApp() {
     const stream = new EventSource(`/api/jobs/${jobId}/events`);
     stream.onmessage = (message) => {
       const event = JSON.parse(message.data) as Activity;
+      if (selectedJobRef.current !== jobId) return;
+      if (event.revision && event.revision < jobRevisionRef.current) return;
+      if (event.revision) jobRevisionRef.current = event.revision;
       setActivity((items) => items.some((item) => item.id === event.id) ? items : [...items, event]);
       if (event.type === 'message' && event.text) setResult(event.text);
       if (event.type === 'status' && event.status) {
@@ -523,12 +580,24 @@ function PanelApp() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId, streamVersion, busy, isRecoveringJob, connection.mode]);
 
-  // Polling keeps progress visible when a mobile network or reverse proxy drops SSE.
+  // Finished tasks can be resumed on another device. Keep checking them too.
   useEffect(() => {
-    if (!jobId || !busy || isRecoveringJob || connection.mode === 'demo') return;
-    const timer = window.setInterval(() => { void refreshJob(jobId); }, 2000);
-    return () => window.clearInterval(timer);
-  // refreshJob is stable for the lifetime of this component.
+    if (!jobId || isRecoveringJob || connection.mode === 'demo') return;
+    let pending = false;
+    const sync = async () => {
+      if (pending || document.hidden) return;
+      pending = true;
+      try { await refreshJob(jobId); } finally { pending = false; }
+    };
+    void sync();
+    const timer = window.setInterval(() => { void sync(); }, 2000);
+    window.addEventListener('focus', sync);
+    document.addEventListener('visibilitychange', sync);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', sync);
+      document.removeEventListener('visibilitychange', sync);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId, busy, isRecoveringJob, connection.mode, streamVersion]);
 
@@ -538,20 +607,24 @@ function PanelApp() {
   }, [elapsed]);
 
   async function refreshJob(id: string) {
+    const mutation = jobMutationRef.current;
     try {
-      const response = await fetch(`/api/jobs/${id}`);
+      const response = await fetch(`/api/jobs/${id}`, { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+      if (selectedJobRef.current !== id || jobMutationRef.current !== mutation) return;
       if (response.status === 404) {
         if (localStorage.getItem(ACTIVE_JOB_KEY) === id) localStorage.removeItem(ACTIVE_JOB_KEY);
         return;
       }
       if (!response.ok) return;
       const job = await response.json() as SavedJob;
+      if (selectedJobRef.current !== id || jobMutationRef.current !== mutation) return;
+      if (job.revision !== undefined && job.revision < jobRevisionRef.current) return;
+      jobRevisionRef.current = job.revision || 0;
       setError((current) => current === '实时连接中断，正在自动恢复进度' ? '' : current);
       setStatus(job.status);
       setActivity(Array.isArray(job.events) ? job.events : []);
       setResult(job.result || '');
       if (job.startedAt) setStartedAt(job.startedAt);
-      if (['completed', 'failed', 'stopped'].includes(job.status)) storeJobInHistory(job);
     } catch { /* Connection errors are shown by the event stream. */ }
   }
 
@@ -574,10 +647,10 @@ function PanelApp() {
     setResult(job.result || '');
     setStartedAt(jobStartedAt);
     setElapsed(Math.max(0, (job.finishedAt || Date.now()) - jobStartedAt));
-    setJobId(job.id);
+    selectJob(job.id);
+    jobRevisionRef.current = job.revision || 0;
     localStorage.setItem(ACTIVE_JOB_KEY, job.id);
     localStorage.setItem('vibe-panel-cwd', job.cwd);
-    if (['completed', 'failed', 'stopped'].includes(job.status)) storeJobInHistory(job);
   }
 
   function buildCommand() {
@@ -616,7 +689,7 @@ function PanelApp() {
     const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 
     setError(''); setActivity([]); setResult(''); setStatus('queued'); setStartedAt(createdAt);
-    setTaskTitle(title); setPrompt(''); setCapturePath(''); setCapturePreview(''); setJobId(id);
+    setTaskTitle(title); setPrompt(''); setCapturePath(''); setCapturePreview(''); selectJob(id);
     await wait(450);
     if (demoRunRef.current !== runId) return;
     setStatus('running');
@@ -638,6 +711,7 @@ function PanelApp() {
   }
 
   async function submit(command: string, title = prompt.trim() || '分析图片') {
+    selectJob(null);
     setError(''); setActivity([]); setResult(''); setStatus('queued'); setStartedAt(Date.now());
     localStorage.setItem('vibe-panel-cwd', cwd);
     try {
@@ -648,7 +722,7 @@ function PanelApp() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || '任务启动失败');
       setTaskTitle(title);
-      setPrompt(''); setCapturePath(''); setCapturePreview(''); setJobId(payload.id);
+      setPrompt(''); setCapturePath(''); setCapturePreview(''); selectJob(payload.id);
       localStorage.setItem(ACTIVE_JOB_KEY, payload.id);
     } catch (reason) {
       setStatus('failed');
@@ -659,6 +733,7 @@ function PanelApp() {
 
   async function followUp(command: string) {
     if (!jobId) return;
+    jobMutationRef.current += 1;
     setError(''); setStatus('queued'); setStartedAt(Date.now());
     try {
       const response = await fetch(`/api/jobs/${jobId}/follow-up`, {
@@ -693,7 +768,7 @@ function PanelApp() {
     voiceStartPendingRef.current = false;
     stopListening(false);
     setIsPreparingVoice(false); setIsTranscribing(false); setCanImportRecording(false);
-    setPrompt(''); setTaskTitle(''); setJobId(null); setStreamVersion(0); setStatus('idle');
+    setPrompt(''); setTaskTitle(''); selectJob(null); setStreamVersion(0); setStatus('idle');
     setActivity([]); setResult(''); setError(''); setCapturePath(''); setCapturePreview('');
     setStartedAt(null); setElapsed(0);
     localStorage.removeItem(ACTIVE_JOB_KEY);
@@ -924,7 +999,7 @@ function PanelApp() {
     setCwd(nextWorkspace);
     localStorage.setItem('vibe-panel-cwd', nextWorkspace);
     if (jobId) {
-      setJobId(null); setStreamVersion(0); setTaskTitle(''); setStatus('idle');
+      selectJob(null); setStreamVersion(0); setTaskTitle(''); setStatus('idle');
       setActivity([]); setResult(''); setStartedAt(null);
       localStorage.removeItem(ACTIVE_JOB_KEY);
     }
@@ -1288,7 +1363,7 @@ function PanelApp() {
                 {layout === 'hardware-micro' && result && !busy && <textarea id="command" className="micro-followup" ref={promptRef} aria-label="继续当前任务" rows={2} value={prompt} maxLength={3000} placeholder={isListening ? '正在录音…' : isTranscribing ? '正在转写…' : '继续当前任务…'} onChange={(event) => setPrompt(event.target.value)} />}
                 <div className="activity-strip">{recentActivity.length ? recentActivity.map((item) => <div key={item.id}><span>{item.type === 'tool' ? 'CMD' : item.type === 'status' ? 'SYS' : 'AI'}</span><p>{item.text}</p></div>) : <div><span>SYS</span><p>{capturePath ? '图片上下文已准备' : '等待输入'}</p></div>}</div>
               </div>
-              <div className="display-side"><div className="counter"><strong>{busy ? '1' : '0'}</strong><span>运行中</span></div><div className="counter"><strong>{history.length}</strong><span>已完成</span></div><button type="button" className="workspace-readout" onClick={openWorkspacePicker} disabled={busy} title="切换 Workspace"><Folder size={15} /><span>{connection.mode === 'remote' ? 'REMOTE WORKSPACE' : 'WORKSPACE'} / 点击切换</span><strong>{cwd.split(/[\\/]/).filter(Boolean).pop() || cwd || '/'}</strong></button><div className={`signal-bars ${connectionState}`} aria-label={`Agent ${connectionState === 'online' ? '连接正常' : '等待连接'}`}><i /><i /><i /><i /></div></div>
+              <div className="display-side"><div className="counter"><strong>{Math.max(runningTaskCount, busy ? 1 : 0)}</strong><span>运行中</span></div><div className="counter"><strong>{completedTaskCount}</strong><span>已完成</span></div><button type="button" className="workspace-readout" onClick={openWorkspacePicker} disabled={busy} title="切换 Workspace"><Folder size={15} /><span>{connection.mode === 'remote' ? 'REMOTE WORKSPACE' : 'WORKSPACE'} / 点击切换</span><strong>{cwd.split(/[\\/]/).filter(Boolean).pop() || cwd || '/'}</strong></button><div className={`signal-bars ${connectionState}`} aria-label={`Agent ${connectionState === 'online' ? '连接正常' : '等待连接'}`}><i /><i /><i /><i /></div></div>
             </div></div>
             <input ref={imageInputRef} hidden type="file" accept="image/*" tabIndex={-1} aria-hidden="true" onChange={(event) => void addImageContext(event)} />
             <input ref={audioInputRef} hidden type="file" accept="audio/*" capture="user" tabIndex={-1} aria-hidden="true" onChange={(event) => void importAudioRecording(event)} />
@@ -1318,7 +1393,7 @@ function PanelApp() {
         <div className={`onboarding-foot ${onboardingReady ? 'ready' : ''}`}>{onboardingReady ? '可以开始创建任务' : '连接完成后这里会显示“可以开始创建任务”'}</div>
       </section></div>}
 
-      {showHistory && <div className="drawer-backdrop" onMouseDown={() => setShowHistory(false)}><aside className="history-drawer" onMouseDown={(event) => event.stopPropagation()}><div className="drawer-heading"><div><span>HISTORY</span><h2>任务记录</h2></div><button className="icon-button" onClick={() => setShowHistory(false)} aria-label="关闭"><X size={20} /></button></div><div className="history-list">{history.length === 0 ? <div className="history-empty"><History size={26} /><p>还没有完成的任务</p></div> : history.map((job) => <button key={job.id} onClick={() => loadJob(job)} className="history-item"><span className={`history-status ${job.status}`}><Check size={13} /></span><span className="history-copy"><strong>{job.prompt}</strong><small>{job.cwd}<br />{new Date(job.createdAt).toLocaleString('zh-CN')}</small></span></button>)}</div></aside></div>}
+      {showHistory && <div className="drawer-backdrop" onMouseDown={() => setShowHistory(false)}><aside className="history-drawer" onMouseDown={(event) => event.stopPropagation()}><div className="drawer-heading"><div><span>{connection.mode === 'demo' ? 'DEMO HISTORY' : 'SHARED TASKS'}</span><h2>任务记录</h2></div><button className="icon-button" onClick={() => setShowHistory(false)} aria-label="关闭"><X size={20} /></button></div><div className="history-list">{history.length === 0 ? <div className="history-empty"><History size={26} /><p>还没有任务</p></div> : history.map((job) => <button key={job.id} onClick={() => loadJob(job)} className="history-item"><span className={`history-status ${job.status}`}>{job.status === 'running' || job.status === 'queued' ? <RotateCw size={13} /> : job.status === 'completed' ? <Check size={13} /> : <CircleStop size={13} />}</span><span className="history-copy"><strong>{job.prompt}</strong><small>{statusLabels[job.status]} · {job.agentProvider === 'claude' ? 'Claude Code' : 'Codex'}<br />{job.cwd}<br />{new Date(job.createdAt).toLocaleString('zh-CN')}</small></span></button>)}</div></aside></div>}
 
       {showWorkspacePicker && <div className="workspace-backdrop" onMouseDown={() => setShowWorkspacePicker(false)}><section className="workspace-picker" role="dialog" aria-modal="true" aria-labelledby="workspace-picker-title" onMouseDown={(event) => event.stopPropagation()}><div className="workspace-picker-heading"><div><span>AGENT FILESYSTEM</span><h2 id="workspace-picker-title">切换 Workspace</h2></div><button type="button" onClick={() => setShowWorkspacePicker(false)} aria-label="关闭目录选择器"><X size={19} /></button></div><form className="workspace-path-form" onSubmit={(event) => { event.preventDefault(); void browseWorkspace(workspacePath.trim()); }}><input aria-label="目录路径" value={workspacePath} onChange={(event) => setWorkspacePath(event.target.value)} spellCheck={false} /><button type="submit" disabled={workspaceLoading || !workspacePath.trim()} aria-label="打开输入的目录" title="打开目录">{workspaceLoading ? <RotateCw className="spin" size={17} /> : <ChevronRight size={17} />}</button></form><div className="workspace-browser-toolbar"><button type="button" onClick={() => workspaceParent && void browseWorkspace(workspaceParent)} disabled={!workspaceParent || workspaceLoading}><ArrowUp size={16} />上一级</button><span>{connection.mode === 'remote' ? 'REMOTE' : 'LOCAL'}</span></div><div className="workspace-directory-list">{workspaceError ? <div className="workspace-browser-empty error"><Terminal size={20} /><p>{workspaceError}</p></div> : workspaceLoading ? <div className="workspace-browser-empty"><RotateCw className="spin" size={21} /><p>正在读取目录</p></div> : workspaceDirectories.length ? workspaceDirectories.map((directory) => <button type="button" key={directory.path} onClick={() => void browseWorkspace(directory.path)}><FolderOpen size={17} /><span>{directory.name}</span><ChevronRight size={15} /></button>) : <div className="workspace-browser-empty"><Folder size={21} /><p>这个目录没有子目录</p></div>}</div><div className="workspace-picker-actions"><button type="button" onClick={() => setShowWorkspacePicker(false)}>取消</button><button type="button" className="select-workspace" onClick={selectWorkspace} disabled={workspaceLoading || Boolean(workspaceError) || !workspaceResolvedPath || workspacePath.trim() !== workspaceResolvedPath}><Check size={16} />选择当前目录</button></div></section></div>}
 
