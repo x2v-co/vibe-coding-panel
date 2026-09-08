@@ -425,6 +425,9 @@ main { padding: 28px 0 76px; }
 }
 .command-screen textarea::placeholder { color: #586058; }
 .command-screen textarea:focus { border-bottom-color: var(--green); }
+.native-selected-session { display: flex; flex-direction: column; gap: 4px; margin: 8px 0 12px; padding: 8px 10px; border-left: 2px solid var(--green); background: rgba(92, 172, 106, .08); }
+.native-selected-session strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.native-selected-session small { color: var(--muted); font: 10px/1.4 'DM Mono', monospace; }
 
 .waveform { height: 40px; margin-bottom: 10px; display: flex; align-items: center; gap: 5px; overflow: hidden; }
 .waveform i { width: 3px; height: 8px; flex: 0 0 3px; background: var(--green); animation: voice-wave 900ms ease-in-out infinite alternate; }

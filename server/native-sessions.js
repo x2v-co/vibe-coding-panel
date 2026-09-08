@@ -5,6 +5,7 @@ import { createInterface } from 'node:readline';
 import spawn from 'cross-spawn';
 
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+const codexId = /^[a-z0-9][a-z0-9-]{20,}$/i;
 const text = (v) => typeof v === 'string' ? v : Array.isArray(v) ? v.map((x) => x?.text || '').join('\n') : '';
 const title = (v) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, 120);
 const time = (v) => typeof v === 'number' ? (v < 1e12 ? v * 1000 : v) : Date.parse(v || '') || 0;
@@ -98,6 +99,17 @@ export class NativeSessions {
     }
     return false;
   }
+  async release(provider, id) {
+    if (provider !== 'codex') throw error('当前 Agent 不支持远程释放终端', 409);
+    const lock = path.join(this.env.CODEX_HOME || path.join(homedir(), '.codex'), 'thread-writer-locks', `${id}.lock`);
+    return new Promise((resolve) => {
+      const child = spawn('lsof', ['-t', '--', lock], { stdio: ['ignore', 'pipe', 'ignore'] }); let output = '';
+      child.stdout.on('data', (b) => { output += b; });
+      child.on('error', () => resolve(false));
+      child.on('close', () => { const pids = output.trim().split(/\s+/).map(Number).filter((pid) => Number.isInteger(pid) && pid > 1); let released = false; for (const pid of pids) { try { process.kill(pid, 'SIGINT'); released = true; } catch {} } resolve(released); });
+      setTimeout(() => { child.kill(); resolve(false); }, 3000);
+    });
+  }
   async claudeFiles() {
     const root = path.join(this.claudeRoot, 'projects');
     let dirs;
@@ -158,7 +170,7 @@ export class NativeSessions {
   }
   async read(provider, workspace, id) {
     const cwd = await workspacePath(workspace);
-    if (!uuid.test(id)) throw error('无效的会话 ID');
+    if (provider === 'codex' ? !codexId.test(id) : !uuid.test(id)) throw error('无效的会话 ID');
     if (provider === 'codex') {
       const { thread: t } = await this.codex.call('thread/read', { threadId: id, includeTurns: true });
       if (await workspacePath(t.cwd) !== cwd) throw error('会话不属于当前 Workspace', 404);

@@ -12,6 +12,7 @@ import { resolveFfmpeg } from './ffmpeg.js';
 import { decodeRecording } from './audio-decode.js';
 import { agentProviders, defaultAgentProvider, probeAgentProviders, buildAgentInvocation, normalizeAgentProvider, parseAgentLine } from './agent-providers.js';
 import { NativeSessions } from './native-sessions.js';
+import { CodexRuntime } from './codex-runtime.js';
 
 const app = express();
 const port = Number(process.env.PANEL_API_PORT || 8787);
@@ -39,8 +40,9 @@ const pairingStore = new PairingStore({
 });
 const pairingAttempts = new Map();
 const nativeSessions = new NativeSessions();
+const codexRuntime = new CodexRuntime();
 const nativeReservations = new Set();
-process.once('exit', () => nativeSessions.close());
+process.once('exit', () => { nativeSessions.close(); codexRuntime.close(); });
 
 await pairingStore.init();
 
@@ -590,6 +592,24 @@ app.get('/api/native-sessions/:provider/:id', async (req, res) => {
   }
 });
 
+app.post('/api/native-sessions/:provider/:id/release', async (req, res) => {
+  try { res.json({ released: await nativeSessions.release(req.params.provider, req.params.id) }); }
+  catch (error) { res.status(error.status || 502).json({ error: error.message || '无法释放终端' }); }
+});
+
+function launchManagedCodex(job, prompt) {
+  job.status = 'running'; job.startedAt = Date.now(); job.result = '';
+  push(job, { type: 'status', status: 'running', text: 'Codex 原生会话已接管' });
+  const unsubscribe = codexRuntime.subscribe(job.threadId, (message) => {
+    const p = message.params || {};
+    const delta = p.delta || p.text || p.item?.text;
+    if (message.method?.includes('agentMessage/delta') && delta) { job.result += String(delta); push(job, { type: 'message', text: String(delta), delta: true }); }
+    if (message.method?.includes('item/completed') && p.item?.type === 'agentMessage' && p.item.text) { job.result = p.item.text; push(job, { type: 'message', text: p.item.text }); }
+    if (message.method?.includes('turn/completed')) { job.status = 'completed'; job.finishedAt = Date.now(); push(job, { type: 'status', status: 'completed', text: '任务完成' }); unsubscribe(); }
+  });
+  codexRuntime.turn(job.threadId, job.cwd, prompt).catch((error) => { job.status = 'failed'; job.finishedAt = Date.now(); job.agentError = error.message; push(job, { type: 'status', status: 'failed', text: error.message }); unsubscribe(); });
+}
+
 app.post('/api/native-sessions/:provider/:id/resume', async (req, res) => {
   const { provider, id } = req.params;
   const key = `${provider}:${id}`;
@@ -608,6 +628,9 @@ app.post('/api/native-sessions/:provider/:id/resume', async (req, res) => {
     job.threadId = id;
     job.nativeSession = { id, provider };
     jobs.set(job.id, job);
+    // File-backed handoff works with every supported Codex CLI. The native
+    // transcript reader reloads the JSONL after each turn; never run a second
+    // writer while the user's terminal owns the session.
     launch(job, prompt, true);
     res.status(201).json({ id: job.id });
   } catch (error) {
