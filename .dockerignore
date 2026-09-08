@@ -1,0 +1,9 @@
+.git
+.github
+.env
+.vibe-panel
+.venv
+dist
+node_modules
+npm-debug.log*
+docs/screenshots
