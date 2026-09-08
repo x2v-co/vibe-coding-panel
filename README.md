@@ -1,124 +1,137 @@
 # Vibe Coding Panel
 
-Vibe Coding Panel is a voice-first control surface for coding agents. It turns the small set of actions people use most often into a tactile, mobile-friendly panel: speak, add visual context, choose a workspace, run, stop, and inspect the result.
+[简体中文](README.zh-CN.md) · [Website](https://vibe.tooluse.app/) · [Try the panel](https://vibe.tooluse.app/app)
 
-The app is designed for a simple boundary: the panel is the client, while the coding agent runs on the computer you control. It supports a no-login demo mode, a local Codex CLI agent, and an advanced remote Bridge.
+Control your computer's Codex or Claude Code from your phone. Speak a request, choose a workspace, press a large key, and watch the result. No hardware required.
+
+No Vibe Panel account, personal server, Tailscale, or tunnel setup is needed. The Connector runs on your computer and connects to the shared Relay at `https://vibe.tooluse.app`. Your agent keeps using its existing login and model provider.
+
+## Install with your Agent
+
+Paste this into Codex, Claude Code, or another coding agent **running on your computer**:
+
+```text
+Install and start Vibe Coding Panel on this computer.
+Repository: https://github.com/x2v-co/vibe-coding-panel
+Read docs/install-for-agents.md in the downloaded checkout and follow it.
+Reuse my existing agent login and model/provider settings. Set up local
+Whisper voice input if possible; report separately if it is unavailable.
+Verify the Connector is online, then show me the phone pairing QR/link
+and how to stop and restart it. Leave account login and phone microphone
+permission to me. Do not report success until you have checked the service.
+```
+
+[Agent installation guide](docs/install-for-agents.md) covers platform checks, commands, existing installations, verification, and handoff.
+
+## Install yourself
+
+**Before you start:** use macOS, Windows 10/11, or Linux with [Node.js 24 LTS](https://nodejs.org/en/download). Install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/) or [Claude Code](https://code.claude.com/docs/en/setup). Send a short text request in that CLI first to confirm it works.
+
+1. **Download and extract** the [project ZIP](https://github.com/x2v-co/vibe-coding-panel/archive/refs/heads/main.zip). Open the extracted folder, not the ZIP.
+2. **Start on your computer** using the launcher below. It installs Node dependencies on first launch.
+3. **Scan the terminal QR code** with your phone camera. Open the link in Safari, Chrome, or Edge, then choose your Agent and workspace. Try a text request first.
+
+| Computer | Start |
+| --- | --- |
+| macOS | Double-click `Vibe Panel.command` |
+| Windows | Double-click `Vibe Panel.bat` |
+| Linux | In the extracted folder, run `npm install`, then `npm run connect` |
+
+Keep the terminal open and the computer awake. The phone can use a different network. Pairing codes expire after 10 minutes and can be used once; an already paired browser normally stays authorized.
+
+Prefer a terminal? With Git installed, run:
+
+```bash
+git clone https://github.com/x2v-co/vibe-coding-panel.git
+cd vibe-coding-panel
+npm install
+npm run connect
+```
+
+If the downloaded copy has no launcher or reports `Missing script: "connect"`, it is an older package. See [troubleshooting](#troubleshooting); do not create an empty replacement script.
+
+## Enable voice input
+
+Text input works without Python. For voice, install [Python 3.12](https://www.python.org/downloads/) and run the following **inside the project folder**, once.
+
+macOS / Linux:
+
+```bash
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -U openai-whisper imageio-ffmpeg
+```
+
+Windows PowerShell:
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -U openai-whisper imageio-ffmpeg
+```
+
+Restart the Connector. It detects this environment without activation; the log should show both `Whisper:` and `ffmpeg:` paths. No separate system ffmpeg installation is required. Linux may need its distribution's Python venv package.
+
+Whisper downloads the `small` model (about 461 MB) on first transcription, so the first request takes longer. On the phone, allow this site's microphone, tap **VOICE INPUT**, speak, then tap again to finish. The transcript fills the draft; press **SEND** to run it. If browser recording fails, use the system audio upload option.
+
+## Choose an Agent
+
+Select Codex or Claude Code in the phone panel. To remember a default for double-click launches, create `.vibe-panel/connector.json` in the project:
+
+```json
+{"agentProvider":"claude"}
+```
+
+Use `codex` to switch back. This file is ignored by Git. `PANEL_AGENT_PROVIDER`, if set, takes precedence. Panel uses the CLI's existing credentials and provider configuration; CLI authentication failures must be resolved there.
 
 ## Runtime screenshots
 
-These screenshots are captured from the running Vibe Panel app in demo-ready local mode.
-
 <p align="center">
-  <img src="docs/screenshots/app-desktop.png" alt="Vibe Panel desktop runtime" width="78%" />
-</p>
-<p align="center">
-  <img src="docs/screenshots/app-mobile.png" alt="Vibe Panel mobile runtime" width="28%" />
+  <img src="docs/screenshots/runtime/panel-desktop.png" alt="Vibe Panel desktop runtime with Micro layout" width="72%" />
+  <img src="docs/screenshots/runtime/panel-mobile.png" alt="Vibe Panel mobile runtime" width="24%" />
 </p>
 
-## What is included
+## Features and limits
 
-- No-login demo mode that simulates a task without reading files or running commands.
-- Local Codex CLI execution with live progress, follow-up tasks, history, and refresh recovery.
-- Voice input sent to local Whisper (`small` by default), with a system-recording fallback.
-- Image upload on every device; desktop screen capture where the browser supports it.
-- Directory browser for local or remote workspaces.
-- Eight selectable key layouts plus four independent color themes.
-- Installable HTTPS PWA for phone and desktop.
-- One-time pairing codes, expiring after 10 minutes, persistent device authorization, and device revocation.
+- Large controls, mobile focus mode, text/voice input, image uploads, and workspace directory selection.
+- Codex and Claude Code tasks with live output, stop, follow-up, and browser history.
+- Eight key layouts, four color themes, and custom Micro key actions, labels, colors, and SVG icons.
+- Micro voice key: hold to talk and release to transcribe; double-tap within 350 ms to latch recording, then press again to stop.
+- Demo mode and installable HTTPS PWA. Demo mode does not execute real tasks.
+- One-time pairing and device revocation from local Settings.
 
-## Quick start
+Micro's native Fast mode, approval/decline, session fork, and plan mode are not implemented by the current CLI adapter. Those controls report their limits. Screen capture depends on desktop browser support; phones can upload images. Browser history does not guarantee session recovery after a Connector restart.
 
-Requirements: Node.js 20+, a working `codex` CLI for real tasks, and a completed Codex login on the computer that runs the agent.
+## Troubleshooting
+
+| Symptom | What to do |
+| --- | --- |
+| Launcher will not open on macOS | Open Terminal in the extracted folder and run `bash "Vibe Panel.command"`. |
+| `node` / `npm` not found | Install Node.js 24 LTS, close and reopen the terminal, then retry. |
+| `Missing script: "connect"` | Confirm the folder's `package.json` contains a `connect` script. Download a current Connector package; if the published copy still lacks it, report the packaging issue. |
+| No Agent ready / authorization error | Run `codex` or `claude` directly and confirm a real text request succeeds. Panel reuses that configuration. |
+| Phone says Connector offline | Keep the Connector running and the computer awake; wait for “电脑 Connector 已连接”, then scan its QR code. |
+| QR code expired | Restart the Connector to get a fresh code. Existing paired browsers do not need to pair again. |
+| Whisper or ffmpeg missing | Complete the voice setup above and restart. A Python virtual environment does not need activation. |
+| Voice changes are not visible | Finish any running task, restart the computer Connector, and reload the phone page. |
+
+## Privacy
+
+The Agent and Whisper run on your computer. With the default shared Relay, prompts, recordings, images, and results pass through that Relay in memory; the Relay implementation does not persist those payloads. This is **not end-to-end encryption**: trust the Relay operator, or [host your own](docs/relay-deployment.md). Your model provider still receives the data sent by your Agent.
+
+Browser history and preferences are stored locally. Device authorization hashes stay on the computer; pairing cookies authorize the phone. Revoke unrecognized devices in local Settings. See [SECURITY.md](SECURITY.md).
+
+## Advanced use and development
+
+For local-only use, Tailscale/Bridge, or environment variables, see [configuration](docs/configuration.md). Server operators can use the [Relay deployment guide](docs/relay-deployment.md). Normal users can use the shared Relay.
 
 ```bash
-npm install
 npm run dev
-```
-
-Open `http://localhost:5178`. Without a local agent, choose **演示** in Settings to try the panel immediately. For real tasks, choose **本机** and run the API on the same computer.
-
-Production mode serves the built PWA and API from one origin:
-
-```bash
-npm run build
-npm start
-```
-
-Open `http://127.0.0.1:8787` on the agent computer.
-
-## Use it from a phone
-
-The public Beta flow is intended to use an HTTPS reverse proxy or tunnel that you control. The included helper uses an ephemeral Cloudflare Tunnel:
-
-```bash
-npm run build
-npm run share
-```
-
-Install `cloudflared` first. The command prints an HTTPS URL. On the agent computer, open the local panel, open Settings, enter that HTTPS URL under **手机配对**, and generate a pairing code or QR code. Scan the QR code on the phone, or enter the one-time code. The code expires after 10 minutes and can only be used once.
-
-For a stable deployment, put the app behind your own HTTPS reverse proxy and set `PANEL_REQUIRE_PAIRING=1`. Do not expose the API or Bridge directly to the public Internet.
-
-After pairing, the phone receives an HttpOnly device cookie. From the local Settings panel you can see authorized devices and revoke any device immediately. Revocation invalidates that device's cookie.
-
-## Remote Agent Bridge
-
-The default local API listens only on loopback. To run the agent on another computer, start a Bridge there with a long random token:
-
-```bash
-PANEL_BRIDGE_HOST=0.0.0.0 \
-PANEL_BRIDGE_PORT=8788 \
-PANEL_BRIDGE_TOKEN='replace-with-a-long-random-token' \
-PANEL_AGENT_NAME='Studio Mac' \
-npm start
-```
-
-Use the advanced **远程** connection mode in Settings and provide the Bridge HTTPS address, token, and remote workspace. Tailscale or WireGuard is recommended for this advanced path. The public Beta pairing flow does not replace the Bridge token; it protects access to the panel itself.
-
-## Voice transcription
-
-The browser records one complete audio clip, then the computer running the app sends it to Whisper. The first `small` model download is about 461 MB.
-
-```bash
-PANEL_WHISPER_BIN=/path/to/whisper \
-PANEL_WHISPER_MODEL=small \
-PANEL_WHISPER_TIMEOUT_MS=180000 \
-npm start
-```
-
-Set `PANEL_FFMPEG_BIN` when ffmpeg is not available through Python `imageio_ffmpeg`. Audio is not uploaded to a Vibe Panel cloud service.
-
-## Configuration
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `PANEL_API_PORT` | `8787` | Local API and production web port |
-| `PANEL_REQUIRE_PAIRING` | unset | Require a paired device for non-loopback API requests |
-| `PANEL_DEVICE_STORE` | `~/.vibe-panel/devices.json` | Device authorization store; keep it private |
-| `PANEL_BRIDGE_HOST` | `127.0.0.1` | Remote Bridge bind address |
-| `PANEL_BRIDGE_PORT` | `8788` | Remote Bridge port |
-| `PANEL_BRIDGE_TOKEN` | unset | Enables and protects the Bridge |
-| `PANEL_AGENT_NAME` | machine hostname | Name shown in the panel |
-| `PANEL_WHISPER_BIN` | `whisper` | Whisper executable |
-| `PANEL_WHISPER_MODEL` | `small` | Whisper model |
-| `PANEL_WHISPER_TIMEOUT_MS` | `180000` | Transcription timeout |
-
-## Privacy and security
-
-Vibe Coding Panel has no hosted task backend. In local mode, prompts, recordings, images, and task output stay on the computer running the app. In remote mode, they travel to the Bridge you configure. The app stores task history and visual preferences in the browser's local storage; device authorization hashes are stored in the local device store and raw device tokens are never written to disk.
-
-An HTTPS tunnel or reverse proxy can observe traffic according to its own policy. Use a provider you trust, keep pairing enabled, rotate Bridge tokens, and revoke devices that you no longer recognize. This project is not affiliated with or endorsed by OpenAI or Codex.
-
-## Development
-
-```bash
 npm test
 npm run check
 npm run build
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and [docs/brand-led-release-route.md](docs/brand-led-release-route.md) for project boundaries and release context.
+Development: open the Vite URL printed in the terminal (normally `http://localhost:5178`). This is separate from the phone Connector flow.
 
-## License
+[Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Product/release context](docs/brand-led-release-route.md) · [MIT license](LICENSE)
 
-MIT. See [LICENSE](LICENSE).
+Not affiliated with or endorsed by OpenAI, Codex, Anthropic, or Claude Code.

@@ -14,17 +14,21 @@
     "dev": "concurrently -k -n api,web -c yellow,cyan \"node --watch server/index.js\" \"vite\"",
     "build": "npm run check && vite build",
     "start": "node server/index.js",
+    "connect": "node scripts/connect.mjs",
+    "connect:relay": "node scripts/connect-relay.mjs",
     "share": "node scripts/share.mjs",
     "check": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
     "test": "node --test server/*.test.js"
   },
   "dependencies": {
+    "cross-spawn": "^7.0.6",
     "@vitejs/plugin-react": "latest",
     "express": "latest",
     "lucide-react": "latest",
     "qrcode": "^1.5.4",
     "react": "latest",
     "react-dom": "latest",
+    "ws": "^8.18.0",
     "vite": "latest"
   },
   "devDependencies": {
