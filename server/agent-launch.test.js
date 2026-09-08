@@ -13,7 +13,7 @@ test('HTTP jobs use configured CLI, inherited credentials and workspace for run 
   await chmod(binary, 0o700);
   const child = spawn(process.execPath, ['server/index.js'], {
     cwd: new URL('..', import.meta.url),
-    env: { ...process.env, PANEL_API_PORT: '0', PANEL_BRIDGE_TOKEN: '', PANEL_REQUIRE_PAIRING: '', PANEL_DEVICE_STORE: path.join(dir, 'devices.json'), PANEL_CODEX_BIN: binary, PANEL_CLAUDE_BIN: binary, PANEL_AGENT_PROVIDER: 'codex', PANEL_TEST_CREDENTIAL: 'fixture-credential', CODEX_HOME: dir },
+    env: { ...process.env, PANEL_API_PORT: '0', PANEL_BRIDGE_TOKEN: '', PANEL_REQUIRE_PAIRING: '1', PANEL_DEVICE_STORE: path.join(dir, 'devices.json'), PANEL_CODEX_BIN: binary, PANEL_CLAUDE_BIN: binary, PANEL_AGENT_PROVIDER: 'codex', PANEL_TEST_CREDENTIAL: 'fixture-credential', CODEX_HOME: dir },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   try {
@@ -78,6 +78,56 @@ test('HTTP jobs use configured CLI, inherited credentials and workspace for run 
     job = await completed(claude.id);
     assert.equal(job.status, 'completed');
     assert.equal(JSON.parse(job.result).args.includes('--resume'), true);
+
+    // A separately paired phone discovers desktop tasks and can resume/stop
+    // them. Requests without a device cookie cannot enumerate those tasks.
+    const remoteHeaders = { 'x-forwarded-for': '192.0.2.50' };
+    assert.equal((await fetch(origin + '/api/jobs', { headers: remoteHeaders })).status, 401);
+    const pairResponse = await fetch(origin + '/api/pair', {
+      method: 'POST', headers: { ...remoteHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: pairing.code }),
+    });
+    assert.equal(pairResponse.status, 201);
+    const cookie = pairResponse.headers.get('set-cookie').split(';')[0];
+    const phone = async (route, body) => {
+      const response = await fetch(origin + route, {
+        method: body ? 'POST' : 'GET',
+        headers: { ...remoteHeaders, Cookie: cookie, 'Content-Type': 'application/json' },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+      assert.equal(response.ok, true);
+      return response.json();
+    };
+    assert.deepEqual(await phone('/api/jobs'), await request('/api/jobs'));
+    const summary = (await phone('/api/jobs')).jobs.find((item) => item.id === claude.id);
+    assert.equal(summary.agentProvider, 'claude');
+    assert.equal(summary.events, undefined, 'The shared list must not download all event logs');
+    assert.equal(summary.remote, undefined, 'The list must not expose bridge credentials');
+    const initialRevision = summary.revision;
+    await phone(`/api/jobs/${claude.id}/follow-up`, { prompt: 'wait-for-stop' });
+    let resumed;
+    for (let i = 0; i < 100; i++) {
+      resumed = await request(`/api/jobs/${claude.id}`);
+      if (resumed.events.some((event) => event.type === 'message')) break;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.equal(resumed.status, 'running');
+    assert.ok(resumed.revision > initialRevision, 'Revision must advance across follow-ups');
+    assert.equal((await request('/api/jobs')).jobs.find((item) => item.id === claude.id).status, 'running');
+    const conflict = await fetch(origin + `/api/jobs/${claude.id}/follow-up`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: 'duplicate' }),
+    });
+    assert.equal(conflict.status, 409);
+    await request(`/api/jobs/${claude.id}/stop`, {});
+    for (let i = 0; i < 100; i++) {
+      if ((await phone(`/api/jobs/${claude.id}`)).status === 'stopped') break;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.equal((await phone(`/api/jobs/${claude.id}`)).status, 'stopped');
+    const phoneJob = await phone('/api/jobs', { prompt: 'created-on-phone', cwd: dir, agentProvider: 'claude' });
+    await completed(phoneJob.id);
+    assert.deepEqual(await phone('/api/jobs'), await request('/api/jobs'));
+    assert.equal((await request('/api/jobs')).jobs[0].id, phoneJob.id);
   } finally {
     const exited = once(child, 'exit');
     child.kill('SIGTERM');

@@ -92,7 +92,8 @@ async function authenticatedDevice(req) {
 }
 
 function push(job, event) {
-  const entry = { id: ++job.sequence, at: Date.now(), ...event };
+  job.revision += 1;
+  const entry = { id: ++job.sequence, revision: job.revision, at: Date.now(), ...event };
   job.events.push(entry);
   if (job.events.length > 500) job.events.shift();
   for (const listener of job.listeners) listener(entry);
@@ -106,7 +107,7 @@ function shouldShowStderr(line) {
 function createJob(prompt, cwd) {
   return {
     id: randomUUID(), cwd, prompt, provider: defaultProvider, status: 'queued', threadId: null,
-    events: [], listeners: new Set(), sequence: 0, process: null, remote: null,
+    events: [], listeners: new Set(), sequence: 0, revision: 0, process: null, remote: null,
     createdAt: Date.now(), startedAt: null, finishedAt: null, result: '',
   };
 }
@@ -620,12 +621,14 @@ app.get('/api/jobs/:id/events', eventsHandler);
 app.get('/api/jobs', (req, res) => {
   const items = [...jobs.values()]
     .sort((a, b) => b.createdAt - a.createdAt)
-    .slice(0, 50)
-    .map(({ process: _process, listeners: _listeners, remote: _remote, ...job }) => ({
-      ...job,
-      events: job.events,
+    .filter((job, index) => index < 100 || !terminalStatuses.has(job.status))
+    .map((job) => ({
+      id: job.id, prompt: job.prompt, cwd: job.cwd, status: job.status,
+      createdAt: job.createdAt, startedAt: job.startedAt, finishedAt: job.finishedAt,
+      revision: job.revision,
       agentProvider: job.provider,
     }));
+  res.setHeader('Cache-Control', 'no-store');
   res.json({ jobs: items });
 });
 
