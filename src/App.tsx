@@ -458,6 +458,22 @@ function PanelApp() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Reconcile browser-local history with the Connector's shared job list so a
+  // phone and desktop browser show the same tasks after pairing.
+  useEffect(() => {
+    if (!authReady || connection.mode === 'demo') return;
+    void (async () => {
+      try {
+        const response = await fetch('/api/jobs');
+        if (!response.ok) return;
+        const payload = await response.json() as { jobs?: SavedJob[] };
+        for (const job of payload.jobs || []) {
+          if (['completed', 'failed', 'stopped'].includes(job.status)) storeJobInHistory(job);
+        }
+      } catch { /* best effort; live task state still syncs through SSE */ }
+    })();
+  }, [authReady, connection.mode]);
+
   useEffect(() => {
     if (!authReady) return;
     if (connection.mode === 'demo') {

@@ -615,6 +615,20 @@ app.post('/api/jobs', async (req, res) => {
 app.get('/api/jobs/:id', getJobHandler);
 app.get('/api/jobs/:id/events', eventsHandler);
 
+// Browsers on the same Connector share the server-side job list. This lets a
+// phone paired through Relay see tasks created in the desktop browser too.
+app.get('/api/jobs', (req, res) => {
+  const items = [...jobs.values()]
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, 50)
+    .map(({ process: _process, listeners: _listeners, remote: _remote, ...job }) => ({
+      ...job,
+      events: job.events,
+      agentProvider: job.provider,
+    }));
+  res.json({ jobs: items });
+});
+
 app.post('/api/jobs/:id/stop', async (req, res) => {
   const job = jobs.get(req.params.id);
   if (!job) return res.status(404).json({ error: '任务不存在' });
