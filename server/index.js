@@ -11,6 +11,7 @@ import { buildWhisperArgs, resolveWhisperModel, resolveWhisperTimeout } from './
 import { resolveFfmpeg } from './ffmpeg.js';
 import { decodeRecording } from './audio-decode.js';
 import { agentProviders, defaultAgentProvider, probeAgentProviders, buildAgentInvocation, normalizeAgentProvider, parseAgentLine } from './agent-providers.js';
+import { NativeSessions } from './native-sessions.js';
 
 const app = express();
 const port = Number(process.env.PANEL_API_PORT || 8787);
@@ -37,6 +38,9 @@ const pairingStore = new PairingStore({
   filePath: process.env.PANEL_DEVICE_STORE || path.join(homedir(), '.vibe-panel', 'devices.json'),
 });
 const pairingAttempts = new Map();
+const nativeSessions = new NativeSessions();
+const nativeReservations = new Set();
+process.once('exit', () => nativeSessions.close());
 
 await pairingStore.init();
 
@@ -465,13 +469,23 @@ function localStopHandler(req, res) {
   res.json({ ok: true });
 }
 
-function localFollowUpHandler(req, res) {
+async function localFollowUpHandler(req, res) {
   const job = jobs.get(req.params.id);
   const prompt = String(req.body?.prompt || '').trim();
   if (!job) return res.status(404).json({ error: '任务不存在' });
   if (!prompt) return res.status(400).json({ error: '请输入后续指令' });
   if (job.status === 'running') return res.status(409).json({ error: '当前任务仍在运行' });
   if (!job.threadId) return res.status(409).json({ error: '该任务无法继续，请新建任务' });
+  if (job.nativeSession) {
+    try {
+      const session = await nativeSessions.read(job.provider, job.cwd, job.threadId);
+      if (!session.canResume) return res.status(409).json({ error: '原生会话被终端占用，请先退出原 CLI' });
+    } catch (error) { return res.status(error.status || 502).json({ error: error.message }); }
+    // Recheck after the asynchronous read: another paired device may have won.
+    if ([...jobs.values()].some(other => other.provider === job.provider && other.threadId === job.threadId && ['running', 'queued'].includes(other.status))) {
+      return res.status(409).json({ error: '该会话正在执行，请稍后再试' });
+    }
+  }
   job.events = [];
   job.sequence = 0;
   launch(job, prompt, true);
@@ -553,6 +567,52 @@ app.post('/api/transcriptions', async (req, res) => {
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || '录音转写失败' });
   }
+});
+
+app.get('/api/native-sessions', async (req, res) => {
+  try {
+    const provider = req.query.provider || defaultProvider;
+    const result = await nativeSessions.list(provider, req.query.workspace, req.query.cursor);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(result);
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.message || '无法读取原生会话' });
+  }
+});
+
+app.get('/api/native-sessions/:provider/:id', async (req, res) => {
+  try {
+    const provider = req.params.provider;
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(await nativeSessions.read(provider, req.query.workspace, req.params.id));
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.message || '无法读取原生会话' });
+  }
+});
+
+app.post('/api/native-sessions/:provider/:id/resume', async (req, res) => {
+  const { provider, id } = req.params;
+  const key = `${provider}:${id}`;
+  const prompt = String(req.body?.prompt || '').trim();
+  if (!prompt) return res.status(400).json({ error: '请输入后续指令' });
+  if (req.body?.terminalReleased !== true) return res.status(409).json({ error: '请先退出原终端会话，并确认在手机继续' });
+  if (nativeReservations.has(key) || [...jobs.values()].some(job => job.provider === provider && job.threadId === id && ['queued', 'running'].includes(job.status))) {
+    return res.status(409).json({ error: '该原生会话正在由 Panel 执行' });
+  }
+  nativeReservations.add(key);
+  try {
+    const session = await nativeSessions.read(provider, req.body?.cwd, id);
+    if (!session.canResume) return res.status(409).json({ error: '会话仍被终端占用，请退出原 CLI 后重试' });
+    const job = createJob(session.title, session.cwd);
+    job.provider = provider;
+    job.threadId = id;
+    job.nativeSession = { id, provider };
+    jobs.set(job.id, job);
+    launch(job, prompt, true);
+    res.status(201).json({ id: job.id });
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.message || '无法接续原生会话' });
+  } finally { nativeReservations.delete(key); }
 });
 
 app.post('/api/workspaces', async (req, res) => {

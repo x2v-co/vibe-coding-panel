@@ -10,7 +10,7 @@ if (args.includes('auth-failure')) {
   emit({ type: 'turn.failed', error: { message: 'stream disconnected before completion' } });
   process.exitCode = 1;
 } else if (args.includes('--output-format')) {
-  emit({ type: 'result', session_id: 'fixture-thread', result });
+  emit({ type: 'result', session_id: args.includes('--resume') ? args[args.indexOf('--resume') + 1] : 'fixture-thread', result });
 } else {
   if (args.includes('retry-success')) emit({ type: 'error', message: 'Reconnecting... 1/5' });
   emit({ type: 'item.completed', item: { type: 'agent_message', text: result } });
