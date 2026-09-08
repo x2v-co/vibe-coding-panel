@@ -90,6 +90,14 @@ py -3.12 -m venv .venv
 
 ## 功能与边界
 
+### 接续终端里的原生会话
+
+选择与终端一致的 **Workspace** 和 **Agent**，打开 **任务记录 → 原生会话**，选择对话。页面每 3 秒读取已保存的新消息。Workspace 按实际目录精确匹配，父目录不会包含所有子项目。
+
+发送追问前，先退出终端里的该会话，在 Panel 勾选交接确认、输入指令，点击 **发送并接续原会话**。CLI 使用原 session ID 和已有配置继续执行。回到终端时，等 Panel 执行结束，在对应目录运行页面显示的 `codex resume <id>` 或 `claude --resume <id>`。
+
+这是原生历史同步和会话交接，不是镜像或控制已经打开的终端。检测到会话占用时会阻止接续；不同 CLI 版本、操作系统可用的进程信息不同，所以仍需确认退出原会话，避免两端同时写入。Codex 需要支持 `app-server` 的 `thread/list`、`thread/read`；Claude 读取本地项目记录，支持 `CLAUDE_CONFIG_DIR`。Relay 和本机/直连使用电脑 Connector，旧版 Remote Bridge 模式暂仅展示 Panel 任务。更新后请重启 Connector。
+
 - 大按键、手机专注模式、文字与语音输入、图片上传、工作区目录选择。
 - Codex 与 Claude Code 实时输出、停止、追问和浏览器历史记录。
 - 八种键位布局、四种配色；Micro 支持自定义动作、文案、颜色和 SVG 键帽。
@@ -116,7 +124,7 @@ py -3.12 -m venv .venv
 
 Agent 和 Whisper 都在自己的电脑上运行。默认共享 Relay 会在内存中转发指令、录音、图片与结果，Relay 实现不持久保存这些内容。这**不是端到端加密**，请使用可信的 Relay，也可[自建服务](docs/relay-deployment.md)。Agent 仍会把其工作所需的数据发送给你配置的模型服务商。
 
-浏览器本地保存历史和偏好；电脑保存设备授权哈希，手机通过配对 Cookie 获得授权。可在电脑本地设置中撤销陌生设备。详见 [SECURITY.md](SECURITY.md)。
+浏览器保存偏好和演示历史；Panel 任务通过电脑 Connector 内存共享。原生记录保存在 CLI 的本地目录，打开会话时可见消息会经过所选连接传输。电脑保存设备授权哈希，手机通过配对 Cookie 获得授权。可在电脑本地设置中撤销陌生设备。详见 [SECURITY.md](SECURITY.md)。
 
 ## 高级使用与开发
 

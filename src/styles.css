@@ -884,6 +884,30 @@ i.micro-keycap-glyph { background: currentColor; mask-size: contain; mask-positi
 .history-copy small { color: var(--muted); font-family: 'DM Mono', monospace; font-size: 9px; line-height: 1.7; overflow-wrap: anywhere; }
 .history-empty { min-height: 240px; display: grid; place-items: center; align-content: center; gap: 12px; color: var(--muted); }
 .history-empty p { margin: 0; font-size: 12px; }
+.history-tabs { display: flex; gap: 6px; margin-top: 16px; }
+.history-tabs button { border: 1px solid var(--line); border-radius: 3px; padding: 8px 12px; color: var(--muted); background: transparent; cursor: pointer; font-size: 11px; }
+.history-tabs button.active { color: #fff; border-color: var(--green); background: #344537; }
+.native-session-hint { margin-top: 14px; padding: 10px 12px; border: 1px solid #d8ddd7; border-radius: 3px; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 9px; line-height: 1.7; }
+.history-error { margin-top: 10px; padding: 10px; color: #a33f2b; border: 1px solid #efb7a8; background: #fff3ef; font-size: 11px; }
+.history-more { width: 100%; min-height: 40px; border: 1px solid var(--line); color: var(--muted); background: transparent; cursor: pointer; }
+.native-session-backdrop { position: fixed; inset: 0; z-index: 34; display: grid; place-items: center; padding: 20px; background: rgba(12,14,12,.62); backdrop-filter: blur(5px); }
+.native-session-dialog { width: min(680px,100%); max-height: min(760px,calc(100dvh - 40px)); overflow: hidden; display: flex; flex-direction: column; border: 1px solid #484f49; border-radius: 6px; background: #f3f4f0; box-shadow: 0 24px 64px rgba(0,0,0,.4); }
+.native-session-dialog .drawer-heading { padding: 18px 20px; border-bottom: 1px solid var(--line); }
+.native-session-dialog .drawer-heading h2 { max-width: 540px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.native-session-messages { min-height: 260px; max-height: 470px; overflow-y: auto; padding: 18px 20px; }
+.native-message { margin: 0 0 14px; padding: 10px 12px; border-radius: 4px; background: rgba(255,255,255,.7); }
+.native-message.user { background: #e4eee3; }
+.native-message span { color: var(--muted); font-family: 'DM Mono', monospace; font-size: 8px; }
+.native-message p { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.6; }
+.native-release-check { margin: 0 20px 14px; display: flex; gap: 8px; align-items: flex-start; color: #4f5b51; font-size: 11px; line-height: 1.5; }
+.native-session-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px 18px; border-top: 1px solid var(--line); }
+.native-session-actions button { min-height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); background: transparent; cursor: pointer; font-size: 11px; }
+.native-session-actions .select-workspace { color: #102116; border-color: #4a985d; background: var(--green); }
+.native-session-actions button:disabled { cursor: not-allowed; opacity: .45; }
+.native-session-input { margin: 12px 20px; min-height: 74px; flex-shrink: 0; padding: 10px; border: 1px solid var(--line); border-radius: 4px; font: inherit; font-size: 13px; }
+.native-session-dialog .native-session-hint { margin: 0 20px 10px; overflow-wrap: anywhere; flex-shrink: 0; }
+.native-session-messages { min-height: 80px; flex: 1; }
+.native-session-dialog .drawer-heading h2 { max-width: min(480px, 65vw); }
 
 footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 9px; }
 

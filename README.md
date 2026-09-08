@@ -91,6 +91,14 @@ Use `codex` to switch back. This file is ignored by Git. `PANEL_AGENT_PROVIDER`,
 
 ## Features and limits
 
+### Continue a terminal session
+
+Choose the same **Workspace** and **Agent** used in your terminal, open **History → Native sessions**, and select a conversation. The panel reads saved messages every three seconds. Workspace matching is exact (a parent folder does not include subprojects).
+
+To send a follow-up, exit that session in the terminal, confirm the handoff in the panel, enter your message, and press **Send and resume**. The CLI resumes the original session ID with its existing configuration. To return to your terminal, wait for the panel turn to finish and run the displayed `codex resume <id>` or `claude --resume <id>` command from that workspace.
+
+This synchronizes saved conversation history and supports handoff; it does not mirror or control an already-open terminal. Occupied sessions are blocked when detected, but the acknowledgement is still required because CLI versions and operating systems expose different process metadata. Keep only one writer per session. Codex discovery requires a CLI with `app-server` `thread/list` and `thread/read`; Claude discovery reads local project transcripts (`CLAUDE_CONFIG_DIR` is respected). Relay and direct/local connections use the computer's Connector; the legacy Remote Bridge mode currently exposes Panel tasks only. Update and restart the Connector to enable this feature.
+
 - Large controls, mobile focus mode, text/voice input, image uploads, and workspace directory selection.
 - Codex and Claude Code tasks with live output, stop, follow-up, and browser history.
 - Eight key layouts, four color themes, and custom Micro key actions, labels, colors, and SVG icons.
@@ -117,7 +125,7 @@ Micro's native Fast mode, approval/decline, session fork, and plan mode are not 
 
 The Agent and Whisper run on your computer. With the default shared Relay, prompts, recordings, images, and results pass through that Relay in memory; the Relay implementation does not persist those payloads. This is **not end-to-end encryption**: trust the Relay operator, or [host your own](docs/relay-deployment.md). Your model provider still receives the data sent by your Agent.
 
-Browser history and preferences are stored locally. Device authorization hashes stay on the computer; pairing cookies authorize the phone. Revoke unrecognized devices in local Settings. See [SECURITY.md](SECURITY.md).
+Preferences and demo history are stored in the browser. Panel tasks are shared through the computer Connector's memory. Native conversation files stay under their CLI's local storage; reading a session sends its visible messages through the chosen connection. Device authorization hashes stay on the computer; pairing cookies authorize the phone. Revoke unrecognized devices in local Settings. See [SECURITY.md](SECURITY.md).
 
 ## Advanced use and development
 
