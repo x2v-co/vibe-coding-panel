@@ -28,7 +28,6 @@ type SavedJob = {
 type WorkspaceDirectory = { name: string; path: string };
 type PairedDevice = { id: string; name: string; userAgent: string; createdAt: number; lastSeenAt: number };
 type PairingInfo = { code: string; expiresAt: number; pairingUrl: string };
-type NativeSession = { id: string; provider: AgentProviderId; cwd: string; title: string; updatedAt: number; status?: string; canResume?: boolean; truncated?: boolean; messages?: { role: string; text: string; at: number }[] };
 
 const ACTIVE_JOB_KEY = 'vibe-panel-active-job-id';
 const MICRO_KEYS_VERSION = '2';
@@ -166,13 +165,6 @@ function PanelApp() {
   const [showSettings, setShowSettings] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => localStorage.getItem('vibe-panel-onboarding-dismissed') !== '1');
   const [showHistory, setShowHistory] = useState(false);
-  const [nativeList, setNativeList] = useState<NativeSession[]>([]);
-  const [nativeSelection, setNativeSelection] = useState<NativeSession | null>(null);
-  const [nativeError, setNativeError] = useState('');
-  const [nativeLoading, setNativeLoading] = useState(false);
-  const [nativeCursor, setNativeCursor] = useState<string | null>(null);
-  const [historySource, setHistorySource] = useState<'native' | 'panel'>('native');
-  const [terminalReleased, setTerminalReleased] = useState(false);
   const [showWorkspacePicker, setShowWorkspacePicker] = useState(false);
   const [workspacePath, setWorkspacePath] = useState('');
   const [workspaceResolvedPath, setWorkspaceResolvedPath] = useState('');
@@ -280,82 +272,6 @@ function PanelApp() {
   function selectAgentProvider(provider: AgentProviderId) {
     setAgentProvider(provider);
     localStorage.setItem('vibe-panel-agent-provider', provider);
-  }
-
-  useEffect(() => { setNativeSelection(null); setNativeList([]); setTerminalReleased(false); }, [cwd, agentProvider, connection.mode]);
-
-  useEffect(() => {
-    if (!showHistory || historySource !== 'native' || connection.mode !== 'local') return;
-    let cancelled = false;
-    let pending = false;
-    const refresh = async () => {
-      if (pending || document.hidden) return;
-      pending = true;
-      try {
-        const response = await fetch(`/api/native-sessions?${new URLSearchParams({ provider: agentProvider, workspace: cwd })}`, { signal: AbortSignal.timeout(25000) });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || '请更新电脑 Connector 后重试');
-        if (cancelled) return;
-        setNativeList(payload.sessions || []); setNativeCursor(payload.nextCursor || null); setNativeError('');
-      } catch (error) { if (!cancelled) setNativeError(error instanceof Error ? error.message : '无法读取会话'); }
-      finally { pending = false; if (!cancelled) setNativeLoading(false); }
-    };
-    setNativeLoading(true); setNativeList([]); void refresh();
-    const timer = window.setInterval(() => { void refresh(); }, 5000);
-    return () => { cancelled = true; window.clearInterval(timer); };
-  }, [showHistory, historySource, agentProvider, cwd, connection.mode]);
-
-  async function moreNativeSessions() {
-    if (!nativeCursor || nativeLoading) return;
-    setNativeLoading(true);
-    try {
-      const response = await fetch(`/api/native-sessions?${new URLSearchParams({ provider: agentProvider, workspace: cwd, cursor: nativeCursor })}`);
-      const payload = await response.json(); if (!response.ok) throw new Error(payload.error);
-      setNativeList(items => [...items, ...(payload.sessions || []).filter((s: NativeSession) => !items.some(i => i.id === s.id))]);
-      setNativeCursor(payload.nextCursor || null);
-    } catch (error) { setNativeError(error instanceof Error ? error.message : '无法读取会话'); }
-    finally { setNativeLoading(false); }
-  }
-
-  useEffect(() => {
-    if (!nativeSelection || connection.mode !== 'local') return;
-    let cancelled = false;
-    let pending = false;
-    const refresh = async () => {
-      if (pending || document.hidden) return;
-      pending = true;
-      try {
-        const response = await fetch(`/api/native-sessions/${nativeSelection.provider}/${nativeSelection.id}?${new URLSearchParams({ workspace: nativeSelection.cwd })}`, { signal: AbortSignal.timeout(25000) });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error);
-        if (!cancelled) { setNativeSelection(payload); setNativeError(''); }
-      } catch (error) { if (!cancelled) setNativeError(error instanceof Error ? error.message : '无法刷新原生会话'); }
-      finally { pending = false; }
-    };
-    void refresh(); const timer = window.setInterval(() => { void refresh(); }, 3000);
-    return () => { cancelled = true; window.clearInterval(timer); };
-  }, [nativeSelection?.id, nativeSelection?.provider, connection.mode]);
-
-  function chooseNativeSession(session: NativeSession) {
-    if (busy || voiceBusy || isRecoveringJob) return;
-    selectJob(null); setStatus('idle'); setResult(''); setActivity([]); setPrompt('');
-    setNativeSelection(session); setTerminalReleased(false); setNativeError(''); setShowHistory(false);
-    localStorage.removeItem(ACTIVE_JOB_KEY);
-  }
-
-  async function resumeNativeSession(command: string) {
-    if (!nativeSelection || !terminalReleased || !nativeSelection.canResume) return;
-    setStatus('queued'); setError('');
-    try {
-      const response = await fetch(`/api/native-sessions/${nativeSelection.provider}/${nativeSelection.id}/resume`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: command, cwd: nativeSelection.cwd, terminalReleased }),
-      });
-      const payload = await response.json(); if (!response.ok) throw new Error(payload.error);
-      setTaskTitle(nativeSelection.title); setNativeSelection(null); setPrompt(''); setResult(''); setActivity([]);
-      setCapturePath(''); setCapturePreview(''); setStartedAt(Date.now()); selectJob(payload.id);
-      localStorage.setItem(ACTIVE_JOB_KEY, payload.id);
-    } catch (error) { setStatus('idle'); setError(error instanceof Error ? error.message : '无法接续会话'); }
   }
 
   function updateProviders(nextProviders: AgentProviderInfo[]) {
@@ -754,7 +670,6 @@ function PanelApp() {
       await runDemo(command);
       return;
     }
-    if (nativeSelection) { await resumeNativeSession(command); return; }
     if (jobId && result) await followUp(command);
     else await submit(command);
   }
@@ -848,7 +763,6 @@ function PanelApp() {
 
   function reset() {
     if (busy || voiceBusy || isAddingContext || isRecoveringJob) return;
-    setNativeSelection(null); setTerminalReleased(false);
     demoRunRef.current += 1;
     voiceSessionRef.current += 1;
     voiceStartPendingRef.current = false;
@@ -1157,7 +1071,6 @@ function PanelApp() {
 
   function loadJob(job: SavedJob) {
     if (busy || voiceBusy || isRecoveringJob || isAddingContext) return;
-    setNativeSelection(null);
     if (jobId !== job.id) {
       const previous = microNavigation.length ? microNavigation.slice(0, microNavigationIndex + 1) : jobId ? [jobId] : [];
       const next = [...previous, job.id];
@@ -1480,9 +1393,7 @@ function PanelApp() {
         <div className={`onboarding-foot ${onboardingReady ? 'ready' : ''}`}>{onboardingReady ? '可以开始创建任务' : '连接完成后这里会显示“可以开始创建任务”'}</div>
       </section></div>}
 
-      {showHistory && <div className="drawer-backdrop" onMouseDown={() => setShowHistory(false)}><aside className="history-drawer" onMouseDown={(event) => event.stopPropagation()}><div className="drawer-heading"><div><span>{connection.mode === 'local' ? 'NATIVE SESSIONS' : 'PANEL TASKS'}</span><h2>{connection.mode === 'local' && historySource === 'native' ? '原生会话' : '任务记录'}</h2></div><button className="icon-button" onClick={() => setShowHistory(false)} aria-label="关闭"><X size={20} /></button></div>{connection.mode === 'local' && <div className="history-tabs"><button className={historySource === 'native' ? 'active' : ''} onClick={() => setHistorySource('native')}>原生会话</button><button className={historySource === 'panel' ? 'active' : ''} onClick={() => setHistorySource('panel')}>Panel 任务</button></div>}{historySource === 'native' && connection.mode === 'local' ? <><div className="native-session-hint">按 Workspace 筛选 · {agentProvider === 'claude' ? 'Claude Code' : 'Codex'}<br />选择后可读取原生对话；接续前请先退出原终端。</div>{nativeError && <div className="history-error">{nativeError}</div>}<div className="history-list">{nativeLoading && !nativeList.length ? <div className="history-empty"><RotateCw className="spin" size={24} /><p>正在读取原生会话</p></div> : nativeList.length === 0 ? <div className="history-empty"><History size={26} /><p>当前 Workspace 没有会话</p></div> : nativeList.map((session) => <button key={session.id} onClick={() => chooseNativeSession(session)} className="history-item"><span className="history-status completed"><History size={13} /></span><span className="history-copy"><strong>{session.title}</strong><small>{new Date(session.updatedAt).toLocaleString('zh-CN')}<br />{session.id}</small></span></button>)}{nativeCursor && <button className="history-more" onClick={() => void moreNativeSessions()}>加载更多</button>}</div></> : <div className="history-list">{history.length === 0 ? <div className="history-empty"><History size={26} /><p>还没有任务</p></div> : history.map((job) => <button key={job.id} onClick={() => loadJob(job)} className="history-item"><span className={`history-status ${job.status}`}>{job.status === 'running' || job.status === 'queued' ? <RotateCw size={13} /> : job.status === 'completed' ? <Check size={13} /> : <CircleStop size={13} />}</span><span className="history-copy"><strong>{job.prompt}</strong><small>{statusLabels[job.status]} · {job.agentProvider === 'claude' ? 'Claude Code' : 'Codex'}<br />{job.cwd}<br />{new Date(job.createdAt).toLocaleString('zh-CN')}</small></span></button>)}</div>}</aside></div>}
-
-      {nativeSelection && <div className="native-session-backdrop"><section className="native-session-dialog" role="dialog" aria-modal="true" aria-label="原生会话详情"><div className="drawer-heading"><div><span>{nativeSelection.provider === 'claude' ? 'CLAUDE CODE' : 'CODEX CLI'}</span><h2>{nativeSelection.title}</h2></div><button className="icon-button" disabled={busy} onClick={() => setNativeSelection(null)} aria-label="关闭"><X size={20} /></button></div><div className="native-session-messages">{nativeSelection.messages ? nativeSelection.messages.length ? nativeSelection.messages.map((message, index) => <div className={`native-message ${message.role}`} key={`${message.at}-${index}`}><span>{message.role === 'user' ? 'YOU' : 'AGENT'}</span><p>{message.text}</p></div>) : <p>会话没有可显示的文字消息</p> : <p>正在读取会话内容…</p>}</div><div className="native-session-hint">每 3 秒读取终端已保存的新消息。{nativeSelection.truncated && '仅展示部分历史。'}<br />{nativeSelection.canResume === false ? '终端仍占用会话：可查看，退出原 CLI 后才能接续。' : '接续完成后，在终端重新 resume 原会话以加载新消息。'}<br /><code>{nativeSelection.provider === 'claude' ? 'claude --resume' : 'codex resume'} {nativeSelection.id}</code></div>{(nativeError || error) && <div className="history-error" role="alert">{nativeError || error}</div>}<textarea className="native-session-input" aria-label="原生会话后续指令" value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="输入后续指令，继续原来的会话…" disabled={busy} /><label className="native-release-check"><input type="checkbox" checked={terminalReleased} onChange={(event) => setTerminalReleased(event.target.checked)} /> 我已退出电脑上的原生终端会话，允许 Panel 接续</label><div className="native-session-actions"><button disabled={busy} onClick={() => { setNativeSelection(null); setShowHistory(true); }}>返回列表</button><button className="select-workspace" disabled={!terminalReleased || nativeSelection.canResume !== true || !prompt.trim() || busy || Boolean(nativeError)} onClick={() => void resumeNativeSession(prompt.trim())}>{busy ? '正在接续…' : '发送并接续原会话'}</button></div></section></div>}
+      {showHistory && <div className="drawer-backdrop" onMouseDown={() => setShowHistory(false)}><aside className="history-drawer" onMouseDown={(event) => event.stopPropagation()}><div className="drawer-heading"><div><span>{connection.mode === 'demo' ? 'DEMO HISTORY' : 'SHARED TASKS'}</span><h2>任务记录</h2></div><button className="icon-button" onClick={() => setShowHistory(false)} aria-label="关闭"><X size={20} /></button></div><div className="history-list">{history.length === 0 ? <div className="history-empty"><History size={26} /><p>还没有任务</p></div> : history.map((job) => <button key={job.id} onClick={() => loadJob(job)} className="history-item"><span className={`history-status ${job.status}`}>{job.status === 'running' || job.status === 'queued' ? <RotateCw size={13} /> : job.status === 'completed' ? <Check size={13} /> : <CircleStop size={13} />}</span><span className="history-copy"><strong>{job.prompt}</strong><small>{statusLabels[job.status]} · {job.agentProvider === 'claude' ? 'Claude Code' : 'Codex'}<br />{job.cwd}<br />{new Date(job.createdAt).toLocaleString('zh-CN')}</small></span></button>)}</div></aside></div>}
 
       {showWorkspacePicker && <div className="workspace-backdrop" onMouseDown={() => setShowWorkspacePicker(false)}><section className="workspace-picker" role="dialog" aria-modal="true" aria-labelledby="workspace-picker-title" onMouseDown={(event) => event.stopPropagation()}><div className="workspace-picker-heading"><div><span>AGENT FILESYSTEM</span><h2 id="workspace-picker-title">切换 Workspace</h2></div><button type="button" onClick={() => setShowWorkspacePicker(false)} aria-label="关闭目录选择器"><X size={19} /></button></div><form className="workspace-path-form" onSubmit={(event) => { event.preventDefault(); void browseWorkspace(workspacePath.trim()); }}><input aria-label="目录路径" value={workspacePath} onChange={(event) => setWorkspacePath(event.target.value)} spellCheck={false} /><button type="submit" disabled={workspaceLoading || !workspacePath.trim()} aria-label="打开输入的目录" title="打开目录">{workspaceLoading ? <RotateCw className="spin" size={17} /> : <ChevronRight size={17} />}</button></form><div className="workspace-browser-toolbar"><button type="button" onClick={() => workspaceParent && void browseWorkspace(workspaceParent)} disabled={!workspaceParent || workspaceLoading}><ArrowUp size={16} />上一级</button><span>{connection.mode === 'remote' ? 'REMOTE' : 'LOCAL'}</span></div><div className="workspace-directory-list">{workspaceError ? <div className="workspace-browser-empty error"><Terminal size={20} /><p>{workspaceError}</p></div> : workspaceLoading ? <div className="workspace-browser-empty"><RotateCw className="spin" size={21} /><p>正在读取目录</p></div> : workspaceDirectories.length ? workspaceDirectories.map((directory) => <button type="button" key={directory.path} onClick={() => void browseWorkspace(directory.path)}><FolderOpen size={17} /><span>{directory.name}</span><ChevronRight size={15} /></button>) : <div className="workspace-browser-empty"><Folder size={21} /><p>这个目录没有子目录</p></div>}</div><div className="workspace-picker-actions"><button type="button" onClick={() => setShowWorkspacePicker(false)}>取消</button><button type="button" className="select-workspace" onClick={selectWorkspace} disabled={workspaceLoading || Boolean(workspaceError) || !workspaceResolvedPath || workspacePath.trim() !== workspaceResolvedPath}><Check size={16} />选择当前目录</button></div></section></div>}
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, copyFile, chmod, rm, realpath, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, copyFile, chmod, rm, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -13,7 +13,7 @@ test('HTTP jobs use configured CLI, inherited credentials and workspace for run 
   await chmod(binary, 0o700);
   const child = spawn(process.execPath, ['server/index.js'], {
     cwd: new URL('..', import.meta.url),
-    env: { ...process.env, PANEL_API_PORT: '0', PANEL_BRIDGE_TOKEN: '', PANEL_REQUIRE_PAIRING: '1', PANEL_DEVICE_STORE: path.join(dir, 'devices.json'), PANEL_CODEX_BIN: binary, PANEL_CLAUDE_BIN: binary, PANEL_AGENT_PROVIDER: 'codex', PANEL_TEST_CREDENTIAL: 'fixture-credential', CODEX_HOME: dir, CLAUDE_CONFIG_DIR: path.join(dir, 'claude-home') },
+    env: { ...process.env, PANEL_API_PORT: '0', PANEL_BRIDGE_TOKEN: '', PANEL_REQUIRE_PAIRING: '1', PANEL_DEVICE_STORE: path.join(dir, 'devices.json'), PANEL_CODEX_BIN: binary, PANEL_CLAUDE_BIN: binary, PANEL_AGENT_PROVIDER: 'codex', PANEL_TEST_CREDENTIAL: 'fixture-credential', CODEX_HOME: dir },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   try {
@@ -128,21 +128,6 @@ test('HTTP jobs use configured CLI, inherited credentials and workspace for run 
     await completed(phoneJob.id);
     assert.deepEqual(await phone('/api/jobs'), await request('/api/jobs'));
     assert.equal((await request('/api/jobs')).jobs[0].id, phoneJob.id);
-
-    const nativeId = '12345678-1234-4234-8234-123456789abc';
-    const transcriptDir = path.join(dir, 'claude-home', 'projects', 'encoded-name');
-    await mkdir(transcriptDir, { recursive: true });
-    await writeFile(path.join(transcriptDir, `${nativeId}.jsonl`), JSON.stringify({ sessionId: nativeId, cwd: dir, type: 'user', message: { content: 'native task' } }) + '\n');
-    const query = new URLSearchParams({ workspace: dir, provider: 'claude' });
-    assert.equal((await fetch(origin + `/api/native-sessions?${query}`, { headers: remoteHeaders })).status, 401);
-    assert.equal((await phone(`/api/native-sessions?${query}`)).sessions[0].id, nativeId);
-    const resumedNative = await phone(`/api/native-sessions/claude/${nativeId}/resume`, { cwd: dir, prompt: 'continue native', terminalReleased: true });
-    const nativeJob = await completed(resumedNative.id);
-    assert.equal(nativeJob.nativeSession.id, nativeId);
-    const nativeArgs = JSON.parse(nativeJob.result).args;
-    assert.equal(nativeArgs[nativeArgs.indexOf('--resume') + 1], nativeId);
-    const rejectedNative = await fetch(origin + `/api/native-sessions/claude/${nativeId}/resume`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cwd: dir, prompt: 'no acknowledgement' }) });
-    assert.equal(rejectedNative.status, 409);
   } finally {
     const exited = once(child, 'exit');
     child.kill('SIGTERM');
