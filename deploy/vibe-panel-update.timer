@@ -1,0 +1,7 @@
+[Unit]
+Description=Check Vibe Panel CI releases
+[Timer]
+OnBootSec=60
+OnUnitInactiveSec=120
+[Install]
+WantedBy=timers.target

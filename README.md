@@ -143,3 +143,7 @@ Development: open the Vite URL printed in the terminal (normally `http://localho
 [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Product/release context](docs/brand-led-release-route.md) · [MIT license](LICENSE)
 
 Not affiliated with or endorsed by OpenAI, Codex, Anthropic, or Claude Code.
+
+## Release readiness
+
+See [startup diagnostics, cross-platform acceptance, Relay limits and release/rollback operations](docs/release-operations.md).

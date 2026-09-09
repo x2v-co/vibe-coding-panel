@@ -191,3 +191,77 @@ test('malformed connector responses fail only their request and keep the relay a
     await new Promise((resolve) => relay.server.close(resolve));
   }
 });
+
+test('rate and pairing limits reject spoofed forwarding headers before body parsing', async () => {
+  const relay = createRelayServer({ rateLimit: 10, pairLimit: 1, audit() {} });
+  const port = await listen(relay.server);
+  try {
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/pair`, { method: 'POST' })).status, 503);
+    const denied = await fetch(`http://127.0.0.1:${port}/api/pair`, { method: 'POST', headers: { 'X-Forwarded-For': 'other-client' } });
+    assert.equal(denied.status, 429);
+    assert.ok(Number(denied.headers.get('retry-after')) > 0);
+    assert.equal(relay.pending.size, 0);
+  } finally { await new Promise(resolve => relay.server.close(resolve)); }
+});
+
+test('oversized and compressed bodies are rejected with structured errors', async () => {
+  const relay = createRelayServer({ maxBodyBytes: 32, audit() {} });
+  const port = await listen(relay.server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/transcriptions`, { method: 'POST', body: 'x'.repeat(33) });
+    assert.equal(response.status, 413);
+    assert.equal((await response.json()).code, 'BODY_TOO_LARGE');
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/pair`, { method: 'POST', body: 'x', headers: { 'Content-Encoding': 'gzip' } })).status, 415);
+  } finally { await new Promise(resolve => relay.server.close(resolve)); }
+});
+
+test('timeouts cancel connector work and release capacity', async () => {
+  const relay = createRelayServer({ requestTimeoutMs: 40, audit() {} });
+  const port = await listen(relay.server);
+  const identity = connectorIdentity('d');
+  const socket = await openConnector(`ws://127.0.0.1:${port}/relay/connect?id=${identity.id}`, identity.credential);
+  const cancellation = new Promise(resolve => socket.on('message', raw => { if (JSON.parse(raw).type === 'cancel') resolve(); }));
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/health`, { headers: { Cookie: `vibe_relay_connector=${identity.id}` } });
+    assert.equal(response.status, 504);
+    await cancellation;
+    assert.equal(relay.pending.size, 0);
+  } finally {
+    socket.close();
+    await new Promise(resolve => socket.once('close', resolve));
+    await new Promise(resolve => relay.server.close(resolve));
+  }
+});
+
+test('trusted proxy separates client limits but untrusted peers cannot', async () => {
+  const relay = createRelayServer({ rateLimit: 1, trustProxy: '127.0.0.1', audit() {} });
+  const port = await listen(relay.server);
+  try {
+    for (const ip of ['192.0.2.1', '192.0.2.2']) {
+      assert.equal((await fetch(`http://127.0.0.1:${port}/api/health`, { headers: { 'X-Forwarded-For': ip } })).status, 503);
+    }
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/health`, { headers: { 'X-Forwarded-For': '192.0.2.1' } })).status, 429);
+  } finally { await new Promise(resolve => relay.server.close(resolve)); }
+});
+
+test('browser disconnect cancels pending work immediately', async () => {
+  const relay = createRelayServer({ requestTimeoutMs: 2000, audit() {} });
+  const port = await listen(relay.server);
+  const identity = connectorIdentity('e');
+  const socket = await openConnector(`ws://127.0.0.1:${port}/relay/connect?id=${identity.id}`, identity.credential);
+  const controller = new AbortController();
+  const cancellation = new Promise(resolve => socket.on('message', raw => {
+    const message = JSON.parse(raw);
+    if (message.type === 'request') controller.abort();
+    if (message.type === 'cancel') resolve();
+  }));
+  try {
+    await assert.rejects(fetch(`http://127.0.0.1:${port}/api/health`, { signal: controller.signal, headers: { Cookie: `vibe_relay_connector=${identity.id}` } }));
+    await cancellation;
+    assert.equal(relay.pending.size, 0);
+  } finally {
+    socket.close();
+    await new Promise(resolve => socket.once('close', resolve));
+    await new Promise(resolve => relay.server.close(resolve));
+  }
+});

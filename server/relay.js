@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocket, WebSocketServer } from 'ws';
 import { readCookie } from './pairing.js';
+import { createLimiter } from './relay-limits.js';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const hopByHopHeaders = new Set([
@@ -46,46 +47,78 @@ function publicHeaders(input = {}) {
 export function createRelayServer(options = {}) {
   const maxConnectors = positiveInteger(options.maxConnectors ?? process.env.PANEL_RELAY_MAX_CONNECTORS, 100);
   const maxInflight = positiveInteger(options.maxInflight ?? process.env.PANEL_RELAY_MAX_INFLIGHT, 100);
-  const requestTimeoutMs = positiveInteger(options.requestTimeoutMs ?? process.env.PANEL_RELAY_REQUEST_TIMEOUT_MS, 10 * 60 * 1000);
+  const requestTimeoutMs = positiveInteger(options.requestTimeoutMs ?? process.env.PANEL_RELAY_REQUEST_TIMEOUT_MS, 60 * 1000);
   const publicUrl = String(options.publicUrl ?? process.env.PANEL_RELAY_PUBLIC_URL ?? '').replace(/\/$/, '');
   const distDir = options.distDir || path.join(appRoot, 'dist');
   const connectors = new Map();
   const pending = new Map();
+  const maxBodyBytes = positiveInteger(options.maxBodyBytes ?? process.env.PANEL_RELAY_MAX_BODY_BYTES, 10 * 1024 * 1024);
+  const rateLimit = positiveInteger(options.rateLimit ?? process.env.PANEL_RELAY_RATE_LIMIT, 120);
+  const pairLimit = positiveInteger(options.pairLimit ?? process.env.PANEL_RELAY_PAIR_LIMIT, 10);
+  const streamTimeoutMs = positiveInteger(options.streamTimeoutMs ?? process.env.PANEL_RELAY_STREAM_TIMEOUT_MS, 10 * 60 * 1000);
+  const perConnectorLimit = positiveInteger(options.perConnectorLimit ?? process.env.PANEL_RELAY_PER_CONNECTOR_INFLIGHT, 20);
+  const limit = createLimiter({ windowMs: options.rateWindowMs || 60000 });
+  const pairLimiter = createLimiter({ windowMs: 10 * 60000 });
+  const trustProxy = options.trustProxy ?? process.env.PANEL_RELAY_TRUST_PROXY;
+  const audit = options.audit || ((event) => console.log(JSON.stringify({ at: new Date().toISOString(), ...event })));
+  const clientIp = req => {
+    const peer = req.socket.remoteAddress || 'unknown';
+    // Trust only an explicitly configured immediate proxy address, never arbitrary XFF.
+    if (trustProxy && peer === trustProxy) return String(req.headers['x-forwarded-for'] || peer).split(',').at(-1).trim();
+    return peer;
+  };
   const app = express();
   const server = http.createServer(app);
   const sockets = new WebSocketServer({ noServer: true, maxPayload: 14 * 1024 * 1024 });
 
+  server.requestTimeout = 30000;
+  server.headersTimeout = 15000;
+  server.timeout = 30000;
   app.disable('x-powered-by');
 
   app.get('/healthz', (_req, res) => {
     res.json({
       ok: true,
       service: 'vibe-panel-relay',
+      version: process.env.PANEL_VERSION || 'development',
       connectors: connectors.size,
       inflight: pending.size,
       capacity: { connectors: maxConnectors, inflight: maxInflight },
     });
   });
 
-  app.use('/api', express.raw({ type: () => true, limit: '12mb' }), (req, res) => {
+  app.use('/api', (req, res, next) => {
+    const ip = clientIp(req);
+    const pairing = /^\/pair\/?$/i.test(req.path);
+    const retry = limit(`api:${ip}`, rateLimit)
+      || (pairing && (pairLimiter(`pair:${ip}`, pairLimit) || pairLimiter(`target:${connectorIdFrom(req)}`, pairLimit * 3)));
+    if (retry) {
+      audit({ event: 'rate_limit', pairing });
+      return res.set('Retry-After', String(retry)).status(429).json({ code: 'RATE_LIMITED', error: 'Too many requests. Please retry later.' });
+    }
+    next();
+  }, express.raw({ type: () => true, limit: maxBodyBytes, inflate: false }), (req, res) => {
     const connectorId = connectorIdFrom(req);
     const connector = connectors.get(connectorId);
     if (!connector || connector.readyState !== WebSocket.OPEN) {
       return res.status(503).json({ error: '电脑 Connector 未连接', code: 'CONNECTOR_OFFLINE' });
     }
-    if (pending.size >= maxInflight) {
+    if (pending.size >= maxInflight || [...pending.values()].filter(item => item.connectorId === connectorId).length >= perConnectorLimit) {
       return res.status(503).json({ error: 'Relay 当前请求较多，请稍后重试', code: 'RELAY_BUSY' });
     }
 
     const requestId = randomUUID();
+    res.setTimeout(0);
+    req.headers['x-forwarded-for'] = clientIp(req);
     const timer = setTimeout(() => {
       const active = pending.get(requestId);
       if (!active) return;
       pending.delete(requestId);
       if (!res.headersSent) res.status(504).json({ error: '电脑响应超时', code: 'CONNECTOR_TIMEOUT' });
       else res.end();
-      connector.send(JSON.stringify({ type: 'cancel', requestId }));
-    }, requestTimeoutMs);
+      audit({ event: 'request_timeout' });
+      if (connector.readyState === WebSocket.OPEN) connector.send(JSON.stringify({ type: 'cancel', requestId }));
+    }, req.path.endsWith('/events') ? streamTimeoutMs : requestTimeoutMs);
 
     pending.set(requestId, { connectorId, res, timer, started: false });
     connector.send(JSON.stringify({
@@ -97,13 +130,20 @@ export function createRelayServer(options = {}) {
       body: Buffer.isBuffer(req.body) && req.body.length ? req.body.toString('base64') : '',
     }));
 
-    req.on('aborted', () => {
+    res.on('close', () => {
       const active = pending.get(requestId);
       if (!active) return;
       clearTimeout(active.timer);
       pending.delete(requestId);
       if (connector.readyState === WebSocket.OPEN) connector.send(JSON.stringify({ type: 'cancel', requestId }));
     });
+  });
+
+  app.use((error, _req, res, next) => {
+    if (!error) return next();
+    const status = error.type === 'entity.too.large' ? 413 : error.status || 400;
+    audit({ event: 'request_rejected', status });
+    res.status(status).json({ code: status === 413 ? 'BODY_TOO_LARGE' : 'INVALID_BODY', error: 'Request body rejected.' });
   });
 
   app.get(['/', '/app'], (req, res, next) => {
@@ -126,12 +166,17 @@ export function createRelayServer(options = {}) {
     try { url = new URL(req.url, 'http://relay.local'); } catch { socket.destroy(); return; }
     if (url.pathname !== '/relay/connect') { socket.destroy(); return; }
 
+    if (limit(`upgrade:${clientIp(req)}`, 30)) {
+      socket.end('HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\n\r\n');
+      return;
+    }
     const connectorId = String(url.searchParams.get('id') || '');
     const authorization = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-    const credential = authorization || String(url.searchParams.get('token') || '');
+    const credential = authorization;
     if (!/^[A-Za-z0-9_-]{43}$/.test(connectorId)
       || !/^[A-Za-z0-9_-]{64}$/.test(credential)
       || connectorIdForCredential(credential) !== connectorId) {
+      audit({ event: 'connector_auth_rejected' });
       socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
       socket.destroy();
       return;
@@ -186,6 +231,7 @@ export function createRelayServer(options = {}) {
           for (const [name, value] of Object.entries(headers)) res.setHeader(name, value);
           res.flushHeaders();
         } else if (message.type === 'response-chunk' && active.started && !res.writableEnded) {
+          if (res.writableLength > 1024 * 1024) throw new Error('Slow consumer');
           res.write(Buffer.from(String(message.data || ''), 'base64'));
         } else if (message.type === 'response-end') {
           clearTimeout(active.timer);

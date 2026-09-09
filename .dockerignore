@@ -7,3 +7,8 @@ dist
 node_modules
 npm-debug.log*
 docs/screenshots
+
+docs/voice-fix-deployment-20260908.md
+deploy/*-image
+deploy/image.env
+deploy/last-release

@@ -3,6 +3,7 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
@@ -18,5 +19,38 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run test:acceptance
       - run: npm test
       - run: npm run build
+
+  release:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: relay-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build versioned image and release package
+        run: |
+          docker build -f Dockerfile.relay --build-arg VERSION="$GITHUB_SHA" -t "vibe-panel:$GITHUB_SHA" .
+          docker save "vibe-panel:$GITHUB_SHA" | gzip > relay-image.tar.gz
+          sha256sum relay-image.tar.gz > SHA256SUMS
+      - name: Publish verified release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "relay-$GITHUB_SHA" >/dev/null 2>&1; then exit 0; fi
+          gh release create "relay-$GITHUB_SHA" relay-image.tar.gz SHA256SUMS --target "$GITHUB_SHA" --title "Relay $GITHUB_SHA" --notes "Three-platform acceptance passed. Versioned Relay image with SHA256 checksum; production pulls and health-checks this release automatically." --latest
+      - name: Verify production applied this version
+        run: |
+          for attempt in $(seq 1 60); do
+            version=$(curl -fsS --max-time 15 "https://vibe.tooluse.app/healthz?release=$GITHUB_SHA" | jq -r '.version' || true)
+            if [ "$version" = "$GITHUB_SHA" ]; then exit 0; fi
+            sleep 10
+          done
+          echo 'Production did not reach the expected version; inspect updater logs and rollback state.'
+          exit 1

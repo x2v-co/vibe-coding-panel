@@ -1,0 +1,5 @@
+services:
+  relay:
+    image: ${PANEL_RELAY_IMAGE:?set immutable PANEL_RELAY_IMAGE}
+    environment:
+      PANEL_RELAY_TRUST_PROXY: ${PANEL_RELAY_TRUST_PROXY:-}

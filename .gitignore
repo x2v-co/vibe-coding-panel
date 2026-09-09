@@ -10,3 +10,7 @@ vite.config.d.ts
 test-results/
 .vibe-panel/
 .env
+
+deploy/*-image
+deploy/image.env
+deploy/last-release

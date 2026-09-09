@@ -142,3 +142,7 @@ npm run build
 [参与贡献](CONTRIBUTING.md) · [更新记录](CHANGELOG.md) · [产品与发布背景](docs/brand-led-release-route.md) · [MIT 许可证](LICENSE)
 
 本项目与 OpenAI、Codex、Anthropic、Claude Code 没有隶属或背书关系。
+
+## Release readiness
+
+See [startup diagnostics, cross-platform acceptance, Relay limits and release/rollback operations](docs/release-operations.md).

@@ -1,0 +1,7 @@
+[Unit]
+Description=Apply verified Vibe Panel CI release
+After=docker.service network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/vibe-coding-panel/deploy/pull-release.py
+TimeoutStartSec=900

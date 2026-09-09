@@ -14,12 +14,14 @@
     "dev": "concurrently -k -n api,web -c yellow,cyan \"node --watch server/index.js\" \"vite\"",
     "build": "npm run check && vite build",
     "start": "node server/index.js",
-    "connect": "node scripts/connect.mjs",
+    "connect": "node scripts/launch.mjs",
     "connect:relay": "node scripts/connect-relay.mjs",
     "relay": "node server/relay.js",
     "share": "node scripts/share.mjs",
     "check": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
-    "test": "node --test server/*.test.js"
+    "test": "node --test server/*.test.js",
+    "doctor": "node scripts/launch.mjs --doctor",
+    "test:acceptance": "node --test scripts/acceptance.test.mjs"
   },
   "dependencies": {
     "cross-spawn": "^7.0.6",
@@ -40,5 +42,8 @@
     "@types/react-dom": "latest",
     "concurrently": "latest",
     "typescript": "latest"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }

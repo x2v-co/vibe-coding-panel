@@ -56,7 +56,7 @@ function findWhisperPython() {
     process.platform === 'win32' ? executable('py') : '',
   ].filter(Boolean);
   return [...new Set(candidates)].find((candidate) => {
-    const result = spawnSync(candidate, ['-c', 'import imageio_ffmpeg'], { stdio: 'ignore' });
+    const result = spawnSync(candidate, ['-c', 'import imageio_ffmpeg'], { stdio: 'ignore', timeout: 10000 });
     return result.status === 0;
   }) || '';
 }
