@@ -124,6 +124,23 @@ test('HTTP jobs use configured CLI, inherited credentials and workspace for run 
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
     assert.equal((await phone(`/api/jobs/${claude.id}`)).status, 'stopped');
+    // Real CLIs may catch SIGINT and exit(1), leaving Node's signal null.
+    await phone(`/api/jobs/${claude.id}/follow-up`, { prompt: 'stop-with-exit-code' });
+    for (let i = 0; i < 100; i++) {
+      if ((await request(`/api/jobs/${claude.id}`)).events.some(event => event.type === 'message')) break;
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    await phone(`/api/jobs/${claude.id}/stop`, {});
+    for (let i = 0; i < 100; i++) {
+      if ((await request(`/api/jobs/${claude.id}`)).status !== 'running') break;
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    const interrupted = await request(`/api/jobs/${claude.id}`);
+    assert.equal(interrupted.status, 'stopped');
+    assert.equal(interrupted.agentError, null);
+    // A later normal turn must not inherit the stop request.
+    await phone(`/api/jobs/${claude.id}/follow-up`, { prompt: 'continue normally' });
+    assert.equal((await completed(claude.id)).status, 'completed');
     const phoneJob = await phone('/api/jobs', { prompt: 'created-on-phone', cwd: dir, agentProvider: 'claude' });
     await completed(phoneJob.id);
     assert.deepEqual(await phone('/api/jobs'), await request('/api/jobs'));

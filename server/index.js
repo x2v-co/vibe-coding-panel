@@ -128,6 +128,7 @@ function launch(job, prompt, resume = false) {
   job.result = '';
   job.agentError = null;
   job.authError = null;
+  job.stopRequested = false;
   push(job, { type: 'status', status: 'running', text: resume ? '正在继续任务' : 'Agent 已开始工作' });
 
   const child = spawnAgent(invocation.command, invocation.args, { cwd: invocation.cwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -164,7 +165,8 @@ function launch(job, prompt, resume = false) {
     logStderr(stderrBuffer);
     job.process = null;
     job.finishedAt = Date.now();
-    job.status = signal ? 'stopped' : code === 0 && !job.agentError ? 'completed' : 'failed';
+    job.status = job.stopRequested || signal ? 'stopped' : code === 0 && !job.agentError ? 'completed' : 'failed';
+    if (job.status === 'stopped') job.agentError = null;
     push(job, {
       type: 'status', status: job.status,
       text: job.status === 'completed' ? '任务完成' : job.status === 'stopped' ? '任务已停止' : job.authError || job.agentError || `任务失败（退出码 ${code}）`,
@@ -467,7 +469,13 @@ function eventsHandler(req, res) {
 function localStopHandler(req, res) {
   const job = jobs.get(req.params.id);
   if (!job) return res.status(404).json({ error: '任务不存在' });
-  if (job.process && job.status === 'running') job.process.kill('SIGINT');
+  if (job.process && job.status === 'running') {
+    job.stopRequested = true;
+    if (!job.process.kill('SIGINT')) {
+      job.stopRequested = false;
+      return res.status(503).json({ error: '停止信号未送达，请重试' });
+    }
+  }
   res.json({ ok: true });
 }
 

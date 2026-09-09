@@ -17,3 +17,11 @@ if (args.includes('auth-failure')) {
   emit({ type: 'turn.completed' });
 }
 if (args.includes('wait-for-stop')) setInterval(() => {}, 1000);
+
+if (args.includes('stop-with-exit-code')) {
+  process.on('SIGINT', () => {
+    emit({ type: 'result', is_error: true, result: 'Interrupted by user' });
+    process.exit(1);
+  });
+  setInterval(() => {}, 1000);
+}
