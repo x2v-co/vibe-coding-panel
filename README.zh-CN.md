@@ -22,7 +22,11 @@
 
 [Agent 安装指南](docs/install-for-agents.md)包含系统检测、安装命令、已有目录处理、验证及交付要求。
 
-## 自己安装：三步开始
+## 下载便携运行包
+
+[下载 Connector](https://vibe.tooluse.app/download)：提供 macOS Apple Silicon／Intel、Windows x64 和 Linux x64 版本。内含 Node.js 24 和锁定依赖，完整解压后运行对应启动文件，无需另装 Node 或 npm。仍需安装并登录 Codex／Claude；语音所需 Whisper／ffmpeg 可选安装。当前为未签名的内测包。[运行包说明与限制](docs/portable-connector.md) · [版本与校验文件](https://github.com/x2v-co/vibe-coding-panel/releases/latest)。
+
+## 从源码安装：三步开始
 
 **准备好：**macOS、Windows 10/11 或 Linux 电脑，安装 [Node.js 24 LTS](https://nodejs.org/zh-cn/download)。安装并登录 [Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://code.claude.com/docs/zh-CN/setup)，先在其终端发送一句话，确认能正常回复。
 

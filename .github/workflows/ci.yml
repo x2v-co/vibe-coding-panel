@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest, macos-15-intel, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -22,6 +22,13 @@ jobs:
       - run: npm run test:acceptance
       - run: npm test
       - run: npm run build
+      - run: node scripts/package-connector.mjs
+      - run: node scripts/test-connector-package.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: connector-${{ matrix.os }}
+          path: release/vibe-connector-*.zip
+          if-no-files-found: error
       - if: runner.os == 'Linux'
         run: python3 deploy/test-release.py
 
@@ -36,17 +43,26 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: connector-*
+          path: connector-packages
+          merge-multiple: true
       - name: Build versioned image and release package
         run: |
           docker build -f Dockerfile.relay --build-arg VERSION="$GITHUB_SHA" -t "vibe-panel:$GITHUB_SHA" .
           docker save "vibe-panel:$GITHUB_SHA" | gzip > relay-image.tar.gz
-          sha256sum relay-image.tar.gz > SHA256SUMS
+          for target in darwin-arm64 darwin-x64 win32-x64 linux-x64; do
+            test -s "connector-packages/vibe-connector-$target.zip"
+          done
+          cp connector-packages/*.zip .
+          sha256sum relay-image.tar.gz vibe-connector-*.zip > SHA256SUMS
       - name: Publish verified release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "relay-$GITHUB_SHA" >/dev/null 2>&1; then exit 0; fi
-          gh release create "relay-$GITHUB_SHA" relay-image.tar.gz SHA256SUMS --target "$GITHUB_SHA" --title "Relay $GITHUB_SHA" --notes "Three-platform acceptance passed. Versioned Relay image with SHA256 checksum; production pulls and health-checks this release automatically." --latest
+          gh release create "relay-$GITHUB_SHA" relay-image.tar.gz vibe-connector-*.zip SHA256SUMS --target "$GITHUB_SHA" --title "Vibe Panel $GITHUB_SHA" --notes "Portable Connector packages include Node 24 and locked dependencies. Extracted-package startup, pairing and task acceptance passed without global Node/npm on macOS Apple Silicon/Intel, Windows x64 and Linux x64. See START-HERE.md for prerequisites and known beta limitations. SHA256SUMS covers all downloads. Relay production updates automatically with health checks and rollback. Feedback: https://github.com/x2v-co/vibe-coding-panel/issues" --latest
       - name: Verify production applied this version
         run: |
           for attempt in $(seq 1 60); do

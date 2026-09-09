@@ -1193,3 +1193,7 @@ footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+.download-packages { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+.download-packages .site-primary-action { font-size: 14px; padding: 12px 16px; }
+.download-package-note { color: var(--muted, #777); font-size: 14px; line-height: 1.7; margin: 24px 0; }

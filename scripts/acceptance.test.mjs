@@ -5,10 +5,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
-const root = path.resolve(import.meta.dirname, '..');
+const sourceRoot = path.resolve(import.meta.dirname, '..');
+const root = process.env.PANEL_ACCEPTANCE_ROOT || sourceRoot;
+const runtime = process.env.PANEL_ACCEPTANCE_ROOT ? path.join(root, 'runtime', process.platform === 'win32' ? 'node.exe' : 'node') : process.execPath;
 function run(args, env, cwd = root) {
   return new Promise(resolve => {
-    const child = spawn(process.execPath, args, { cwd, env: { ...process.env, ...env } });
+    const child = spawn(runtime, args, { cwd, env: { ...process.env, ...env } });
     let stdout = '', stderr = '';
     child.stdout.on('data', data => stdout += data);
     child.stderr.on('data', data => stderr += data);
@@ -36,8 +38,8 @@ test('installed checkout diagnoses missing and authenticated agents and occupied
     assert.equal(result.code, 1, result.stderr);
     assert.equal(JSON.parse(result.stdout).checks.find(c => c.name === 'agent login').ok, false);
     const cli = path.join(directory, process.platform === 'win32' ? 'agent.cmd' : 'agent');
-    const fixture = path.join(root, 'server/fixtures/agent-cli.cjs');
-    await writeFile(cli, process.platform === 'win32' ? `@echo off\r\n"${process.execPath}" "${fixture}" %*\r\n` : `#!/bin/sh\nexec "${process.execPath}" "${fixture}" "$@"\n`);
+    const fixture = path.join(sourceRoot, 'server/fixtures/agent-cli.cjs');
+    await writeFile(cli, process.platform === 'win32' ? `@echo off\r\n"${runtime}" "${fixture}" %*\r\n` : `#!/bin/sh\nexec "${runtime}" "${fixture}" "$@"\n`);
     await chmod(cli, 0o755);
     result = await run(['scripts/launch.mjs', '--doctor', '--json'], { ...env, PANEL_CODEX_BIN: cli });
     assert.equal(result.code, 0, result.stderr + result.stdout);
@@ -57,10 +59,10 @@ test('unified launcher connects, pairs and runs a fixture task through Relay', {
   const origin = `http://127.0.0.1:${relay.server.address().port}`;
   const directory = await mkdtemp(path.join(tmpdir(), 'vibe launch '));
   const cli = path.join(directory, process.platform === 'win32' ? 'agent.cmd' : 'agent');
-  const fixture = path.join(root, 'server/fixtures/agent-cli.cjs');
-  await writeFile(cli, process.platform === 'win32' ? `@echo off\r\n"${process.execPath}" "${fixture}" %*\r\n` : `#!/bin/sh\nexec "${process.execPath}" "${fixture}" "$@"\n`);
+  const fixture = path.join(sourceRoot, 'server/fixtures/agent-cli.cjs');
+  await writeFile(cli, process.platform === 'win32' ? `@echo off\r\n"${runtime}" "${fixture}" %*\r\n` : `#!/bin/sh\nexec "${runtime}" "${fixture}" "$@"\n`);
   await chmod(cli, 0o755);
-  const child = spawn(process.execPath, ['scripts/launch.mjs'], {
+  const child = spawn(runtime, ['scripts/launch.mjs'], {
     cwd: root, detached: process.platform !== 'win32',
     env: { ...process.env, PANEL_CODEX_BIN: cli, PANEL_CLAUDE_BIN: cli, PANEL_AGENT_PROVIDER: 'codex', PANEL_RELAY_URL: origin, PANEL_RELAY_STATE: path.join(directory, 'relay.json'), PANEL_DEVICE_STORE: path.join(directory, 'devices.json'), PANEL_BRIDGE_TOKEN: '', CODEX_HOME: directory, CLAUDE_CONFIG_DIR: directory },
   });

@@ -23,7 +23,11 @@ permission to me. Do not report success until you have checked the service.
 
 [Agent installation guide](docs/install-for-agents.md) covers platform checks, commands, existing installations, verification, and handoff.
 
-## Install yourself
+## Portable download
+
+[Download a portable Connector](https://vibe.tooluse.app/download) for macOS Apple Silicon/Intel, Windows x64 or Linux x64. Node.js 24 and locked application dependencies are included: extract the ZIP and run the platform launcher without installing Node or npm. An installed, authenticated Codex/Claude CLI is still required; Whisper/ffmpeg are optional for voice. Packages are unsigned internal-beta builds. [Package instructions and limitations](docs/portable-connector.md) · [Releases and checksums](https://github.com/x2v-co/vibe-coding-panel/releases/latest).
+
+## Install from source
 
 **Before you start:** use macOS, Windows 10/11, or Linux with [Node.js 24 LTS](https://nodejs.org/en/download). Install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/) or [Claude Code](https://code.claude.com/docs/en/setup). Send a short text request in that CLI first to confirm it works.
 

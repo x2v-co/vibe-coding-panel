@@ -16,3 +16,5 @@ deploy/image.env
 deploy/last-release
 deploy/deploy.lock
 deploy/failed-release
+
+release/

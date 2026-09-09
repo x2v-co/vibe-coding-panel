@@ -9,20 +9,23 @@ process.chdir(root);
 const require = createRequire(import.meta.url);
 const json = process.argv.includes('--json');
 const doctor = process.argv.includes('--doctor');
+let bundle;
+try { bundle = require('../bundle.json'); } catch {}
 const checks = [];
 const add = (name, ok, next = '') => checks.push({ name, ok, next: ok ? '' : next });
 add('Node.js >=22.12', Number(process.versions.node.split('.')[0]) > 22 || (Number(process.versions.node.split('.')[0]) === 22 && Number(process.versions.node.split('.')[1]) >= 12), 'Install Node.js 24 LTS: https://nodejs.org/');
 const npm = (args) => spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', args, { cwd: root, encoding: 'utf8', shell: process.platform === 'win32', timeout: 180000 });
-add('npm', npm(['--version']).status === 0, 'Reinstall Node.js with npm and PATH enabled.');
+if (!bundle) add('npm', npm(['--version']).status === 0, 'Reinstall Node.js with npm and PATH enabled.');
+else add('bundled runtime', bundle.platform === process.platform && bundle.arch === process.arch, 'Download the Connector for this operating system and CPU architecture.');
 function dependencies() {
   try { for (const name of Object.keys(require('../package.json').dependencies)) require.resolve(name); return true; } catch { return false; }
 }
-if (!doctor && checks.every(c => c.ok) && !dependencies()) {
+if (!bundle && !doctor && checks.every(c => c.ok) && !dependencies()) {
   console.log('Installing locked dependencies (npm ci)...');
   const result = npm(['ci']);
   if (result.status !== 0) { console.error('npm ci failed. Check network access and retry.'); process.exit(1); }
 }
-add('dependencies', dependencies(), 'Run npm ci in the project directory.');
+add('dependencies', dependencies(), bundle ? 'Re-download and fully extract the Connector ZIP; runtime files are missing.' : 'Run npm ci in the project directory.');
 let selectedPort;
 const requested = Number(process.env.PANEL_API_PORT || 8787);
 for (const port of [requested, 8800, 8801, 8802, 8810, 8811]) {
@@ -42,7 +45,7 @@ if (dependencies()) {
   checks.push({ name: 'agents', ok: true, agents });
 }
 const ok = checks.every(c => c.ok);
-if (json) console.log(JSON.stringify({ ok, platform: process.platform, node: process.version, port: selectedPort, checks }));
+if (json) console.log(JSON.stringify({ ok, platform: process.platform, node: process.version, bundle: bundle || null, port: selectedPort, checks }));
 else for (const check of checks) console.log(`${check.ok ? 'OK' : 'FAIL'} ${check.name}${check.next ? ': ' + check.next : ''}`);
 if (!ok) process.exit(1);
 if (!doctor) {
