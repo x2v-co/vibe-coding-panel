@@ -63,6 +63,7 @@ else for (const check of checks) {
   if (check.speech) {
     const speech = check.speech;
     console.log(`INFO speech (optional): ${speech.backend} / ${speech.model}; Whisper ${speech.whisper.version || 'unknown'} (${speech.whisper.status}); ffmpeg ${speech.ffmpeg.version || 'unknown'} (${speech.ffmpeg.status})`);
+    if (speech.guidance) console.log(speech.guidance);
   } else console.log(`${check.ok ? 'OK' : 'FAIL'} ${check.name}${check.revision ? ': ' + check.revision.slice(0, 8) : ''}${check.next ? ': ' + check.next : ''}`);
 }
 if (!ok) process.exit(1);

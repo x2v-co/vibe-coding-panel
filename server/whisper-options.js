@@ -12,6 +12,11 @@ export function resolveWhisperModel(env = process.env) {
   return env.PANEL_WHISPER_MODEL || (resolveWhisperBackend(env) === 'mlx' ? 'mlx-community/whisper-large-v3-turbo-q4' : 'small');
 }
 
+export function speechConfiguration(env = process.env) {
+  try { return { backend: resolveWhisperBackend(env), model: resolveWhisperModel(env) }; }
+  catch { return { backend: 'unknown', model: 'unknown', guidance: '语音后端配置无效。请在电脑将 PANEL_WHISPER_BACKEND 设置为 openai 或 mlx，或移除此自定义设置后重启；仍可使用文字输入。' }; }
+}
+
 export function resolveWhisperTimeout(env = process.env) {
   const configured = Number(env.PANEL_WHISPER_TIMEOUT_MS);
   return Number.isFinite(configured) && configured > 0 ? configured : 20 * 60 * 1000;

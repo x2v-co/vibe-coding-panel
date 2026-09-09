@@ -161,3 +161,24 @@ Whisper; it does not install an agent, a correction provider, or GPU drivers.
 Expect several minutes and about 3 GB of free disk space on first installation.
 Downloads go to GitHub, PyPI, PyTorch's CPU index and OpenAI's model storage;
 they contain software/model requests, not microphone recordings.
+
+
+## Recovering from failures
+
+| Panel message | Next action |
+| --- | --- |
+| Connector offline | Wake the computer and open Vibe Panel; wait for its connected message. Usually no new pairing is needed. |
+| Device not paired / authorization revoked | Generate a new code on the computer and pair that device again. |
+| Request too frequent | Wait for the displayed Retry-After interval; repeated clicks can extend pressure on the service. |
+| Upload too large | Split the recording or compress the image; keep individual uploads below roughly 7 MiB because the Relay limit includes base64 overhead. |
+| Computer response timed out | Check task history and project changes before resending. For voice, shorten the recording and verify the model is installed. |
+| Agent authentication / quota | Check the selected provider's login, key or quota on the computer. Phone pairing cannot fix provider credentials or limits. |
+| Missing CLI / unsupported CLI arguments | Check the Agent install/version and configured executable, then restart Connector. |
+| Speech dependencies / model download | Run Setup Voice on the computer; custom MLX users should repair their chosen environment. |
+| Invalid speech backend | Set PANEL_WHISPER_BACKEND to openai or mlx, or remove the override and restart. Health/diagnostics and text tasks remain available. |
+
+API errors use readable messages; speech failures also return stable codes such as
+WHISPER_MISSING, SPEECH_CONFIGURATION, SPEECH_DEPENDENCIES, SPEECH_MODEL_DOWNLOAD,
+SPEECH_MEMORY and SPEECH_TIMEOUT. Unknown proxy/runtime messages are replaced with
+guidance rather than rendered as HTML or raw parser errors. Agent task logs retain
+diagnostic output; review them before retrying a task that may have changed files.

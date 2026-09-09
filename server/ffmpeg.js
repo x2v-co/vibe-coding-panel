@@ -14,5 +14,5 @@ export async function resolveFfmpeg({ configured, pythonCandidates, readProcess 
       return binary;
     } catch { /* This Python or its bundled ffmpeg is unavailable. */ }
   }
-  throw new Error('没有可运行的 ffmpeg。请在 Whisper 所用 Python 中安装 imageio-ffmpeg，或修复 PANEL_FFMPEG_BIN 指定的程序。');
+  throw Object.assign(new Error('没有可运行的 ffmpeg。请在电脑运行 Setup Voice 并重启 Connector；使用自定义语音环境时，请修复该环境的 imageio-ffmpeg 或录音解码程序。'), { status: 503, code: 'FFMPEG_MISSING' });
 }

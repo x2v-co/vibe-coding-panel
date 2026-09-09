@@ -7,7 +7,7 @@ import { homedir, hostname, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PairingStore, isLoopbackRequest, readCookie } from './pairing.js';
-import { buildWhisperArgs, resolveWhisperModel, resolveWhisperTimeout, resolveWhisperBackend, resolveWhisperBinary } from './whisper-options.js';
+import { buildWhisperArgs, resolveWhisperModel, resolveWhisperTimeout, resolveWhisperBackend, resolveWhisperBinary, speechConfiguration } from './whisper-options.js';
 import { managedSpeechEnv } from './managed-speech.js';
 Object.assign(process.env, managedSpeechEnv());
 import { resolveFfmpeg } from './ffmpeg.js';
@@ -17,6 +17,7 @@ const correctTranscript = createTranscriptCorrector();
 import { agentProviders, defaultAgentProvider, probeAgentProviders, buildAgentInvocation, normalizeAgentProvider, parseAgentLine } from './agent-providers.js';
 import { releaseInfo, speechDiagnostics, cachedDiagnostics } from './runtime-info.js';
 import { NativeSessions } from './native-sessions.js';
+import { speechFailure, agentFailure } from './user-errors.js';
 import { CodexRuntime } from './codex-runtime.js';
 
 const app = express();
@@ -145,8 +146,10 @@ function launch(job, prompt, resume = false) {
   job.process = child;
   let stdoutBuffer = '';
   let stderrBuffer = '';
+  let failureDetails = '', startError = null;
   function logStderr(line) {
     if (!shouldShowStderr(line)) return;
+    failureDetails = (failureDetails + '\n' + line).slice(-4000);
     if (line.includes('Authorization validation failed')) {
       job.authError = '模型服务拒绝了当前认证，请检查 Codex 所选 provider 的认证配置；手机配对无需重做。';
     }
@@ -165,10 +168,11 @@ function launch(job, prompt, resume = false) {
     for (const line of lines) logStderr(line);
   });
   child.on('error', (error) => {
-    job.agentError = error.message;
+    startError = agentFailure(error, job.provider);
+    job.agentError = startError;
     job.status = 'failed';
     job.finishedAt = Date.now();
-    push(job, { type: 'status', status: 'failed', text: error.message });
+    push(job, { type: 'status', status: 'failed', text: job.agentError });
   });
   child.on('close', (code, signal) => {
     if (stdoutBuffer) parseAgentLine(job.provider, job, stdoutBuffer, (event) => push(job, event));
@@ -177,9 +181,10 @@ function launch(job, prompt, resume = false) {
     job.finishedAt = Date.now();
     job.status = job.stopRequested || signal ? 'stopped' : code === 0 && !job.agentError ? 'completed' : 'failed';
     if (job.status === 'stopped') job.agentError = null;
+    if (job.status === 'failed') job.agentError = startError || agentFailure([job.authError, job.agentError, failureDetails].filter(Boolean).join('\n'), job.provider);
     push(job, {
       type: 'status', status: job.status,
-      text: job.status === 'completed' ? '任务完成' : job.status === 'stopped' ? '任务已停止' : job.authError || job.agentError || `任务失败（退出码 ${code}）`,
+      text: job.status === 'completed' ? '任务完成' : job.status === 'stopped' ? '任务已停止' : job.agentError,
     });
   });
 }
@@ -306,7 +311,7 @@ async function localWorkspaceHandler(req, res) {
   try {
     res.json(await listWorkspaceDirectories(req.body?.path));
   } catch (error) {
-    res.status(error.code === 'ENOENT' ? 404 : 400).json({ error: error.message || '无法读取该目录' });
+    res.status(['ENOENT', 'ENOTDIR'].includes(error.code) ? 404 : 400).json({ error: ['ENOENT', 'ENOTDIR'].includes(error.code) ? '目录不存在或不是文件夹，请重新选择工作目录。' : '无法读取该目录，请在电脑检查目录访问权限后重试。' });
   }
 }
 
@@ -317,20 +322,18 @@ function runProcess(command, args, timeoutMs = 120000, env = process.env) {
     let stdout = '';
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
-      reject(new Error('语音转写超时；首次使用可能仍在下载模型，请重试'));
+      reject(speechFailure(new Error('timeout')));
     }, timeoutMs);
     child.stderr.on('data', (chunk) => { stderr = (stderr + chunk.toString()).slice(-8000); });
     child.stdout.on('data', (chunk) => { stdout = (stdout + chunk.toString()).slice(-8000); });
     child.on('error', (error) => {
       clearTimeout(timer);
-      reject(error.code === 'ENOENT'
-        ? new Error('本机未安装 Whisper，请设置 PANEL_WHISPER_BIN')
-        : error);
+      reject(speechFailure(error));
     });
     child.on('close', (code) => {
       clearTimeout(timer);
       if (code === 0) resolve({ stdout, stderr });
-      else reject(new Error(stderr.trim().split(/\r?\n/).pop() || `Whisper 退出码 ${code}`));
+      else reject(speechFailure(new Error(stderr || `Whisper exit ${code}`)));
     });
   });
 }
@@ -382,6 +385,8 @@ async function exposeFfmpeg(ffmpegPath, workDir) {
 }
 
 async function transcribeAudio(audioInput, languageInput) {
+  const configuration = speechConfiguration();
+  if (configuration.guidance) throw Object.assign(new Error(configuration.guidance), { status: 503, code: 'SPEECH_CONFIGURATION' });
   const match = String(audioInput || '').match(/^data:audio\/([A-Za-z0-9.+-]+)(?:;[^,]*)?;base64,([A-Za-z0-9+/=]+)$/);
   if (!match) throw Object.assign(new Error('录音格式无效'), { status: 400 });
   const bytes = Buffer.from(match[2], 'base64');
@@ -419,7 +424,7 @@ async function transcribeAudio(audioInput, languageInput) {
       // Whisper catches per-file errors and can exit 0 without writing a result.
       const detail = (diagnostics.stdout + '\n' + diagnostics.stderr).split(/\r?\n/)
         .filter((line) => line.trim()).slice(-3).join(' ').replaceAll(workDir, '[录音临时目录]').slice(-800);
-      throw new Error(`Whisper 未生成转写结果${detail ? `：${detail}` : '，请查看电脑上的 Whisper 安装配置'}`);
+      throw speechFailure(new Error(detail));
     }
   } finally {
     await rm(workDir, { recursive: true, force: true });
@@ -528,7 +533,7 @@ app.get('/api/health', async (req, res) => {
     device,
     demoAvailable: true,
     connector: connectorRelease,
-    speech: { backend: resolveWhisperBackend(), model: resolveWhisperModel() },
+    speech: speechConfiguration(),
   });
 });
 
@@ -595,7 +600,8 @@ app.post('/api/transcriptions', async (req, res) => {
     const text = await correctTranscript(original, { timeoutMs: 50000 - (Date.now() - started) });
     res.json({ text });
   } catch (error) {
-    res.status(error.status || 500).json({ error: error.message || '录音转写失败' });
+    const failure = error.status ? error : speechFailure(error);
+    res.status(failure.status).json({ error: failure.message, code: failure.code || 'INVALID_RECORDING' });
   }
 });
 
@@ -642,7 +648,7 @@ function launchManagedCodex(job, prompt) {
     if (message.method?.includes('item/completed') && p.item?.type === 'agentMessage' && p.item.text) { job.result = p.item.text; push(job, { type: 'message', text: p.item.text }); }
     if (message.method?.includes('turn/completed')) { job.status = 'completed'; job.finishedAt = Date.now(); push(job, { type: 'status', status: 'completed', text: '任务完成' }); unsubscribe(); }
   });
-  codexRuntime.turn(job.threadId, job.cwd, prompt).catch((error) => { job.status = 'failed'; job.finishedAt = Date.now(); job.agentError = error.message; push(job, { type: 'status', status: 'failed', text: error.message }); unsubscribe(); });
+  codexRuntime.turn(job.threadId, job.cwd, prompt).catch((error) => { job.status = 'failed'; job.finishedAt = Date.now(); job.agentError = error.message; push(job, { type: 'status', status: 'failed', text: job.agentError }); unsubscribe(); });
 }
 
 app.post('/api/native-sessions/:provider/:id/resume', async (req, res) => {

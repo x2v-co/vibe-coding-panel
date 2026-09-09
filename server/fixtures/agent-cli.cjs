@@ -9,6 +9,10 @@ if (args.includes('auth-failure')) {
   process.stderr.write('ERROR failed to refresh available models: Authorization validation failed\n');
   emit({ type: 'turn.failed', error: { message: 'stream disconnected before completion' } });
   process.exitCode = 1;
+} else if (args.includes('quota-failure')) {
+  process.stderr.write('usage_limit_reached: quota exceeded\n');
+  emit(args.includes('--output-format') ? { type: 'result', is_error: true, result: 'stream disconnected before completion' } : { type: 'turn.failed', error: { message: 'stream disconnected before completion' } });
+  process.exitCode = 1;
 } else if (args.includes('--output-format')) {
   emit({ type: 'result', session_id: args.includes('--resume') ? args[args.indexOf('--resume') + 1] : 'fixture-thread', result });
 } else {

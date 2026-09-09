@@ -5,6 +5,18 @@ Portable packages use package version 0.1.0 plus an exact Git revision. Each
 four Connector ZIPs, the Relay image, SHA256SUMS and version-specific notes.
 The application remains an internal beta; see [known limitations](docs/known-issues.md).
 
+## 2026-09-10 — actionable failure guidance
+
+- Handle proxy HTML and malformed API responses without exposing JSON parser errors.
+- Explain Connector offline/timeout, revoked pairing, request limits and upload size,
+  including checking existing tasks before resending after an uncertain response.
+- Distinguish missing CLI, provider authentication/quota/network and incompatible
+  CLI arguments from phone pairing failures.
+- Classify speech installation, model download, memory, permissions and timeout
+  failures; invalid optional speech configuration keeps text mode operational.
+- Add HTTP fault acceptance for missing CLI, quota failure and invalid speech
+  configuration, plus browser/API response tests and accessible error announcements.
+
 ## 2026-09-10 — release documentation
 
 - Publish privacy and terms pages, accessible before pairing and from the panel.

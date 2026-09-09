@@ -5,6 +5,7 @@ import {
   Smartphone, Sparkles, Terminal, Trash2, Wifi, X, Zap,
 } from 'lucide-react';
 import QRCode from 'qrcode';
+import { readApiResponse, userError } from './api';
 import { MIN_RECORDING_MS, recordingMimeTypes, validateRecording } from './recording';
 import { Fragment, ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { defaultMicroKeys, microActions, microColors, microIconOptions, microKeycapAssets, readMicroConfiguration, updateMicroConfiguration, unavailableMicroAction, MicroVoiceGesture } from './micro';
@@ -18,7 +19,7 @@ type ConnectionState = 'online' | 'checking' | 'offline' | 'unknown';
 type AgentProviderId = 'codex' | 'claude';
 type AgentConnection = { mode: ConnectionMode; url: string; token: string };
 type AgentProviderInfo = { id: AgentProviderId; label: string; available: boolean; authenticated: boolean; version?: string };
-type RuntimeDiagnostics = { connector: { version: string; revision: string | null; distribution: string }; node: string; platform: string; arch: string; providers: AgentProviderInfo[]; speech: { backend: string; model: string; whisper: { status: string; version: string | null }; ffmpeg: { status: string; version: string | null }; correction: string } };
+type RuntimeDiagnostics = { connector: { version: string; revision: string | null; distribution: string }; node: string; platform: string; arch: string; providers: AgentProviderInfo[]; speech: { backend: string; model: string; whisper: { status: string; version: string | null }; ffmpeg: { status: string; version: string | null }; correction: string; guidance?: string } };
 type Activity = { id: number; revision?: number; at: number; type: string; text?: string; status?: string };
 type SavedJob = {
   id: string; prompt: string; cwd: string; status: JobStatus; result?: string;
@@ -302,11 +303,11 @@ function PanelApp() {
       pending = true;
       try {
         const response = await fetch(`/api/native-sessions?${new URLSearchParams({ provider: agentProvider, workspace: cwd })}`, { signal: AbortSignal.timeout(25000) });
-        const payload = await response.json();
+        const payload = await readApiResponse(response);
         if (!response.ok) throw new Error(payload.error || '请更新电脑 Connector 后重试');
         if (cancelled) return;
         setNativeList(payload.sessions || []); setNativeCursor(payload.nextCursor || null); setNativeError('');
-      } catch (error) { if (!cancelled) setNativeError(error instanceof Error ? error.message : '无法读取会话'); }
+      } catch (error) { if (!cancelled) setNativeError(userError(error, '无法读取会话')); }
       finally { pending = false; if (!cancelled) setNativeLoading(false); }
     };
     setNativeLoading(true); setNativeList([]); void refresh();
@@ -319,10 +320,10 @@ function PanelApp() {
     setNativeLoading(true);
     try {
       const response = await fetch(`/api/native-sessions?${new URLSearchParams({ provider: agentProvider, workspace: cwd, cursor: nativeCursor })}`);
-      const payload = await response.json(); if (!response.ok) throw new Error(payload.error);
+      const payload = await readApiResponse(response); if (!response.ok) throw new Error(payload.error);
       setNativeList(items => [...items, ...(payload.sessions || []).filter((s: NativeSession) => !items.some(i => i.id === s.id))]);
       setNativeCursor(payload.nextCursor || null);
-    } catch (error) { setNativeError(error instanceof Error ? error.message : '无法读取会话'); }
+    } catch (error) { setNativeError(userError(error, '无法读取会话')); }
     finally { setNativeLoading(false); }
   }
 
@@ -335,10 +336,10 @@ function PanelApp() {
       pending = true;
       try {
         const response = await fetch(`/api/native-sessions/${nativeSelection.provider}/${nativeSelection.id}?${new URLSearchParams({ workspace: nativeSelection.cwd })}`, { signal: AbortSignal.timeout(25000) });
-        const payload = await response.json();
+        const payload = await readApiResponse(response);
         if (!response.ok) throw new Error(payload.error);
         if (!cancelled) { setNativeSelection(payload); setNativeError(''); }
-      } catch (error) { if (!cancelled) setNativeError(error instanceof Error ? error.message : '无法刷新原生会话'); }
+      } catch (error) { if (!cancelled) setNativeError(userError(error, '无法刷新原生会话')); }
       finally { pending = false; }
     };
     void refresh(); const timer = window.setInterval(() => { void refresh(); }, 3000);
@@ -367,11 +368,11 @@ function PanelApp() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: command, cwd: session.cwd, terminalReleased }),
       });
-      const payload = await response.json(); if (!response.ok) throw new Error(payload.error);
+      const payload = await readApiResponse(response); if (!response.ok) throw new Error(payload.error);
       setTaskTitle(session.title); nativeSelectionRef.current = null; setNativeSelection(null); setPrompt(''); setResult(''); setActivity([]);
       setCapturePath(''); setCapturePreview(''); setStartedAt(Date.now()); selectJob(payload.id);
       localStorage.setItem(ACTIVE_JOB_KEY, payload.id);
-    } catch (error) { setStatus('idle'); setError(error instanceof Error ? error.message : '无法接续会话'); }
+    } catch (error) { setStatus('idle'); setError(userError(error, '无法接续会话')); }
   }
 
   async function releaseNativeTerminal() {
@@ -386,7 +387,7 @@ function PanelApp() {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cwd: session.cwd }),
         signal: AbortSignal.timeout(25000),
       });
-      const payload = await response.json();
+      const payload = await readApiResponse(response);
       if (!response.ok || !payload.released || !payload.session?.canResume) {
         setNativeHandoff({ key, state: payload.state === 'timeout' ? 'timeout' : 'error', message: payload.error || '终端尚未释放，请在电脑退出 CLI 后重试' });
         return;
@@ -419,7 +420,7 @@ function PanelApp() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, deviceName: isMobileDevice ? 'Mobile panel' : 'Browser panel' }),
       });
-      const payload = await response.json();
+      const payload = await readApiResponse(response);
       if (!response.ok) throw new Error(payload.error || '配对失败');
       setPairedDevice(payload.device || null);
       setPairCode('');
@@ -431,7 +432,7 @@ function PanelApp() {
       window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
       return true;
     } catch (reason) {
-      if (!quiet) setError(reason instanceof Error ? reason.message : '配对失败');
+      if (!quiet) setError(userError(reason, '配对失败'));
       return false;
     } finally {
       setPairingBusy(false);
@@ -445,7 +446,7 @@ function PanelApp() {
         setPairingAdmin(false);
         return;
       }
-      const payload = await response.json();
+      const payload = await readApiResponse(response);
       setPairingAdmin(true);
       setDevices(Array.isArray(payload.devices) ? payload.devices : []);
     } catch {
@@ -462,12 +463,12 @@ function PanelApp() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ publicUrl: publicUrl.trim() }),
       });
-      const payload = await response.json();
+      const payload = await readApiResponse(response);
       if (!response.ok) throw new Error(payload.error || '无法生成配对码');
       setPairingInfo(payload);
       setPairingQr(await QRCode.toDataURL(payload.pairingUrl, { width: 280, margin: 1, errorCorrectionLevel: 'M' }));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '无法生成配对码');
+      setError(userError(reason, '无法生成配对码'));
     } finally {
       setPairingBusy(false);
     }
@@ -491,14 +492,14 @@ function PanelApp() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ connection: connectionPayload }),
       });
-      const payload = await response.json();
+      const payload = await readApiResponse(response);
       if (!response.ok) throw new Error(payload.error || 'Agent 连接失败');
       updateProviders(payload.providers || []);
       setConnectionState('online');
       setAgentLabel(connection.mode === 'remote' ? payload.name || 'REMOTE AGENT' : 'LOCAL AGENT');
     } catch (reason) {
       setConnectionState('offline');
-      setError(reason instanceof Error ? reason.message : 'Agent 连接失败');
+      setError(userError(reason, 'Agent 连接失败'));
     }
   }
 
@@ -562,7 +563,7 @@ function PanelApp() {
     setRuntimeDiagnostics(null); setDiagnosticsError('');
     void fetch('/api/diagnostics', { signal: abort.signal }).then(async response => {
       if (!response.ok) throw new Error(response.status === 404 ? '电脑 Connector 版本较旧，请更新后重启' : '暂时无法读取诊断，请检查电脑连接后重试');
-      const data = await response.json() as RuntimeDiagnostics;
+      const data = await readApiResponse(response) as RuntimeDiagnostics;
       if (!data.connector || !data.speech || !Array.isArray(data.providers)) throw new Error('诊断格式不兼容，请更新电脑 Connector');
       if (!abort.signal.aborted) { setRuntimeDiagnostics(data); setConnectorRevision(data.connector.revision); }
     }).catch(error => { if (!abort.signal.aborted) setDiagnosticsError(error.message); })
@@ -582,7 +583,7 @@ function PanelApp() {
     const initialize = async () => {
       try {
         const response = await fetch('/api/health');
-        const payload = await response.json();
+        const payload = await readApiResponse(response);
         if (!response.ok) throw new Error(payload.error || '无法连接控制面板');
         setConnectorRevision(payload.connector?.revision || null);
         if (payload.publicUrl) {
@@ -602,7 +603,7 @@ function PanelApp() {
         void loadDevices();
       } catch (reason) {
         setConnectionState('offline');
-        setError(reason instanceof Error ? reason.message : '无法连接控制面板');
+        setError(userError(reason, '无法连接控制面板'));
       } finally {
         setAuthReady(true);
       }
@@ -625,7 +626,7 @@ function PanelApp() {
       try {
         const response = await fetch('/api/jobs', { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]), cache: 'no-store' });
         if (!response.ok) return;
-        const payload = await response.json() as { jobs?: SavedJob[] };
+        const payload = await readApiResponse(response) as { jobs?: SavedJob[] };
         if (cancelled || !Array.isArray(payload.jobs)) return;
         // Replace browser history with this Connector's list. Do not mix task
         // records from another computer or demo into a newly paired session.
@@ -674,11 +675,11 @@ function PanelApp() {
           localStorage.removeItem(ACTIVE_JOB_KEY);
           return;
         }
-        const payload = await response.json();
+        const payload = await readApiResponse(response);
         if (!response.ok) throw new Error(payload.error || '无法恢复上次任务');
         restoreJob(payload as SavedJob);
       } catch (reason) {
-        setError(reason instanceof Error ? reason.message : '无法恢复上次任务');
+        setError(userError(reason, '无法恢复上次任务'));
       } finally {
         setIsRecoveringJob(false);
       }
@@ -757,7 +758,7 @@ function PanelApp() {
         return;
       }
       if (!response.ok) return;
-      const job = await response.json() as SavedJob;
+      const job = await readApiResponse(response) as SavedJob;
       if (selectedJobRef.current !== id || jobMutationRef.current !== mutation) return;
       if (job.revision !== undefined && job.revision < jobRevisionRef.current) return;
       jobRevisionRef.current = job.revision || 0;
@@ -862,7 +863,7 @@ function PanelApp() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: command, cwd, agentProvider, connection: connectionPayload }),
       });
-      const payload = await response.json();
+      const payload = await readApiResponse(response);
       if (!response.ok) throw new Error(payload.error || '任务启动失败');
       setTaskTitle(title);
       setPrompt(''); setCapturePath(''); setCapturePreview(''); selectJob(payload.id);
@@ -870,7 +871,7 @@ function PanelApp() {
     } catch (reason) {
       setStatus('failed');
       setStartedAt(null);
-      setError(reason instanceof Error ? reason.message : '任务启动失败');
+      setError(userError(reason, '任务启动失败'));
     }
   }
 
@@ -883,13 +884,13 @@ function PanelApp() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: command }),
       });
-      const payload = await response.json();
+      const payload = await readApiResponse(response);
       if (!response.ok) throw new Error(payload.error || '无法继续任务');
       setPrompt(''); setCapturePath(''); setCapturePreview(''); setActivity([]); setResult('');
       setStreamVersion((version) => version + 1);
     } catch (reason) {
       setStatus('failed');
-      setError(reason instanceof Error ? reason.message : '无法继续任务');
+      setError(userError(reason, '无法继续任务'));
     }
   }
 
@@ -936,7 +937,7 @@ function PanelApp() {
   }
 
   function microphoneErrorMessage(reason: unknown) {
-    if (!(reason instanceof DOMException)) return reason instanceof Error ? reason.message : '无法启动麦克风';
+    if (!(reason instanceof DOMException)) return userError(reason, '无法启动麦克风');
     if (reason.name === 'NotAllowedError' || reason.name === 'SecurityError') {
       return '麦克风未授权，请在当前网站的权限设置中允许麦克风后重试';
     }
@@ -954,7 +955,7 @@ function PanelApp() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ audio: await audioDataUrl(blob), language: 'zh' }),
       });
-      const payload = await response.json();
+      const payload = await readApiResponse(response);
       if (!response.ok) throw new Error(payload.error || '录音转写失败');
       if (voiceSession !== voiceSessionRef.current) return;
       const transcript = String(payload.text || '').trim();
@@ -964,7 +965,7 @@ function PanelApp() {
     } catch (reason) {
       if (voiceSession === voiceSessionRef.current) {
         setCanImportRecording(true);
-        setError(reason instanceof Error ? reason.message : '录音转写失败');
+        setError(userError(reason, '录音转写失败'));
       }
     } finally {
       if (voiceSession === voiceSessionRef.current) setIsTranscribing(false);
@@ -1039,7 +1040,7 @@ function PanelApp() {
         } catch (error) {
           if (voiceSession === voiceSessionRef.current) {
             setCanImportRecording(true);
-            setError(error instanceof Error ? error.message : '录音无法读取，请重试');
+            setError(userError(error, '录音无法读取，请重试'));
           }
         } finally {
           voiceFinalizingRef.current = false;
@@ -1113,7 +1114,7 @@ function PanelApp() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: pathToOpen, connection: connectionPayload }),
       });
-      const payload = await response.json();
+      const payload = await readApiResponse(response);
       if (!response.ok) throw new Error(payload.error || '无法读取该目录');
       setWorkspacePath(payload.path);
       setWorkspaceResolvedPath(payload.path);
@@ -1122,7 +1123,7 @@ function PanelApp() {
     } catch (reason) {
       setWorkspaceResolvedPath('');
       setWorkspaceDirectories([]);
-      setWorkspaceError(reason instanceof Error ? reason.message : '无法读取该目录');
+      setWorkspaceError(userError(reason, '无法读取该目录'));
     } finally {
       setWorkspaceLoading(false);
     }
@@ -1157,7 +1158,7 @@ function PanelApp() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cwd, image: dataUrl, connection: connectionPayload }),
     });
-    const payload = await response.json();
+    const payload = await readApiResponse(response);
     if (!response.ok) throw new Error(payload.error || '图片保存失败');
     setCapturePath(payload.path);
     setCapturePreview(dataUrl);
@@ -1171,7 +1172,7 @@ function PanelApp() {
     try {
       await saveContextImage(await imageDataUrl(file));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '无法添加图片');
+      setError(userError(reason, '无法添加图片'));
     } finally {
       setIsAddingContext(false);
     }
@@ -1198,7 +1199,7 @@ function PanelApp() {
       await saveContextImage(dataUrl);
     } catch (reason) {
       if (reason instanceof DOMException && reason.name === 'NotAllowedError') setError('已取消屏幕捕获');
-      else setError(reason instanceof Error ? reason.message : '屏幕捕获失败');
+      else setError(userError(reason, '屏幕捕获失败'));
     } finally {
       stream?.getTracks().forEach((track) => track.stop());
       setIsCapturing(false);
@@ -1487,7 +1488,7 @@ function PanelApp() {
         </dl>
         {connectorRevision && __PANEL_REVISION__ !== 'unknown' && connectorRevision !== __PANEL_REVISION__ && <p role="status">网页与电脑版本不同。先刷新页面；若仍提示不同，再更新并重启电脑 Connector。配对状态会保留。</p>}
         {diagnosticsError && <p role="status">{diagnosticsError}</p>}
-        {runtimeDiagnostics && (runtimeDiagnostics.speech.whisper.status !== 'ok' || runtimeDiagnostics.speech.ffmpeg.status !== 'ok') && <p>语音组件未就绪，可继续输入文字。请在电脑安装包中运行 Setup Voice，再重启 Connector；详情见<a href="https://github.com/x2v-co/vibe-coding-panel/blob/main/docs/configuration.md" target="_blank" rel="noreferrer">安装说明</a>。</p>}
+        {runtimeDiagnostics && (runtimeDiagnostics.speech.whisper.status !== 'ok' || runtimeDiagnostics.speech.ffmpeg.status !== 'ok') && <p>{runtimeDiagnostics.speech.guidance || <>语音组件未就绪，可继续输入文字。请在电脑安装包中运行 Setup Voice，再重启 Connector；详情见<a href="https://github.com/x2v-co/vibe-coding-panel/blob/main/docs/configuration.md" target="_blank" rel="noreferrer">安装说明</a>。</>}</p>}
       </fieldset>}
       <p className="privacy-note"><ShieldCheck size={14} /><span>录音在电脑上转写，转写文字会通过电脑配置的 Claude 服务自动校对。发送前可直接修改输入框；共享 Relay 会转发内容，详见<a href="/privacy/" target="_blank" rel="noreferrer">隐私说明</a>与<a href="/terms/" target="_blank" rel="noreferrer">使用条款</a>。</span></p>
     </div>;
@@ -1532,7 +1533,7 @@ function PanelApp() {
             <div className="device-footer"><span><Keyboard size={14} /> TEXT + VOICE</span><button type="button" className="theme-shortcut" onClick={() => setShowSettings(true)}><Palette size={14} /> PANEL / {activeLayout.label}</button></div>
             {showSettings && renderSettingsPopover()}
           </div>
-          {error && <div className="error-banner"><Terminal size={16} /><span>{error}</span>{canImportRecording && <button type="button" className="audio-import-action" onClick={() => audioInputRef.current?.click()}><FileAudio size={15} />系统录音</button>}<button onClick={() => { setError(''); setCanImportRecording(false); }} aria-label="关闭"><X size={15} /></button></div>}
+          {error && <div className="error-banner" role="alert"><Terminal size={16} /><span>{error}</span>{canImportRecording && <button type="button" className="audio-import-action" onClick={() => audioInputRef.current?.click()}><FileAudio size={15} />系统录音</button>}<button onClick={() => { setError(''); setCanImportRecording(false); }} aria-label="关闭"><X size={15} /></button></div>}
         </section>
 
         <section className="control-legend" aria-label="控制说明"><div><span>01</span><strong>说</strong><p>语音成为任务草稿</p></div><div><span>02</span><strong>看</strong><p>捕获当前屏幕上下文</p></div><div><span>03</span><strong>执行</strong><p>{activeAgent.label} 在项目中完成工作</p></div></section>

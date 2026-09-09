@@ -5,7 +5,7 @@ import spawn from 'cross-spawn';
 import path from 'node:path';
 import { resolveFfmpeg } from './ffmpeg.js';
 import { managedSpeechEnv } from './managed-speech.js';
-import { resolveWhisperBackend, resolveWhisperBinary, resolveWhisperModel } from './whisper-options.js';
+import { resolveWhisperBinary, resolveWhisperModel, speechConfiguration } from './whisper-options.js';
 
 export function releaseInfo(root) {
   const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
@@ -65,7 +65,9 @@ export async function speechDiagnostics(env = process.env, runner = probeCommand
     const remaining = Math.min(4000, deadline - Date.now());
     return remaining > 0 ? runner(command, args, environment, remaining) : Promise.resolve({ status: 'timeout', output: '' });
   };
-  const backend = resolveWhisperBackend(env), binary = resolveWhisperBinary(env);
+  const configuration = speechConfiguration(env);
+  if (configuration.guidance) return { ...configuration, whisper: { status: 'configuration', version: null }, ffmpeg: { status: 'unknown', version: null }, correction: env.PANEL_TRANSCRIPT_CORRECTION === 'off' ? 'off' : 'automatic' };
+  const backend = configuration.backend, binary = resolveWhisperBinary(env);
   const [whisper, ffmpeg] = await Promise.all([
     run(binary, ['--help'], env), run(env.PANEL_FFMPEG_BIN || 'ffmpeg', ['-version'], env),
   ]);
