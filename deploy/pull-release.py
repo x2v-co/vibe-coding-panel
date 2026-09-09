@@ -19,8 +19,13 @@ with get(API) as response:
     release = json.load(response)
 tag = release['tag_name']
 if not tag.startswith('relay-') or len(tag) != 46 or any(c not in '0123456789abcdef' for c in tag[6:]):
-    raise SystemExit('No valid relay release')
+    print('No relay release to apply')
+    raise SystemExit(0)
 state = ROOT / 'deploy/last-release'
+failed = ROOT / 'deploy/failed-release'
+if failed.exists() and failed.read_text().strip() == tag:
+    print('Release previously failed; awaiting a new release or operator retry')
+    raise SystemExit(0)
 if state.exists() and state.read_text().strip() == tag:
     raise SystemExit(0)
 assets = {a['name']: a['browser_download_url'] for a in release['assets']}
@@ -36,5 +41,9 @@ with tempfile.TemporaryDirectory(prefix='vibe-release-') as directory:
     if digest.hexdigest() != expected:
         raise SystemExit('Release checksum mismatch')
     subprocess.run(['docker', 'load', '-i', str(archive)], check=True)
-    subprocess.run(['bash', str(ROOT / 'deploy/apply-release.sh'), 'vibe-panel:' + tag[6:]], check=True)
+    try:
+        subprocess.run(['bash', str(ROOT / 'deploy/apply-release.sh'), 'vibe-panel:' + tag[6:]], check=True)
+    except subprocess.CalledProcessError:
+        failed.write_text(tag + '\n')
+        raise
     state.write_text(tag + '\n')

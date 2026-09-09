@@ -22,6 +22,8 @@ jobs:
       - run: npm run test:acceptance
       - run: npm test
       - run: npm run build
+      - if: runner.os == 'Linux'
+        run: python3 deploy/test-release.py
 
   release:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'

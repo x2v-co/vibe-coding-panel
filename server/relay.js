@@ -244,6 +244,7 @@ export function createRelayServer(options = {}) {
           else res.end();
         }
       } catch {
+        if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'cancel', requestId: message.requestId }));
         clearTimeout(active.timer);
         pending.delete(message.requestId);
         if (!res.headersSent) res.status(502).json({ error: '电脑 Connector 返回了无效响应', code: 'INVALID_CONNECTOR_RESPONSE' });

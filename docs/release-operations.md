@@ -66,7 +66,7 @@ is needed. Keep Docker images needed for rollback; do not prune them blindly.
 Inspect `journalctl -u vibe-panel-update.service` and `/healthz` for version and
 capacity. To roll back, run `sudo bash deploy/rollback.sh`. The last-release marker
 prevents the timer immediately reapplying that same release. To deliberately
-retry it, remove `deploy/last-release` and start the updater. Stop the timer to
+retry it, remove `deploy/last-release` and `deploy/failed-release` if present, then start the updater. Failed releases are quarantined to avoid repeated automatic switch/rollback loops. Stop the timer to
 freeze releases. For a manual restart use `docker compose --env-file .env
 --env-file deploy/image.env -f docker-compose.relay.yml -f deploy/image.yml up -d`.
 A release restarts Relay; paired Connectors automatically reconnect, but inflight

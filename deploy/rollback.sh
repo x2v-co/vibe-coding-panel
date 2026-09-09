@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd /opt/vibe-coding-panel
-exec 9>/tmp/vibe-panel-deploy.lock
+exec 9>deploy/deploy.lock
 flock -w 120 9
 image=$(cat deploy/previous-image)
 [[ "$image" =~ ^sha256:[a-f0-9]{64}$ ]] || exit 1
