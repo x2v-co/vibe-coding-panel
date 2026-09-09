@@ -23,7 +23,7 @@ function stopChild(child) {
   if (win) spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore', timeout: 10000 });
   else { try { process.kill(-child.pid, 'SIGKILL'); } catch {} }
 }
-const env = { ...process.env, UV_PYTHON_INSTALL_DIR: path.join(home, 'python'), UV_CACHE_DIR: path.join(home, 'cache'), UV_NO_PROGRESS: '1' };
+const env = { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8', UV_PYTHON_INSTALL_DIR: path.join(home, 'python'), UV_CACHE_DIR: path.join(home, 'cache'), UV_NO_PROGRESS: '1' };
 for (const key of ['PYTHONHOME', 'PYTHONPATH', 'VIRTUAL_ENV', 'CONDA_PREFIX']) delete env[key];
 
 function run(command, args, { capture = false, timeoutMs = 25 * 60 * 1000 } = {}) {

@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm, copyFile, chmod, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import { managedSpeechEnv } from '../server/managed-speech.js';
 const app = path.resolve(process.argv[2]);
 const runtime = process.argv[3];
 const home = await mkdtemp(path.join(tmpdir(), 'vibe clean voice '));
@@ -18,6 +19,7 @@ function run(command, args, options = {}) {
 try {
   run(runtime, ['scripts/launch.mjs', '--setup-voice'], { stdio: 'inherit' });
   const config = JSON.parse(await readFile(path.join(home, 'current.json'), 'utf8'));
+  Object.assign(env, managedSpeechEnv(env));
   assert.equal(config.platform, process.platform); assert.equal(config.arch, process.arch);
   assert.ok(config.python.startsWith(home));
   assert.match(run(config.python, ['--version']), /Python 3\.11\./);

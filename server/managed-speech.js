@@ -16,6 +16,6 @@ export function managedSpeechEnv(env = process.env) {
       || !existsSync(path.join(config.modelDir, 'small.pt'))) return { ...env };
     return { PANEL_WHISPER_BACKEND: 'openai', PANEL_WHISPER_BIN: config.whisper,
       PANEL_PYTHON_BIN: config.python, PANEL_FFMPEG_BIN: config.ffmpeg,
-      PANEL_WHISPER_MODEL_DIR: config.modelDir, ...env };
+      PANEL_WHISPER_MODEL_DIR: config.modelDir, ...env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' };
   } catch { return { ...env }; }
 }

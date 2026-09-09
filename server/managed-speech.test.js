@@ -24,6 +24,7 @@ test('managed speech activates only a complete compatible install and preserves 
     assert.equal(installed.PANEL_WHISPER_BIN, config.whisper);
     assert.equal(installed.PANEL_PYTHON_BIN, config.python);
     assert.equal(installed.PANEL_FFMPEG_BIN, config.ffmpeg);
+    assert.equal(managedSpeechEnv({ ...env, PYTHONIOENCODING: 'cp1252' }).PYTHONIOENCODING, 'utf-8');
     const custom = { ...env, PANEL_WHISPER_BACKEND: 'mlx', PANEL_WHISPER_MODEL: 'custom-model' };
     assert.deepEqual(managedSpeechEnv(custom), custom);
     assert.deepEqual(managedSpeechEnv({ ...env, PANEL_WHISPER_BIN: '/custom/whisper' }), { ...env, PANEL_WHISPER_BIN: '/custom/whisper' });
