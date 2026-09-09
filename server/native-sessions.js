@@ -69,25 +69,53 @@ export class CodexSessionReader {
   }
 }
 
+async function inspectProcess(command, args, env = process.env) {
+  return new Promise(resolve => {
+    const child = spawn(command, args, { env, stdio: ['ignore', 'pipe', 'ignore'] });
+    let output = '';
+    const timer = setTimeout(() => { child.kill('SIGKILL'); resolve({ code: null, output: '' }); }, 3000);
+    child.stdout.on('data', chunk => { output = (output + chunk.toString()).slice(-16000); });
+    child.once('error', () => { clearTimeout(timer); resolve({ code: null, output: '' }); });
+    child.once('close', code => { clearTimeout(timer); resolve({ code, output }); });
+  });
+}
+
+export async function verifiedAgentPid(pid, provider, metadataTime = Infinity, expectedStart) {
+  if (!Number.isInteger(pid) || pid <= 1 || pid === process.pid || !['codex', 'claude'].includes(provider)) return false;
+  const identity = await inspectProcess('ps', ['-p', String(pid), '-o', 'comm=']);
+  if (identity.code !== 0) return false;
+  const name = path.basename(identity.output.trim()).toLowerCase();
+  if (!(name === provider || name.startsWith(`${provider}-`))) return false;
+  if (provider === 'codex') {
+    const command = await inspectProcess('ps', ['-p', String(pid), '-o', 'args=']);
+    // A shared daemon can own multiple sessions; never stop it for one handoff.
+    if (command.code !== 0 || /(?:^|\s)(?:app-server|remote-control)(?:\s|$)/.test(command.output)) return false;
+  }
+  if (Number.isFinite(metadataTime) || expectedStart) {
+    const birth = await inspectProcess('ps', ['-p', String(pid), '-o', 'lstart='], { ...process.env, LC_ALL: 'C', TZ: 'UTC' });
+    const started = Date.parse(birth.output.trim() + ' UTC');
+    if (birth.code !== 0 || !Number.isFinite(started) || started > metadataTime) return false;
+    if (expectedStart && birth.output.trim().replace(/\s+/g, ' ') !== expectedStart.trim().replace(/\s+/g, ' ')) return false;
+  }
+  return true;
+}
+
 export class NativeSessions {
   constructor({ env = process.env, codex = new CodexSessionReader(env), alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } } } = {}) { this.env = env; this.codex = codex; this.alive = alive; this.claudeRoot = env.CLAUDE_CONFIG_DIR || env.CLAUDE_HOME || path.join(homedir(), '.claude'); this.cache = new Map(); }
   close() { this.codex.close?.(); }
   async attached(provider, id) {
     if (provider === 'codex') {
-      // Codex owns this lock. Never remove it or modify its session files.
       const lock = path.join(this.env.CODEX_HOME || path.join(homedir(), '.codex'), 'thread-writer-locks', `${id}.lock`);
-      // Lock-file existence is not proof of ownership; use the OS lock probe.
-      // lsof identifies a currently open writer on macOS/Linux. On Windows,
-      // active turn metadata below remains the available read-only signal.
-      if (process.platform === 'win32') return false;
-      return new Promise((resolve) => {
-        const child = spawn('lsof', ['-t', '--', lock], { stdio: ['ignore', 'pipe', 'ignore'] });
-        let output = ''; child.stdout.on('data', b => { output += b; });
-        child.on('error', () => resolve(false));
-        child.on('close', () => resolve(output.trim().length > 0));
-        const timer = setTimeout(() => { child.kill(); resolve(true); }, 3000);
-        child.on('close', () => clearTimeout(timer));
-      });
+      try { await stat(lock); } catch (e) { return e.code !== 'ENOENT'; }
+      // Missing inspection tools/permissions are unknown ownership, never permission to write.
+      if (process.platform === 'win32') {
+        const result = await inspectProcess('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+          "try { $f=[IO.File]::Open($env:VIBE_LOCK_PROBE,'Open','ReadWrite','None'); $f.Close(); exit 0 } catch { exit 1 }"],
+          { ...process.env, VIBE_LOCK_PROBE: lock });
+        return result.code !== 0;
+      }
+      const result = await inspectProcess('lsof', ['-t', '--', lock]);
+      return result.code === null || ![0, 1].includes(result.code) || Boolean(result.output.trim());
     }
     const dir = path.join(this.claudeRoot, 'sessions');
     let names; try { names = await readdir(dir); } catch { return false; }
@@ -99,30 +127,51 @@ export class NativeSessions {
     }
     return false;
   }
-  async release(provider, id) {
+  async release(provider, workspace, id, { timeoutMs = 10000, pollMs = 200 } = {}) {
+    let session = await this.read(provider, workspace, id); // Validate ID and workspace before signaling.
+    if (session.canResume) return { released: true, state: 'released', session };
+    if (process.platform === 'win32') throw error('请在电脑终端按 Ctrl+C 或退出 CLI，等待会话释放后重试', 409);
+    if (!await this.signalRelease(provider, id)) throw error('无法核实终端进程，请在电脑退出原 CLI 后重试', 409);
+    const deadline = Date.now() + timeoutMs;
+    do {
+      session = await this.read(provider, workspace, id);
+      if (session.canResume) return { released: true, state: 'released', session };
+      if (Date.now() >= deadline) break;
+      await new Promise(resolve => setTimeout(resolve, pollMs));
+    } while (Date.now() < deadline);
+    throw Object.assign(error('终端尚未退出，请在电脑结束当前任务或退出 CLI，然后重试', 408), { state: 'timeout' });
+  }
+  async signalRelease(provider, id) {
     if (provider === 'claude') {
       const dir = path.join(this.claudeRoot, 'sessions'); let names;
       try { names = await readdir(dir); } catch { return false; }
-      let released = false;
-      for (const name of names.filter((n) => /^\d+\.json$/.test(n))) {
+      let sent = false;
+      for (const name of names.filter(n => /^\d+\.json$/.test(n))) {
         try {
-          const { rows } = await transcript(path.join(dir, name), 16384);
-          for (const row of rows) if (row.sessionId === id && Number.isInteger(row.pid) && row.pid > 1) {
-            try { process.kill(row.pid, 'SIGINT'); released = true; } catch {}
+          const file = path.join(dir, name);
+          const metadata = await stat(file);
+          const { rows } = await transcript(file, 16384);
+          for (const row of rows) if (row.sessionId === id && Number(row.pid) === Number(path.basename(name, '.json'))) {
+            if (typeof row.procStart === 'string' && await verifiedAgentPid(row.pid, provider, metadata.mtimeMs, row.procStart)) {
+              try { process.kill(row.pid, 'SIGINT'); sent = true; } catch {}
+            }
           }
         } catch {}
       }
-      return released;
+      return sent;
     }
-    if (provider !== 'codex') throw error('当前 Agent 不支持远程释放终端', 409);
     const lock = path.join(this.env.CODEX_HOME || path.join(homedir(), '.codex'), 'thread-writer-locks', `${id}.lock`);
-    return new Promise((resolve) => {
-      const child = spawn('lsof', ['-t', '--', lock], { stdio: ['ignore', 'pipe', 'ignore'] }); let output = '';
-      child.stdout.on('data', (b) => { output += b; });
-      child.on('error', () => resolve(false));
-      child.on('close', () => { const pids = output.trim().split(/\s+/).map(Number).filter((pid) => Number.isInteger(pid) && pid > 1); let released = false; for (const pid of pids) { try { process.kill(pid, 'SIGINT'); released = true; } catch {} } resolve(released); });
-      setTimeout(() => { child.kill(); resolve(false); }, 3000);
-    });
+    const owners = await inspectProcess('lsof', ['-t', '--', lock]);
+    if (owners.code !== 0) return false;
+    let sent = false;
+    for (const pid of owners.output.trim().split(/\s+/).map(Number)) {
+      if (!await verifiedAgentPid(pid, provider)) continue;
+      // Re-check ownership immediately before the signal; stale PID lists are not authority.
+      const current = await inspectProcess('lsof', ['-a', '-p', String(pid), '-t', '--', lock]);
+      if (current.code !== 0 || !current.output.trim().split(/\s+/).includes(String(pid))) continue;
+      try { process.kill(pid, 'SIGINT'); sent = true; } catch {}
+    }
+    return sent;
   }
   async claudeFiles() {
     const root = path.join(this.claudeRoot, 'projects');
@@ -195,7 +244,7 @@ export class NativeSessions {
       }
       const active = t.status?.type === 'active' || t.turns?.at(-1)?.status === 'inProgress';
       const attached = active || await this.attached(provider, id);
-      return { id, provider, cwd, title: title(t.name || t.preview) || id, updatedAt: time(t.updatedAt), messages: messages.slice(-100), truncated: messages.length > 100, canResume: !attached, status: attached ? 'attached' : 'saved' };
+      return { id, provider, cwd, title: title(t.name || t.preview) || id, updatedAt: time(t.updatedAt), messages: messages.slice(-100), truncated: messages.length > 100, canRelease: process.platform !== 'win32', canResume: !attached, status: attached ? 'attached' : 'saved' };
     }
     if (provider !== 'claude') throw error('不支持的 Agent');
     for (const file of await this.claudeFiles()) {
@@ -203,7 +252,7 @@ export class NativeSessions {
       const session = await this.claudeInfo(file);
       if (!session || await workspacePath(session.cwd) !== cwd) continue;
       const attached = await this.attached(provider, id);
-      return { ...session, canResume: !attached, status: attached ? 'attached' : 'saved' };
+      return { ...session, canRelease: process.platform !== 'win32', canResume: !attached, status: attached ? 'attached' : 'saved' };
     }
     throw error('找不到该 Workspace 的会话', 404);
   }

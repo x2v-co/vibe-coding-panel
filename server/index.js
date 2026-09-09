@@ -607,8 +607,15 @@ app.get('/api/native-sessions/:provider/:id', async (req, res) => {
 });
 
 app.post('/api/native-sessions/:provider/:id/release', async (req, res) => {
-  try { res.json({ released: await nativeSessions.release(req.params.provider, req.params.id) }); }
-  catch (error) { res.status(error.status || 502).json({ error: error.message || '无法释放终端' }); }
+  const { provider, id } = req.params;
+  const key = `${provider}:${id}`;
+  if (nativeReservations.has(key) || [...jobs.values()].some(job => job.provider === provider && job.threadId === id && ['queued', 'running'].includes(job.status))) {
+    return res.status(409).json({ state: 'error', error: '该会话正在由 Panel 执行或交接，请稍后重试' });
+  }
+  nativeReservations.add(key);
+  try { res.json(await nativeSessions.release(provider, req.body?.cwd, id)); }
+  catch (error) { res.status(error.status || 502).json({ state: error.state || 'error', error: error.message || '无法释放终端' }); }
+  finally { nativeReservations.delete(key); }
 });
 
 function launchManagedCodex(job, prompt) {

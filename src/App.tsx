@@ -28,7 +28,7 @@ type SavedJob = {
 type WorkspaceDirectory = { name: string; path: string };
 type PairedDevice = { id: string; name: string; userAgent: string; createdAt: number; lastSeenAt: number };
 type PairingInfo = { code: string; expiresAt: number; pairingUrl: string };
-type NativeSession = { id: string; provider: AgentProviderId; cwd: string; title: string; updatedAt: number; status?: string; canResume?: boolean; truncated?: boolean; messages?: { role: string; text: string; at: number }[] };
+type NativeSession = { id: string; provider: AgentProviderId; cwd: string; title: string; updatedAt: number; status?: string; canResume?: boolean; canRelease?: boolean; truncated?: boolean; messages?: { role: string; text: string; at: number }[] };
 
 const ACTIVE_JOB_KEY = 'vibe-panel-active-job-id';
 const MICRO_KEYS_VERSION = '2';
@@ -171,6 +171,8 @@ function PanelApp() {
   const [nativeDetailsOpen, setNativeDetailsOpen] = useState(false);
   const [confirmNativeRelease, setConfirmNativeRelease] = useState(false);
   const [nativeError, setNativeError] = useState('');
+  const [nativeHandoff, setNativeHandoff] = useState<{ key: string; state: 'releasing' | 'released' | 'timeout' | 'error'; message: string } | null>(null);
+  const nativeReleasePendingRef = useRef(false);
   const [nativeLoading, setNativeLoading] = useState(false);
   const [nativeCursor, setNativeCursor] = useState<string | null>(null);
   const [historySource, setHistorySource] = useState<'native' | 'panel'>('native');
@@ -240,7 +242,8 @@ function PanelApp() {
 
   const busy = status === 'queued' || status === 'running';
   const voiceBusy = isPreparingVoice || isListening || isFinalizingVoice || isTranscribing;
-  const canExecute = Boolean(prompt.trim() || capturePath) && !busy && !voiceBusy && !isAddingContext && !isRecoveringJob;
+  const selectedHandoff = nativeSelection && nativeHandoff?.key === `${nativeSelection.provider}:${nativeSelection.id}` ? nativeHandoff : null;
+  const canExecute = Boolean(prompt.trim() || capturePath) && !busy && !voiceBusy && !isAddingContext && !isRecoveringJob && selectedHandoff?.state !== 'releasing';
   const latestProgress = [...activity].reverse().find((item) => item.text && item.type !== 'status')?.text
     || (busy ? '正在理解任务' : '等待下一条指令');
   const recentActivity = activity.filter((item) => item.type !== 'message').slice(-4);
@@ -343,7 +346,7 @@ function PanelApp() {
     if (busy || voiceBusy || isRecoveringJob) return;
     selectJob(null); setStatus('idle'); setResult(''); setActivity([]); setPrompt('');
     nativeSelectionRef.current = session;
-    setNativeSelection(session); setNativeDetailsOpen(false); setConfirmNativeRelease(false); setTaskTitle(session.title);
+    setNativeSelection(session); setNativeHandoff(null); setNativeDetailsOpen(false); setConfirmNativeRelease(false); setTaskTitle(session.title);
     // A saved session is safe for Connector handoff. Keep the explicit release
     // checkbox only for sessions that are currently attached to a terminal.
     setTerminalReleased(true); setNativeError(''); setShowHistory(false);
@@ -369,17 +372,28 @@ function PanelApp() {
 
   async function releaseNativeTerminal() {
     const session = nativeSelection || nativeSelectionRef.current;
-    if (!session) return;
-    setNativeError('正在请求电脑退出终端…');
+    if (!session || nativeReleasePendingRef.current) return;
+    const key = `${session.provider}:${session.id}`;
+    nativeReleasePendingRef.current = true;
+    setConfirmNativeRelease(false);
+    setNativeHandoff({ key, state: 'releasing', message: '正在等待电脑终端退出…' });
     try {
-      const response = await fetch(`/api/native-sessions/${session.provider}/${session.id}/release`, { method: 'POST' });
-      const payload = await response.json(); if (!response.ok) throw new Error(payload.error);
-      if (!payload.released) throw new Error('没有找到可安全退出的终端进程');
-      setConfirmNativeRelease(false);
-      setNativeError('已发送退出请求，正在刷新会话状态…');
-      window.setTimeout(() => setNativeError(''), 1200);
-    } catch (reason) { setNativeError(reason instanceof Error ? reason.message : '无法释放终端'); }
+      const response = await fetch(`/api/native-sessions/${session.provider}/${session.id}/release`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cwd: session.cwd }),
+        signal: AbortSignal.timeout(25000),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.released || !payload.session?.canResume) {
+        setNativeHandoff({ key, state: payload.state === 'timeout' ? 'timeout' : 'error', message: payload.error || '终端尚未释放，请在电脑退出 CLI 后重试' });
+        return;
+      }
+      setNativeHandoff({ key, state: 'released', message: '终端已释放，可以继续此会话' });
+      setNativeSelection(current => current?.id === session.id && current.provider === session.provider ? payload.session : current);
+    } catch (reason) {
+      setNativeHandoff({ key, state: reason instanceof DOMException && reason.name === 'TimeoutError' ? 'timeout' : 'error', message: '交接未确认完成，请检查电脑终端状态后重试' });
+    } finally { nativeReleasePendingRef.current = false; }
   }
+
 
   function updateProviders(nextProviders: AgentProviderInfo[]) {
     if (!Array.isArray(nextProviders)) return;
@@ -1466,7 +1480,7 @@ function PanelApp() {
                     : result && !busy ? <div className="result-screen"><span className="screen-label">TASK COMPLETE</span><strong>{taskTitle}</strong><p>{result}</p><button onClick={async () => { await navigator.clipboard.writeText(result); setCopied(true); window.setTimeout(() => setCopied(false), 1500); }}>{copied ? <Check size={14} /> : <Copy size={14} />}{copied ? '已复制' : '复制结果'}</button></div>
                     : busy ? <div className="running-screen"><span className="screen-label">NOW RUNNING</span><strong>{taskTitle || '正在启动 Agent'}</strong><p>{latestProgress}</p><div className="progress-track"><i /></div></div>
                     : isRecoveringJob ? <div className="running-screen recovering-screen"><span className="screen-label">RESTORING SESSION</span><strong>正在恢复上次任务</strong><p>正在连接 Agent 并读取最新进度</p><div className="progress-track"><i /></div></div>
-                    : <div className="command-screen">{isListening && <div className="waveform" aria-hidden="true">{Array.from({ length: 28 }, (_, index) => <i key={index} />)}</div>}<div className="screen-label">{nativeSelection ? 'NATIVE SESSION' : isListening ? 'LISTENING' : isTranscribing ? 'TRANSCRIBING' : 'COMMAND DRAFT'}</div>{nativeSelection && <div className="native-selected-session"><strong>{nativeSelection.title}</strong><small>{nativeSelection.canResume === false ? '电脑终端占用中：退出后可继续' : '已连接，输入内容将继续此会话'}</small>{nativeSelection.canResume === false && (nativeSelection.provider === 'codex' || nativeSelection.provider === 'claude') && (confirmNativeRelease ? <span className="release-native-confirm"><span>退出当前电脑终端？</span><button type="button" className="release-native-cancel" onClick={() => setConfirmNativeRelease(false)}>取消</button><button type="button" className="release-native-button danger" onClick={() => void releaseNativeTerminal()}>确认退出</button></span> : <button type="button" className="release-native-button" onClick={() => setConfirmNativeRelease(true)}>请求退出电脑终端</button>)}</div>}<label htmlFor="command">任务指令</label><textarea id="command" ref={promptRef} value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void execute(); } }} rows={3} maxLength={3000} placeholder={isListening ? '正在录音，再按一次结束…' : isTranscribing ? '正在转写与校对…' : nativeSelection ? '继续这个原生会话…' : '按下语音键，或在这里输入…'} /></div>}
+                    : <div className="command-screen">{isListening && <div className="waveform" aria-hidden="true">{Array.from({ length: 28 }, (_, index) => <i key={index} />)}</div>}<div className="screen-label">{nativeSelection ? 'NATIVE SESSION' : isListening ? 'LISTENING' : isTranscribing ? 'TRANSCRIBING' : 'COMMAND DRAFT'}</div>{nativeSelection && <div className="native-selected-session"><strong>{nativeSelection.title}</strong><small role="status" aria-live="polite">{selectedHandoff?.state === 'releasing' || selectedHandoff?.state === 'timeout' || selectedHandoff?.state === 'error' ? selectedHandoff.message : confirmNativeRelease ? '请求交接：确认后将中断电脑上的当前任务' : nativeSelection.canResume === false ? (nativeSelection.canRelease === false ? '请在电脑退出 CLI，释放后可继续' : '电脑终端占用中：退出后可继续') : selectedHandoff?.state === 'released' ? selectedHandoff.message : '已连接，输入内容将继续此会话'}</small>{nativeSelection.canResume === false && nativeSelection.canRelease !== false && (nativeSelection.provider === 'codex' || nativeSelection.provider === 'claude') && (confirmNativeRelease ? <span className="release-native-confirm"><span>退出当前电脑终端？</span><button type="button" className="release-native-cancel" onClick={() => setConfirmNativeRelease(false)}>取消</button><button type="button" className="release-native-button danger" onClick={() => void releaseNativeTerminal()}>确认退出</button></span> : <button type="button" className="release-native-button" disabled={selectedHandoff?.state === 'releasing'} onClick={() => setConfirmNativeRelease(true)}>请求退出电脑终端</button>)}</div>}<label htmlFor="command">任务指令</label><textarea id="command" ref={promptRef} value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void execute(); } }} rows={3} maxLength={3000} placeholder={isListening ? '正在录音，再按一次结束…' : isTranscribing ? '正在转写与校对…' : nativeSelection ? '继续这个原生会话…' : '按下语音键，或在这里输入…'} /></div>}
                 </div>
                 {layout === 'hardware-micro' && result && !busy && <textarea id="command" className="micro-followup" ref={promptRef} aria-label="继续当前任务" rows={2} value={prompt} maxLength={3000} placeholder={isListening ? '正在录音…' : isTranscribing ? '正在转写…' : '继续当前任务…'} onChange={(event) => setPrompt(event.target.value)} />}
                 <div className="activity-strip">{recentActivity.length ? recentActivity.map((item) => <div key={item.id}><span>{item.type === 'tool' ? 'CMD' : item.type === 'status' ? 'SYS' : 'AI'}</span><p>{item.text}</p></div>) : <div><span>SYS</span><p>{capturePath ? '图片上下文已准备' : '等待输入'}</p></div>}</div>
