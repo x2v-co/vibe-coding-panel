@@ -22,6 +22,7 @@ upstream CLI versions, real phone microphone access, or platform installers.
 
 | Environment variable | Default | Meaning |
 | --- | --- | --- |
+| PANEL_RELAY_MAX_UPLOADS | 8 | Concurrent bodies being parsed, before forwarding |
 | PANEL_RELAY_RATE_LIMIT | 120 | API requests per client per minute |
 | PANEL_RELAY_PAIR_LIMIT | 10 | Pair attempts per client per 10 minutes; target limit is 3x |
 | PANEL_RELAY_MAX_BODY_BYTES | 10485760 | Raw API body cap, including base64 audio overhead |
@@ -32,7 +33,7 @@ upstream CLI versions, real phone microphone access, or platform installers.
 | PANEL_RELAY_MAX_CONNECTORS | 100 | Connected computers |
 | PANEL_RELAY_TRUST_PROXY | unset | Exact immediate proxy socket IP allowed to supply XFF |
 
-Rate limits run before parsing bodies. Compressed bodies are rejected. HTTP
+Rate limits and the upload concurrency cap run before parsing bodies; socket send buffers are also capped. Compressed bodies are rejected. HTTP
 uploads have a 30-second deadline and headers 15 seconds. WebSocket registration
 is limited to 30 attempts/minute/client and requires a bearer credential (query
 credentials are no longer accepted). Rate tables are bounded and fail closed at

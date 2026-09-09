@@ -265,3 +265,27 @@ test('browser disconnect cancels pending work immediately', async () => {
     await new Promise(resolve => relay.server.close(resolve));
   }
 });
+
+test('partial uploads consume bounded parser capacity and disconnect releases it', async () => {
+  const { request } = await import('node:http');
+  const relay = createRelayServer({ maxUploads: 1, audit() {} });
+  const port = await listen(relay.server);
+  const partial = request(`http://127.0.0.1:${port}/api/transcriptions`, { method: 'POST', headers: { 'Content-Length': '100' } });
+  partial.on('error', () => {});
+  partial.write('x');
+  async function waitFor(count) {
+    for (let i = 0; i < 100 && relay.uploading !== count; i++) await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(relay.uploading, count);
+  }
+  try {
+    await waitFor(1);
+    const response = await fetch(`http://127.0.0.1:${port}/api/health`);
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).code, 'RELAY_BUSY');
+    partial.destroy();
+    await waitFor(0);
+  } finally {
+    partial.destroy();
+    await new Promise(resolve => relay.server.close(resolve));
+  }
+});

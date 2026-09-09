@@ -53,6 +53,8 @@ export function createRelayServer(options = {}) {
   const connectors = new Map();
   const pending = new Map();
   const maxBodyBytes = positiveInteger(options.maxBodyBytes ?? process.env.PANEL_RELAY_MAX_BODY_BYTES, 10 * 1024 * 1024);
+  const maxUploads = positiveInteger(options.maxUploads ?? process.env.PANEL_RELAY_MAX_UPLOADS, 8);
+  let uploading = 0;
   const rateLimit = positiveInteger(options.rateLimit ?? process.env.PANEL_RELAY_RATE_LIMIT, 120);
   const pairLimit = positiveInteger(options.pairLimit ?? process.env.PANEL_RELAY_PAIR_LIMIT, 10);
   const streamTimeoutMs = positiveInteger(options.streamTimeoutMs ?? process.env.PANEL_RELAY_STREAM_TIMEOUT_MS, 10 * 60 * 1000);
@@ -87,6 +89,7 @@ export function createRelayServer(options = {}) {
     });
   });
 
+  const parseBody = express.raw({ type: () => true, limit: maxBodyBytes, inflate: false });
   app.use('/api', (req, res, next) => {
     const ip = clientIp(req);
     const pairing = /^\/pair\/?$/i.test(req.path);
@@ -97,13 +100,25 @@ export function createRelayServer(options = {}) {
       return res.set('Retry-After', String(retry)).status(429).json({ code: 'RATE_LIMITED', error: 'Too many requests. Please retry later.' });
     }
     next();
-  }, express.raw({ type: () => true, limit: maxBodyBytes, inflate: false }), (req, res) => {
+  }, (req, res, next) => {
+    if (uploading >= maxUploads) return res.status(503).json({ code: 'RELAY_BUSY', error: 'Relay upload capacity reached.' });
+    uploading += 1;
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      uploading -= 1;
+      res.off('close', release);
+    };
+    res.once('close', release);
+    parseBody(req, res, error => { release(); next(error); });
+  }, (req, res) => {
     const connectorId = connectorIdFrom(req);
     const connector = connectors.get(connectorId);
     if (!connector || connector.readyState !== WebSocket.OPEN) {
       return res.status(503).json({ error: '电脑 Connector 未连接', code: 'CONNECTOR_OFFLINE' });
     }
-    if (pending.size >= maxInflight || [...pending.values()].filter(item => item.connectorId === connectorId).length >= perConnectorLimit) {
+    if (connector.bufferedAmount > 2 * maxBodyBytes || pending.size >= maxInflight || [...pending.values()].filter(item => item.connectorId === connectorId).length >= perConnectorLimit) {
       return res.status(503).json({ error: 'Relay 当前请求较多，请稍后重试', code: 'RELAY_BUSY' });
     }
 
@@ -280,7 +295,7 @@ export function createRelayServer(options = {}) {
     for (const socket of connectors.values()) socket.close(1001, 'Relay shutting down');
   });
 
-  return { app, server, connectors, pending };
+  return { app, server, connectors, pending, get uploading() { return uploading; } };
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
