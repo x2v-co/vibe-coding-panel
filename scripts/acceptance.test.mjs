@@ -82,9 +82,18 @@ test('unified launcher connects, pairs and runs a fixture task through Relay', {
     const code = await until(() => output.match(/配对码：([A-Za-z0-9-]+)/)?.[1]);
     const id = await until(() => [...relay.connectors.keys()][0]);
     let cookie = `vibe_relay_connector=${id}`;
+    const unauthenticatedDiagnostics = await fetch(origin + '/api/diagnostics', { headers: { Cookie: cookie } });
+    assert.equal(unauthenticatedDiagnostics.status, 401);
     const paired = await fetch(origin + '/api/pair', { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
     assert.equal(paired.status, 201, await paired.text());
     cookie += '; ' + paired.headers.get('set-cookie').split(';')[0];
+    const diagnosticsResponse = await fetch(origin + '/api/diagnostics', { headers: { Cookie: cookie } });
+    assert.equal(diagnosticsResponse.status, 200);
+    const diagnostics = await diagnosticsResponse.json();
+    assert.equal(diagnostics.platform, process.platform);
+    assert.ok(diagnostics.node.startsWith('v'));
+    assert.equal(diagnostics.speech.backend, 'openai');
+    assert.ok(diagnostics.providers.some(provider => provider.authenticated));
     const jobResponse = await fetch(origin + '/api/jobs', { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: 'verify', cwd: directory }) });
     assert.equal(jobResponse.status, 201);
     const job = await jobResponse.json();

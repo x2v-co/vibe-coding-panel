@@ -13,6 +13,7 @@ import { decodeRecording } from './audio-decode.js';
 import { createTranscriptCorrector } from './transcript-correction.js';
 const correctTranscript = createTranscriptCorrector();
 import { agentProviders, defaultAgentProvider, probeAgentProviders, buildAgentInvocation, normalizeAgentProvider, parseAgentLine } from './agent-providers.js';
+import { releaseInfo, speechDiagnostics, cachedDiagnostics } from './runtime-info.js';
 import { NativeSessions } from './native-sessions.js';
 import { CodexRuntime } from './codex-runtime.js';
 
@@ -36,6 +37,11 @@ function availableProviders() {
 const pairingRequired = ['1', 'true', 'yes'].includes(String(process.env.PANEL_REQUIRE_PAIRING || '').toLowerCase());
 const jobs = new Map();
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const connectorRelease = releaseInfo(appRoot);
+const collectDiagnostics = cachedDiagnostics(async () => ({
+  connector: connectorRelease, node: process.version, platform: process.platform, arch: process.arch,
+  providers: availableProviders(), speech: await speechDiagnostics(),
+}));
 const terminalStatuses = new Set(['completed', 'failed', 'stopped']);
 const pairingStore = new PairingStore({
   filePath: process.env.PANEL_DEVICE_STORE || path.join(homedir(), '.vibe-panel', 'devices.json'),
@@ -519,6 +525,7 @@ app.get('/api/health', async (req, res) => {
     paired: !pairingRequired || local || Boolean(device),
     device,
     demoAvailable: true,
+    connector: connectorRelease,
     speech: { backend: resolveWhisperBackend(), model: resolveWhisperModel() },
   });
 });
@@ -571,6 +578,11 @@ app.use('/api', async (req, res, next) => {
   } catch {
     res.status(500).json({ error: '无法验证设备授权' });
   }
+});
+
+app.get('/api/diagnostics', async (req, res) => {
+  try { res.setHeader('Cache-Control', 'no-store'); res.json(await collectDiagnostics()); }
+  catch { res.status(503).json({ error: '版本诊断暂时不可用，请稍后重试或重启电脑 Connector' }); }
 });
 
 app.post('/api/transcriptions', async (req, res) => {

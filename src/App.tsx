@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { MIN_RECORDING_MS, recordingMimeTypes, validateRecording } from './recording';
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { defaultMicroKeys, microActions, microColors, microIconOptions, microKeycapAssets, readMicroConfiguration, updateMicroConfiguration, unavailableMicroAction, MicroVoiceGesture } from './micro';
 import type { MicroKeyId, MicroActionId, MicroIconId, MicroKeyConfig } from './micro';
 
@@ -18,6 +18,7 @@ type ConnectionState = 'online' | 'checking' | 'offline' | 'unknown';
 type AgentProviderId = 'codex' | 'claude';
 type AgentConnection = { mode: ConnectionMode; url: string; token: string };
 type AgentProviderInfo = { id: AgentProviderId; label: string; available: boolean; authenticated: boolean; version?: string };
+type RuntimeDiagnostics = { connector: { version: string; revision: string | null; distribution: string }; node: string; platform: string; arch: string; providers: AgentProviderInfo[]; speech: { backend: string; model: string; whisper: { status: string; version: string | null }; ffmpeg: { status: string; version: string | null }; correction: string } };
 type Activity = { id: number; revision?: number; at: number; type: string; text?: string; status?: string };
 type SavedJob = {
   id: string; prompt: string; cwd: string; status: JobStatus; result?: string;
@@ -189,6 +190,9 @@ function PanelApp() {
   const [connection, setConnection] = useState<AgentConnection>(readConnection);
   const [connectionState, setConnectionState] = useState<ConnectionState>(() => readConnection().mode === 'local' ? 'online' : 'unknown');
   const [agentLabel, setAgentLabel] = useState('LOCAL AGENT');
+  const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnostics | null>(null);
+  const [diagnosticsError, setDiagnosticsError] = useState('');
+  const [connectorRevision, setConnectorRevision] = useState<string | null>(null);
   const [agentProvider, setAgentProvider] = useState<AgentProviderId>(readAgentProvider);
   const [providers, setProviders] = useState<AgentProviderInfo[]>([]);
   const [microKeys, setMicroKeys] = useState<MicroKeyConfig[]>(readMicroKeys);
@@ -552,6 +556,21 @@ function PanelApp() {
   }, [layout]);
 
   useEffect(() => {
+    if (!showSettings || connection.mode !== 'local') return;
+    const abort = new AbortController();
+    const timer = window.setTimeout(() => { setDiagnosticsError('诊断超时，请稍后重新打开设置，文字输入不受影响'); abort.abort(); }, 15000);
+    setRuntimeDiagnostics(null); setDiagnosticsError('');
+    void fetch('/api/diagnostics', { signal: abort.signal }).then(async response => {
+      if (!response.ok) throw new Error(response.status === 404 ? '电脑 Connector 版本较旧，请更新后重启' : '暂时无法读取诊断，请检查电脑连接后重试');
+      const data = await response.json() as RuntimeDiagnostics;
+      if (!data.connector || !data.speech || !Array.isArray(data.providers)) throw new Error('诊断格式不兼容，请更新电脑 Connector');
+      if (!abort.signal.aborted) { setRuntimeDiagnostics(data); setConnectorRevision(data.connector.revision); }
+    }).catch(error => { if (!abort.signal.aborted) setDiagnosticsError(error.message); })
+      .finally(() => window.clearTimeout(timer));
+    return () => { window.clearTimeout(timer); abort.abort(); };
+  }, [showSettings, connection.mode]);
+
+  useEffect(() => {
     if (showSettings) void loadDevices();
   // Device administration is intentionally probed only while settings are visible.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -565,6 +584,7 @@ function PanelApp() {
         const response = await fetch('/api/health');
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || '无法连接控制面板');
+        setConnectorRevision(payload.connector?.revision || null);
         if (payload.publicUrl) {
           setPublicUrl(payload.publicUrl);
           localStorage.setItem('vibe-panel-public-url', payload.publicUrl);
@@ -1454,6 +1474,21 @@ function PanelApp() {
       </fieldset>}
       <fieldset className="theme-fieldset"><legend>外观配色</legend><div className="theme-options">{themes.map((item) => <button type="button" key={item.id} className={`theme-option ${item.id}`} aria-pressed={theme === item.id} onClick={() => selectTheme(item.id)} title={item.description}><i aria-hidden="true"><span /></i><strong>{item.label}</strong></button>)}</div></fieldset>
       {connection.mode !== 'demo' && <><label htmlFor="cwd">{connection.mode === 'remote' ? '远程工作目录' : '工作目录'}</label><input id="cwd" value={cwd} onChange={(event) => setCwd(event.target.value)} placeholder={connection.mode === 'remote' ? '/home/user/project' : 'C:\\path\\to\\project 或 /path/to/project'} /></>}
+      {connection.mode === 'local' && <fieldset className="runtime-diagnostics"><legend>版本与诊断</legend>
+        <dl><dt>网页</dt><dd>{__PANEL_REVISION__.slice(0, 8)}</dd>
+          <dt>Connector</dt><dd>{runtimeDiagnostics ? (runtimeDiagnostics.connector.revision?.slice(0, 8) || runtimeDiagnostics.connector.version) : connectorRevision?.slice(0, 8) || '检测中'}</dd>
+          {runtimeDiagnostics && <><dt>运行环境</dt><dd>{runtimeDiagnostics.platform} / {runtimeDiagnostics.arch} · Node {runtimeDiagnostics.node}</dd>
+            {runtimeDiagnostics.providers.map(provider => <Fragment key={provider.id}><dt>{provider.label}</dt><dd>{provider.version || '未检测到'} · {provider.authenticated ? '已登录' : '未登录'}</dd></Fragment>)}
+            <dt>语音识别</dt><dd>{runtimeDiagnostics.speech.backend} · {runtimeDiagnostics.speech.whisper.version || '版本未知'} · {runtimeDiagnostics.speech.whisper.status === 'ok' ? '可运行' : '需检查安装'}</dd>
+            <dt>语音模型</dt><dd>{runtimeDiagnostics.speech.model}</dd>
+            <dt>文字校对</dt><dd>{runtimeDiagnostics.speech.correction === 'off' ? '关闭' : '自动，失败保留原文'}</dd>
+            <dt>录音解码</dt><dd>ffmpeg {runtimeDiagnostics.speech.ffmpeg.version || '版本未知'} · {runtimeDiagnostics.speech.ffmpeg.status === 'ok' ? '可运行' : '需检查安装'}</dd>
+          </>}
+        </dl>
+        {connectorRevision && __PANEL_REVISION__ !== 'unknown' && connectorRevision !== __PANEL_REVISION__ && <p role="status">网页与电脑版本不同。请更新并重启电脑 Connector，再刷新此页面。配对状态会保留。</p>}
+        {diagnosticsError && <p role="status">{diagnosticsError}</p>}
+        {runtimeDiagnostics && (runtimeDiagnostics.speech.whisper.status !== 'ok' || runtimeDiagnostics.speech.ffmpeg.status !== 'ok') && <p>语音组件未就绪，可继续输入文字。请在电脑按<a href="https://github.com/x2v-co/vibe-coding-panel/blob/main/docs/configuration.md" target="_blank" rel="noreferrer">安装说明</a>检查 Whisper 和 ffmpeg。</p>}
+      </fieldset>}
       <p className="privacy-note"><ShieldCheck size={14} />录音在电脑上转写，转写文字会通过电脑配置的 Claude 服务自动校对。发送前可直接修改输入框；模型服务与 HTTPS 转发服务适用各自的隐私条款。</p>
     </div>;
   }

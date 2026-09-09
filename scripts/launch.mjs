@@ -43,10 +43,22 @@ if (dependencies()) {
   const agents = probeAgentProviders();
   add('agent login', agents.some(a => a.authenticated), 'Install Codex CLI or Claude Code, then run codex login or claude auth login.');
   checks.push({ name: 'agents', ok: true, agents });
+  if (doctor) {
+    const { releaseInfo, speechDiagnostics } = await import('../server/runtime-info.js');
+    checks.push({ name: 'connector version', ok: true, ...releaseInfo(root) });
+    // Voice is optional: a missing component must not block text-only startup.
+    const speech = await speechDiagnostics();
+    checks.push({ name: 'speech (optional)', ok: true, speech });
+  }
 }
 const ok = checks.every(c => c.ok);
 if (json) console.log(JSON.stringify({ ok, platform: process.platform, node: process.version, bundle: bundle || null, port: selectedPort, checks }));
-else for (const check of checks) console.log(`${check.ok ? 'OK' : 'FAIL'} ${check.name}${check.next ? ': ' + check.next : ''}`);
+else for (const check of checks) {
+  if (check.speech) {
+    const speech = check.speech;
+    console.log(`INFO speech (optional): ${speech.backend} / ${speech.model}; Whisper ${speech.whisper.version || 'unknown'} (${speech.whisper.status}); ffmpeg ${speech.ffmpeg.version || 'unknown'} (${speech.ffmpeg.status})`);
+  } else console.log(`${check.ok ? 'OK' : 'FAIL'} ${check.name}${check.revision ? ': ' + check.revision.slice(0, 8) : ''}${check.next ? ': ' + check.next : ''}`);
+}
 if (!ok) process.exit(1);
 if (!doctor) {
   process.env.PANEL_API_PORT = String(selectedPort);

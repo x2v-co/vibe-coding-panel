@@ -1,7 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+let revision = 'unknown';
+try { if (existsSync(path.join(import.meta.dirname, '.git'))) revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: import.meta.dirname, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch {}
 
 export default defineConfig({
+  define: { __PANEL_REVISION__: JSON.stringify(revision) },
   plugins: [react()],
   server: {
     host: '127.0.0.1',

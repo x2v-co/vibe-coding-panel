@@ -117,3 +117,26 @@ back to the original transcription. Concurrent requests also retain their text
 rather than queueing model work. Set `PANEL_TRANSCRIPT_CORRECTION=off` on the
 Connector to keep all transcription processing local. No transcripts or model
 reasoning are logged by the correction module.
+
+### Version and speech diagnostics
+
+The existing settings panel shows the web revision, running Connector revision,
+Node/platform/architecture, Codex/Claude versions and login state, selected speech
+backend/model, Whisper package version when its interpreter can be identified,
+and the runnable ffmpeg version. A web/Connector revision mismatch recommends
+updating and restarting the computer Connector, then refreshing the page.
+
+`node scripts/launch.mjs --doctor --json` includes the same optional speech probe
+and release identity; missing voice components do not block text-only startup.
+Portable launchers accept `--doctor --json` without global Node/npm. Version
+metadata is captured when the server starts, so updating source files cannot
+make an old running process claim to be the new revision. Source ZIPs without
+Git/bundle metadata show the package version and an unknown revision.
+
+`GET /api/diagnostics` is restricted to local requests or paired devices. Probes
+are bounded, cached for one minute and shared by concurrent requests. Output does
+not include binary paths, raw subprocess errors, credentials or model reasoning.
+The ffmpeg check uses the same Python fallback as startup. CLI availability and
+version are not a successful microphone/model inference test: this probe does not
+download or load model weights, and unsupported interpreter wrappers may show an
+unknown package version even when the CLI is runnable.
