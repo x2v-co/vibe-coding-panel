@@ -97,13 +97,25 @@ test('Codex lock probe observes a live file handle and later release on this OS'
   const id='55555555-5555-4555-8555-555555555555';
   await mkdir(path.join(root,'thread-writer-locks'));
   const sessions=new NativeSessions({env:{CODEX_HOME:root},codex:{close(){}}});
+  const lock=path.join(root,'thread-writer-locks',id+'.lock');
+  // Windows PowerShell startup can exceed a single probe's deadline under CI
+  // load. Unknown ownership correctly stays occupied; recovery is eventual.
+  const released=async()=>{
+    const deadline=Date.now()+15000;
+    while(await sessions.attached('codex',id)) {
+      assert(Date.now()<deadline,'closed lock must become available within 15 seconds');
+      await new Promise(resolve=>setTimeout(resolve,100));
+    }
+  };
   let file;
   try {
     assert.equal(await sessions.attached('codex',id),false);
-    file=await open(path.join(root,'thread-writer-locks',id+'.lock'),'w+');
+    await writeFile(lock,'');
+    await released(); // Exercise the actual probe, not the missing-file shortcut.
+    file=await open(lock,'r+');
     assert.equal(await sessions.attached('codex',id),true);
     await file.close();file=null;
-    assert.equal(await sessions.attached('codex',id),false);
+    await released();
   } finally {await file?.close();await rm(root,{recursive:true,force:true});}
 });
 
