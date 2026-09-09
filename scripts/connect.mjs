@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { agentProviders, defaultAgentProvider } from '../server/agent-providers.js';
 import { resolveFfmpeg } from '../server/ffmpeg.js';
+import { resolveWhisperBackend, resolveWhisperModel } from '../server/whisper-options.js';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const relayUrl = String(process.env.PANEL_RELAY_URL || 'https://vibe.tooluse.app').trim();
@@ -63,10 +64,11 @@ function findWhisperPython() {
 
 const apiPort = await choosePort();
 const env = { ...process.env, PANEL_API_PORT: String(apiPort), PANEL_RELAY_URL: relayUrl, PANEL_AGENT_PROVIDER: defaultAgentProvider() };
+const whisperCommand = resolveWhisperBackend(env) === 'mlx' ? 'mlx_whisper' : 'whisper';
 const venvWhisper = process.platform === 'win32'
-  ? path.join(projectRoot, '.venv', 'Scripts', 'whisper.exe')
-  : path.join(projectRoot, '.venv', 'bin', 'whisper');
-const whisperBin = String(env.PANEL_WHISPER_BIN || (spawnSync(venvWhisper, ['--help'], { stdio: 'ignore', timeout: 30000 }).status === 0 ? venvWhisper : executable('whisper'))).trim();
+  ? path.join(projectRoot, '.venv', 'Scripts', `${whisperCommand}.exe`)
+  : path.join(projectRoot, '.venv', 'bin', whisperCommand);
+const whisperBin = String(env.PANEL_WHISPER_BIN || (spawnSync(venvWhisper, ['--help'], { stdio: 'ignore', timeout: 30000 }).status === 0 ? venvWhisper : executable(whisperCommand))).trim();
 const pythonBin = findWhisperPython();
 const codexBin = String(env.PANEL_CODEX_BIN || executable('codex')).trim();
 const claudeBin = String(env.PANEL_CLAUDE_BIN || executable('claude')).trim();
@@ -97,7 +99,7 @@ process.stdout.write(`Platform: ${process.platform}\n`);
 process.stdout.write(`Relay: ${relayUrl}\n`);
 process.stdout.write(`默认 Agent: ${agentProviders[env.PANEL_AGENT_PROVIDER].label}\n`);
 process.stdout.write(`本机端口: ${apiPort}${apiPort === Number(process.env.PANEL_API_PORT || 8787) ? '' : '（默认端口被占用，已自动切换）'}\n`);
-if (whisperBin) process.stdout.write(`Whisper: ${whisperBin}\n`);
+if (whisperBin) process.stdout.write(`Whisper: ${whisperBin} (${resolveWhisperBackend(env)} / ${resolveWhisperModel(env)})\n`);
 else process.stdout.write('Whisper: 未检测到（仍可使用文字输入）\n');
 if (env.PANEL_FFMPEG_BIN) process.stdout.write(`ffmpeg: ${env.PANEL_FFMPEG_BIN}\n`);
 else process.stdout.write('ffmpeg: 未检测到（语音转写可能不可用）\n');

@@ -7,7 +7,7 @@ import { homedir, hostname, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PairingStore, isLoopbackRequest, readCookie } from './pairing.js';
-import { buildWhisperArgs, resolveWhisperModel, resolveWhisperTimeout } from './whisper-options.js';
+import { buildWhisperArgs, resolveWhisperModel, resolveWhisperTimeout, resolveWhisperBackend, resolveWhisperBinary } from './whisper-options.js';
 import { resolveFfmpeg } from './ffmpeg.js';
 import { decodeRecording } from './audio-decode.js';
 import { agentProviders, defaultAgentProvider, probeAgentProviders, buildAgentInvocation, normalizeAgentProvider, parseAgentLine } from './agent-providers.js';
@@ -383,7 +383,7 @@ async function transcribeAudio(audioInput, languageInput) {
   const inputPath = path.join(workDir, `speech.${extension}`);
   try {
     await writeFile(inputPath, bytes);
-    const whisperBin = process.env.PANEL_WHISPER_BIN || 'whisper';
+    const whisperBin = resolveWhisperBinary();
     const model = resolveWhisperModel();
     const language = String(languageInput || 'zh').replace(/[^A-Za-z-]/g, '') || 'zh';
     const bundledFfmpeg = await findBundledFfmpeg();
@@ -398,7 +398,7 @@ async function transcribeAudio(audioInput, languageInput) {
     }
     const diagnostics = await runProcess(
       whisperBin,
-      buildWhisperArgs(normalizedPath, model, language, workDir),
+      buildWhisperArgs(normalizedPath, model, language, workDir, resolveWhisperBackend()),
       resolveWhisperTimeout(),
       whisperEnv,
     );
@@ -517,6 +517,7 @@ app.get('/api/health', async (req, res) => {
     paired: !pairingRequired || local || Boolean(device),
     device,
     demoAvailable: true,
+    speech: { backend: resolveWhisperBackend(), model: resolveWhisperModel() },
   });
 });
 

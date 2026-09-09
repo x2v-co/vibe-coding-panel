@@ -67,3 +67,24 @@ npm test              # tests
 npm run check         # TypeScript checks
 npm run build         # production frontend
 ```
+
+### Apple Silicon speech recognition
+
+The default speech backend remains OpenAI Whisper with the `small` model.
+On an Apple Silicon Mac with `mlx-whisper` installed, select the accelerated
+larger multilingual model with:
+
+```sh
+PANEL_WHISPER_BACKEND=mlx npm run connect
+```
+
+This uses `mlx_whisper` and `mlx-community/whisper-large-v3-turbo-q4` by default.
+Set `PANEL_WHISPER_BIN` if that executable is outside PATH, and
+`PANEL_WHISPER_MODEL` to select another compatible MLX model directory/repository.
+The first run downloads model weights (about 464 MB for the default MLX model).
+Pre-download and test the model locally before phone use; model download time may
+exceed the Relay request deadline. The launcher prints the selected backend/model,
+and `/api/health` reports them under `speech`. Audio still transcribes locally.
+Windows, Linux and Intel Macs should use the default backend. The two CLIs use
+different flag spellings; the Connector adapts the flags rather than requiring a
+wrapper. Neither backend is given the expected transcript as a prompt.

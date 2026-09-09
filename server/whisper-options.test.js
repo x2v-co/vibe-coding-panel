@@ -22,3 +22,19 @@ test('short voice commands are transcribed without a seeded phrase', () => {
     '--condition_on_previous_text', 'False',
   ]);
 });
+
+test('MLX CLI receives compatible flags and a larger multilingual model without seeded text', async () => {
+  const { resolveWhisperBackend, resolveWhisperBinary } = await import('./whisper-options.js');
+  const env = { PANEL_WHISPER_BACKEND: 'mlx' };
+  assert.equal(resolveWhisperBackend(env), 'mlx');
+  assert.equal(resolveWhisperBinary(env), 'mlx_whisper');
+  const model = resolveWhisperModel(env);
+  assert.equal(model, 'mlx-community/whisper-large-v3-turbo-q4');
+  const args = buildWhisperArgs('/tmp/input_voice.wav', model, 'zh', '/tmp/voice_output', 'mlx');
+  assert.equal(args[0], '/tmp/input_voice.wav');
+  assert.ok(args.includes('/tmp/voice_output'));
+  for (const flag of ['--condition-on-previous-text', '--output-format', '--output-dir']) assert.ok(args.includes(flag));
+  assert.equal(args.some(arg => arg.startsWith('--') && arg.includes('_')), false);
+  assert.equal(args.includes('--initial-prompt'), false);
+  assert.throws(() => resolveWhisperBackend({ PANEL_WHISPER_BACKEND: 'unknown' }), /must be/);
+});
