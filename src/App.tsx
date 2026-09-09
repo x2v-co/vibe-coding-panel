@@ -1489,7 +1489,7 @@ function PanelApp() {
         {diagnosticsError && <p role="status">{diagnosticsError}</p>}
         {runtimeDiagnostics && (runtimeDiagnostics.speech.whisper.status !== 'ok' || runtimeDiagnostics.speech.ffmpeg.status !== 'ok') && <p>语音组件未就绪，可继续输入文字。请在电脑安装包中运行 Setup Voice，再重启 Connector；详情见<a href="https://github.com/x2v-co/vibe-coding-panel/blob/main/docs/configuration.md" target="_blank" rel="noreferrer">安装说明</a>。</p>}
       </fieldset>}
-      <p className="privacy-note"><ShieldCheck size={14} />录音在电脑上转写，转写文字会通过电脑配置的 Claude 服务自动校对。发送前可直接修改输入框；共享 Relay 会转发内容，详见<a href="/privacy/" target="_blank" rel="noreferrer">隐私说明</a>与<a href="/terms/" target="_blank" rel="noreferrer">使用条款</a>。</p>
+      <p className="privacy-note"><ShieldCheck size={14} /><span>录音在电脑上转写，转写文字会通过电脑配置的 Claude 服务自动校对。发送前可直接修改输入框；共享 Relay 会转发内容，详见<a href="/privacy/" target="_blank" rel="noreferrer">隐私说明</a>与<a href="/terms/" target="_blank" rel="noreferrer">使用条款</a>。</span></p>
     </div>;
   }
 
