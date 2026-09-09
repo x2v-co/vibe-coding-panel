@@ -141,3 +141,23 @@ The ffmpeg check uses the same Python fallback as startup. CLI availability and
 version are not a successful microphone/model inference test: this probe does not
 download or load model weights, and unsupported interpreter wrappers may show an
 unknown package version even when the CLI is runnable.
+
+## Optional one-click voice setup
+
+Portable packages include `Setup Voice.command` (macOS), `Setup Voice.bat`
+(Windows), and `Setup Voice.sh` (Linux). Source checkouts can run
+`node scripts/launch.mjs --setup-voice`. This uses a checksum-pinned uv 0.12.11
+bootstrap to install managed Python 3.11 and an isolated OpenAI Whisper 20250625
+environment, downloads and verifies the multilingual small model, and checks
+ffmpeg before publishing the active configuration. Restart the Connector after
+setup. Installation does not require an agent login and does not alter system
+Python. Missing or failed setup leaves text input available.
+
+Default storage is `~/.vibe-panel/speech`; override with `PANEL_SPEECH_HOME`.
+`PANEL_WHISPER_MODEL_DIR` selects the OpenAI model cache directory. Manual
+`PANEL_WHISPER_BACKEND` / `PANEL_WHISPER_BIN` settings take precedence, so an
+existing MLX configuration is not replaced. The managed installer uses CPU
+Whisper; it does not install an agent, a correction provider, or GPU drivers.
+Expect several minutes and about 3 GB of free disk space on first installation.
+Downloads go to GitHub, PyPI, PyTorch's CPU index and OpenAI's model storage;
+they contain software/model requests, not microphone recordings.

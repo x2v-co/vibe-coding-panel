@@ -17,9 +17,29 @@ and the built panel: no separate Node.js, npm, or npm install is needed.
 
 Install and log in to Codex CLI or Claude Code before starting. These third-party
 agents are not included, and their subscriptions/usage limits still apply.
-Whisper and ffmpeg are optional separate prerequisites for voice input; text input
-works without them. See the repository's configuration guide for speech setup
-and automatic text correction privacy behavior.
+Voice is optional. On macOS, open `Setup Voice.command`; on Windows, open
+`Setup Voice.bat`; on Linux, run `bash "Setup Voice.sh"`. This downloads a
+checksum-verified uv bootstrap, managed Python 3.11, pinned Whisper dependencies,
+bundled ffmpeg and the multilingual small model. Allow several minutes, internet
+access to GitHub/PyPI/PyTorch/OpenAI model storage, and about 3 GB of free space.
+The installer verifies model loading and ffmpeg before activating the environment.
+Restart the Connector when it finishes. No global Python/pip or administrator
+access is needed. Text input works without this optional installation.
+
+Speech files live in `~/.vibe-panel/speech`, outside the extracted app, and survive
+Connector updates. `PANEL_SPEECH_HOME` can select another directory. An interrupted
+or failed install does not replace a previously working installation; rerunning
+uses cached Python/packages/models. Explicit `PANEL_WHISPER_BACKEND` or
+`PANEL_WHISPER_BIN` keeps your existing manual configuration (including MLX).
+The automatic installer currently installs OpenAI Whisper on CPU, not MLX/CUDA;
+speed depends on the computer. See `docs/configuration.md` for optional MLX and
+automatic text correction privacy behavior. No audio is uploaded during setup.
+
+To remove managed speech, stop the Connector and remove only its speech directory.
+This does not remove device pairing. Older managed environments remain available
+on disk after a successful reinstall; the active one is identified by
+`speech/current.json`. Avoid moving a managed Python environment: rerun setup at
+the desired location instead.
 
 Keep the terminal open and computer awake. Scan the one-time pairing QR code with
 your phone. The Connector does not start at login automatically. To stop it, press

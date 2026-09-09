@@ -17,7 +17,7 @@ export function resolveWhisperTimeout(env = process.env) {
   return Number.isFinite(configured) && configured > 0 ? configured : 20 * 60 * 1000;
 }
 
-export function buildWhisperArgs(inputPath, model, language, outputDir, backend = 'openai') {
+export function buildWhisperArgs(inputPath, model, language, outputDir, backend = 'openai', env = process.env) {
   const args = [
     inputPath,
     '--model', model,
@@ -28,6 +28,7 @@ export function buildWhisperArgs(inputPath, model, language, outputDir, backend 
     '--output_dir', outputDir,
     '--verbose', 'False',
   ];
+  if (backend === 'openai' && env.PANEL_WHISPER_MODEL_DIR) args.push('--model_dir', env.PANEL_WHISPER_MODEL_DIR);
   // mlx-whisper uses hyphenated flags; OpenAI Whisper uses underscores.
   return backend === 'mlx' ? args.map(arg => arg.startsWith('--') ? arg.replaceAll('_', '-') : arg) : args;
 }

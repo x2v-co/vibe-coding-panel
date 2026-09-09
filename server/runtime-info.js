@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import spawn from 'cross-spawn';
 import path from 'node:path';
 import { resolveFfmpeg } from './ffmpeg.js';
+import { managedSpeechEnv } from './managed-speech.js';
 import { resolveWhisperBackend, resolveWhisperBinary, resolveWhisperModel } from './whisper-options.js';
 
 export function releaseInfo(root) {
@@ -42,8 +43,7 @@ async function whisperPython(binary, env, run) {
     resolved = lookup.output.trim().split(/\r?\n/)[0];
   }
   if (process.platform === 'win32') {
-    const python = path.resolve(path.dirname(resolved), '..', 'python.exe');
-    return existsSync(python) ? python : null;
+    return [path.join(path.dirname(resolved), 'python.exe'), path.resolve(path.dirname(resolved), '..', 'python.exe')].find(existsSync) || null;
   }
   let file;
   try {
@@ -59,6 +59,7 @@ async function whisperPython(binary, env, run) {
 }
 
 export async function speechDiagnostics(env = process.env, runner = probeCommand) {
+  env = managedSpeechEnv(env);
   const deadline = Date.now() + 12000;
   const run = (command, args, environment) => {
     const remaining = Math.min(4000, deadline - Date.now());
@@ -75,7 +76,7 @@ export async function speechDiagnostics(env = process.env, runner = probeCommand
   let python;
   if (ffmpeg.status === 'ok') result.ffmpeg.version = ffmpeg.output.match(/ffmpeg version ([^\s]+)/)?.[1] || null;
   if (whisper.status === 'ok') {
-    python = await whisperPython(binary, env, run);
+    python = env.PANEL_PYTHON_BIN || await whisperPython(binary, env, run);
     if (python) {
       const distribution = backend === 'mlx' ? 'mlx-whisper' : 'openai-whisper';
       const version = await run(python, ['-c', `import importlib.metadata; print(importlib.metadata.version('${distribution}'))`], env);

@@ -8,6 +8,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PairingStore, isLoopbackRequest, readCookie } from './pairing.js';
 import { buildWhisperArgs, resolveWhisperModel, resolveWhisperTimeout, resolveWhisperBackend, resolveWhisperBinary } from './whisper-options.js';
+import { managedSpeechEnv } from './managed-speech.js';
+Object.assign(process.env, managedSpeechEnv());
 import { resolveFfmpeg } from './ffmpeg.js';
 import { decodeRecording } from './audio-decode.js';
 import { createTranscriptCorrector } from './transcript-correction.js';

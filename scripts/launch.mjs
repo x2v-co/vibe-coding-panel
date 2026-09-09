@@ -6,6 +6,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 process.chdir(root);
+if (process.argv.includes('--setup-voice')) {
+  await import('./setup-voice.mjs');
+  process.exit(process.exitCode || 0);
+}
 const require = createRequire(import.meta.url);
 const json = process.argv.includes('--json');
 const doctor = process.argv.includes('--doctor');
@@ -39,6 +43,8 @@ for (const port of [requested, 8800, 8801, 8802, 8810, 8811]) {
 }
 add('local port', Boolean(selectedPort), 'Close another Connector or set PANEL_API_PORT to an unused port.');
 if (dependencies()) {
+  const { managedSpeechEnv } = await import('../server/managed-speech.js');
+  Object.assign(process.env, managedSpeechEnv());
   const { probeAgentProviders } = await import('../server/agent-providers.js');
   const agents = probeAgentProviders();
   add('agent login', agents.some(a => a.authenticated), 'Install Codex CLI or Claude Code, then run codex login or claude auth login.');

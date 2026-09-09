@@ -24,6 +24,8 @@ jobs:
       - run: npm run build
       - run: node scripts/package-connector.mjs
       - run: node scripts/test-connector-package.mjs
+        env:
+          PANEL_TEST_VOICE_SETUP: '1'
       - uses: actions/upload-artifact@v4
         with:
           name: connector-${{ matrix.os }}

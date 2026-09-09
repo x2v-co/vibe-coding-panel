@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { agentProviders, defaultAgentProvider } from '../server/agent-providers.js';
 import { resolveFfmpeg } from '../server/ffmpeg.js';
 import { resolveWhisperBackend, resolveWhisperModel } from '../server/whisper-options.js';
+import { managedSpeechEnv } from '../server/managed-speech.js';
+Object.assign(process.env, managedSpeechEnv());
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const relayUrl = String(process.env.PANEL_RELAY_URL || 'https://vibe.tooluse.app').trim();

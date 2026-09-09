@@ -1487,7 +1487,7 @@ function PanelApp() {
         </dl>
         {connectorRevision && __PANEL_REVISION__ !== 'unknown' && connectorRevision !== __PANEL_REVISION__ && <p role="status">网页与电脑版本不同。先刷新页面；若仍提示不同，再更新并重启电脑 Connector。配对状态会保留。</p>}
         {diagnosticsError && <p role="status">{diagnosticsError}</p>}
-        {runtimeDiagnostics && (runtimeDiagnostics.speech.whisper.status !== 'ok' || runtimeDiagnostics.speech.ffmpeg.status !== 'ok') && <p>语音组件未就绪，可继续输入文字。请在电脑按<a href="https://github.com/x2v-co/vibe-coding-panel/blob/main/docs/configuration.md" target="_blank" rel="noreferrer">安装说明</a>检查 Whisper 和 ffmpeg。</p>}
+        {runtimeDiagnostics && (runtimeDiagnostics.speech.whisper.status !== 'ok' || runtimeDiagnostics.speech.ffmpeg.status !== 'ok') && <p>语音组件未就绪，可继续输入文字。请在电脑安装包中运行 Setup Voice，再重启 Connector；详情见<a href="https://github.com/x2v-co/vibe-coding-panel/blob/main/docs/configuration.md" target="_blank" rel="noreferrer">安装说明</a>。</p>}
       </fieldset>}
       <p className="privacy-note"><ShieldCheck size={14} />录音在电脑上转写，转写文字会通过电脑配置的 Claude 服务自动校对。发送前可直接修改输入框；模型服务与 HTTPS 转发服务适用各自的隐私条款。</p>
     </div>;

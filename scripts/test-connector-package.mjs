@@ -36,4 +36,8 @@ with zipfile.ZipFile(sys.argv[1]) as z:
   const checks = spawnSync(process.execPath, ['--test', 'scripts/acceptance.test.mjs'], { cwd: root, env: { ...env, PANEL_ACCEPTANCE_ROOT: app }, stdio: 'inherit', timeout: 120000 });
   assert.equal(checks.status, 0, 'Extracted package acceptance failed');
   console.log('Portable launcher, no-global-Node/npm diagnostics, pairing and task execution passed.');
+  if (process.env.PANEL_TEST_VOICE_SETUP === '1') {
+    const voice = spawnSync(process.execPath, [path.join(root, 'scripts/test-voice-setup.mjs'), app, runtime], { cwd: root, env, stdio: 'inherit', timeout: 40 * 60 * 1000 });
+    assert.equal(voice.status, 0, 'Portable speech setup acceptance failed');
+  }
 } finally { await rm(directory, { recursive: true, force: true }); }
