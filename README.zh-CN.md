@@ -55,25 +55,15 @@ npm run connect
 
 ## 开启语音输入
 
-文字功能不需要 Python。语音功能需要 [Python 3.12](https://www.python.org/downloads/)，安装后在**项目目录中**执行一次：
-
-macOS / Linux：
+文字功能无需语音依赖。便携包用户在电脑运行 `Setup Voice.command`（macOS）、`Setup Voice.bat`（Windows）或 `bash "Setup Voice.sh"`（Linux）；源码用户运行：
 
 ```bash
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -U openai-whisper imageio-ffmpeg
+node scripts/launch.mjs --setup-voice
 ```
 
-Windows PowerShell：
+安装器自动下载托管 Python 3.11、Whisper、ffmpeg 和 small 模型，验证通过后启用，不修改系统 Python。预留约 3 GB 空间与数分钟下载时间，完成后重启 Connector。已有手动 MLX / Whisper 配置优先。详见[运行包说明](docs/portable-connector.md)和[高级配置](docs/configuration.md)。
 
-```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -U openai-whisper imageio-ffmpeg
-```
-
-重新启动 Connector。无需激活虚拟环境，启动器会自动检测；日志应同时显示 `Whisper:` 和 `ffmpeg:` 路径。不需要另装系统 ffmpeg。Linux 如提示缺少 venv，安装对应发行版的 Python venv 软件包后重试。
-
-第一次转写会下载约 461 MB 的 Whisper `small` 模型，请耐心等待。手机允许当前网站使用麦克风后，点击 **VOICE INPUT** 开始，说完再点一下结束。识别文字先填入草稿，按 **SEND** 才会执行。浏览器录音失败时，可选择上传系统录音文件。
+手机允许当前网站使用麦克风后，点击 **VOICE INPUT** 开始，说完再点一下结束。识别文字经自动校对后填入原输入框，可手动修改；按 **SEND** 才会执行。校对会在发送前调用电脑配置的 Claude 模型服务，失败时保留原文。浏览器录音失败时，可上传系统录音文件。
 
 ## 选择 Agent
 
@@ -150,3 +140,5 @@ npm run build
 ## Release readiness
 
 See [startup diagnostics, cross-platform acceptance, Relay limits and release/rollback operations](docs/release-operations.md).
+
+发布资料：[变更记录](CHANGELOG.md) · [已知限制](docs/known-issues.md) · [隐私说明](https://vibe.tooluse.app/privacy/) · [使用条款](https://vibe.tooluse.app/terms/)。

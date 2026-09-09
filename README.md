@@ -56,25 +56,25 @@ If the downloaded copy has no launcher or reports `Missing script: "connect"`, i
 
 ## Enable voice input
 
-Text input works without Python. For voice, install [Python 3.12](https://www.python.org/downloads/) and run the following **inside the project folder**, once.
-
-macOS / Linux:
+Text input requires no speech dependencies. In portable packages, open
+`Setup Voice.command` (macOS), `Setup Voice.bat` (Windows), or run
+`bash "Setup Voice.sh"` (Linux). Source users can run:
 
 ```bash
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -U openai-whisper imageio-ffmpeg
+node scripts/launch.mjs --setup-voice
 ```
 
-Windows PowerShell:
+Setup installs managed Python 3.11, Whisper, ffmpeg and a verified small model
+without changing system Python. Allow about 3 GB of disk space and several
+minutes for downloads, then restart the Connector. Explicit manual MLX/Whisper
+settings take priority. See [package instructions](docs/portable-connector.md)
+and [advanced configuration](docs/configuration.md).
 
-```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -U openai-whisper imageio-ffmpeg
-```
-
-Restart the Connector. It detects this environment without activation; the log should show both `Whisper:` and `ffmpeg:` paths. No separate system ffmpeg installation is required. Linux may need its distribution's Python venv package.
-
-Whisper downloads the `small` model (about 461 MB) on first transcription, so the first request takes longer. On the phone, allow this site's microphone, tap **VOICE INPUT**, speak, then tap again to finish. The transcript fills the draft; press **SEND** to run it. If browser recording fails, use the system audio upload option.
+Allow the site's microphone on your phone, tap **VOICE INPUT**, speak, and tap
+again to finish. Automatic correction calls the configured Claude model service
+before SEND and fills the existing editable draft. Edit it directly if needed;
+failed correction keeps the raw text. Press **SEND** to execute the task. If
+browser recording fails, use the system audio upload option.
 
 ## Choose an Agent
 
@@ -151,3 +151,5 @@ Not affiliated with or endorsed by OpenAI, Codex, Anthropic, or Claude Code.
 ## Release readiness
 
 See [startup diagnostics, cross-platform acceptance, Relay limits and release/rollback operations](docs/release-operations.md).
+
+Release information: [Changelog](CHANGELOG.md) · [Known limitations](docs/known-issues.md) · [Privacy notice (Chinese)](https://vibe.tooluse.app/privacy/) · [Terms (Chinese)](https://vibe.tooluse.app/terms/).

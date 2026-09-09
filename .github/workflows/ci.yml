@@ -45,6 +45,8 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
           pattern: connector-*
@@ -64,7 +66,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "relay-$GITHUB_SHA" >/dev/null 2>&1; then exit 0; fi
-          gh release create "relay-$GITHUB_SHA" relay-image.tar.gz vibe-connector-*.zip SHA256SUMS --target "$GITHUB_SHA" --title "Vibe Panel $GITHUB_SHA" --notes "Portable Connector packages include Node 24 and locked dependencies. Extracted-package startup, pairing and task acceptance passed without global Node/npm on macOS Apple Silicon/Intel, Windows x64 and Linux x64. See START-HERE.md for prerequisites and known beta limitations. SHA256SUMS covers all downloads. Relay production updates automatically with health checks and rollback. Feedback: https://github.com/x2v-co/vibe-coding-panel/issues" --latest
+          previous=$(gh release view --json tagName --jq .tagName)
+          python3 scripts/release-notes.py --revision "$GITHUB_SHA" --previous "$previous" --output release-notes.md
+          gh release create "relay-$GITHUB_SHA" relay-image.tar.gz vibe-connector-*.zip SHA256SUMS --target "$GITHUB_SHA" --title "Vibe Panel 0.1.0 · ${GITHUB_SHA:0:8}" --notes-file release-notes.md --latest
       - name: Verify production applied this version
         run: |
           for attempt in $(seq 1 60); do

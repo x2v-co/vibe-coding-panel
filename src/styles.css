@@ -1203,3 +1203,7 @@ footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto
 .runtime-diagnostics dd { margin: 0; overflow-wrap: anywhere; }
 .runtime-diagnostics p { font-size: 12px; line-height: 1.6; }
 .runtime-diagnostics a { color: inherit; text-decoration: underline; }
+
+.footer-links { display: flex; gap: 16px; flex-wrap: wrap; }
+.footer-links a { color: inherit; text-underline-offset: 3px; }
+.site-footer > span:last-child { flex-wrap: wrap; justify-content: flex-end; }
