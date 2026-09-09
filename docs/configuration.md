@@ -88,3 +88,32 @@ and `/api/health` reports them under `speech`. Audio still transcribes locally.
 Windows, Linux and Intel Macs should use the default backend. The two CLIs use
 different flag spellings; the Connector adapts the flags rather than requiring a
 wrapper. Neither backend is given the expected transcript as a prompt.
+
+### Automatic transcript correction
+
+After local Whisper transcription, the Connector automatically corrects obvious
+homophones and punctuation before filling the existing editable draft. There is
+no extra button and no automatic task execution. Model mistakes can still occur;
+the user can edit the draft before sending it.
+
+Only transcript text is sent to the computer's configured Claude text provider;
+audio, project files and task history are not sent for correction. The Connector
+reuses `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, and model
+settings from its environment or the user's Claude `settings.json` (including
+`CLAUDE_CONFIG_DIR`). OAuth-only setups use the installed, logged-in Claude CLI
+with tools, MCP, skills, hooks and session persistence disabled, in a temporary
+working directory. This can consume the configured provider's usage allowance.
+
+`PANEL_CORRECTION_MODEL` overrides the correction model. Otherwise the configured
+Haiku alias/model is used. The Messages API uses a bounded reasoning budget for
+ambiguous Chinese word boundaries. Providers without a compatible Messages API
+or model safely retain the original transcript. Codex-only installations without
+Claude credentials likewise retain the original text.
+
+Correction has a 25-second deadline, a bounded response size and one inference at
+a time per Connector. Unavailable authentication, errors, timeouts, malformed or
+truncated output, or mutations to written code/path/URL/number tokens all fall
+back to the original transcription. Concurrent requests also retain their text
+rather than queueing model work. Set `PANEL_TRANSCRIPT_CORRECTION=off` on the
+Connector to keep all transcription processing local. No transcripts or model
+reasoning are logged by the correction module.

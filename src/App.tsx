@@ -211,7 +211,6 @@ function PanelApp() {
   const [isRecoveringJob, setIsRecoveringJob] = useState(() => Boolean(localStorage.getItem(ACTIVE_JOB_KEY)));
   const promptRef = useRef<HTMLTextAreaElement | null>(null);
   const latestPromptRef = useRef('');
-  const speechBaseRef = useRef('');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const microphoneStreamRef = useRef<MediaStream | null>(null);
   const voiceFinalizingRef = useRef(false);
@@ -926,9 +925,8 @@ function PanelApp() {
       if (voiceSession !== voiceSessionRef.current) return;
       const transcript = String(payload.text || '').trim();
       if (!transcript) throw new Error('没有识别到语音，请靠近麦克风后重试');
-      const nextPrompt = [speechBaseRef.current, transcript].filter(Boolean).join(' ');
-      latestPromptRef.current = nextPrompt;
-      setPrompt(nextPrompt);
+      // Preserve edits made while transcription/correction was in flight.
+      setPrompt(current => [current.trim(), transcript].filter(Boolean).join(' '));
     } catch (reason) {
       if (voiceSession === voiceSessionRef.current) {
         setCanImportRecording(true);
@@ -974,7 +972,6 @@ function PanelApp() {
       const recordingStream = stream;
       let startedAt = 0;
       let recordingFailed = false;
-      speechBaseRef.current = latestPromptRef.current.trim();
       shouldTranscribeRef.current = true;
       microphoneStreamRef.current = stream;
       mediaRecorderRef.current = recorder;
@@ -1048,7 +1045,6 @@ function PanelApp() {
     if (!file) return;
     const voiceSession = voiceSessionRef.current + 1;
     voiceSessionRef.current = voiceSession;
-    speechBaseRef.current = latestPromptRef.current.trim();
     const extension = file.name.split('.').pop()?.toLowerCase();
     const fallbackType = extension === 'm4a' ? 'audio/x-m4a' : extension ? `audio/${extension}` : 'audio/mp4';
     const recording = file.type.startsWith('audio/') ? file : new Blob([file], { type: fallbackType });
@@ -1310,7 +1306,7 @@ function PanelApp() {
 
   function renderVoiceKey(className = '', approve = false) {
     const shouldApprove = approve && canExecute;
-    return <button type="button" className={`console-key voice-key ${isListening ? 'listening' : ''} ${className}`} onClick={shouldApprove ? () => void execute() : toggleSpeech} disabled={busy || isPreparingVoice || isFinalizingVoice || isTranscribing}>{shouldApprove ? <Check size={29} /> : isListening ? <MicOff size={31} /> : isPreparingVoice || isFinalizingVoice || isTranscribing ? <RotateCw className="spin" size={31} /> : <Mic size={31} />}<span>{shouldApprove ? 'APPROVE' : isListening ? 'LISTENING' : isPreparingVoice ? 'STARTING' : isFinalizingVoice ? 'PROCESSING' : isTranscribing ? 'TRANSCRIBING' : approve ? 'VOICE APPROVE' : 'VOICE INPUT'}</span><small>{shouldApprove ? '批准执行' : isListening ? '再次按下结束' : isPreparingVoice ? '正在打开麦克风' : isFinalizingVoice ? '正在完成录音' : isTranscribing ? '正在转成文字' : '点按开始'}</small></button>;
+    return <button type="button" className={`console-key voice-key ${isListening ? 'listening' : ''} ${className}`} onClick={shouldApprove ? () => void execute() : toggleSpeech} disabled={busy || isPreparingVoice || isFinalizingVoice || isTranscribing}>{shouldApprove ? <Check size={29} /> : isListening ? <MicOff size={31} /> : isPreparingVoice || isFinalizingVoice || isTranscribing ? <RotateCw className="spin" size={31} /> : <Mic size={31} />}<span>{shouldApprove ? 'APPROVE' : isListening ? 'LISTENING' : isPreparingVoice ? 'STARTING' : isFinalizingVoice ? 'PROCESSING' : isTranscribing ? 'TRANSCRIBING' : approve ? 'VOICE APPROVE' : 'VOICE INPUT'}</span><small>{shouldApprove ? '批准执行' : isListening ? '再次按下结束' : isPreparingVoice ? '正在打开麦克风' : isFinalizingVoice ? '正在完成录音' : isTranscribing ? '正在转写与校对' : '点按开始'}</small></button>;
   }
 
   function renderExecuteKey(className = '', approve = false) {
@@ -1444,7 +1440,7 @@ function PanelApp() {
       </fieldset>}
       <fieldset className="theme-fieldset"><legend>外观配色</legend><div className="theme-options">{themes.map((item) => <button type="button" key={item.id} className={`theme-option ${item.id}`} aria-pressed={theme === item.id} onClick={() => selectTheme(item.id)} title={item.description}><i aria-hidden="true"><span /></i><strong>{item.label}</strong></button>)}</div></fieldset>
       {connection.mode !== 'demo' && <><label htmlFor="cwd">{connection.mode === 'remote' ? '远程工作目录' : '工作目录'}</label><input id="cwd" value={cwd} onChange={(event) => setCwd(event.target.value)} placeholder={connection.mode === 'remote' ? '/home/user/project' : 'C:\\path\\to\\project 或 /path/to/project'} /></>}
-      <p className="privacy-note"><ShieldCheck size={14} />项目本身不收集任务、录音或代码。启用第三方 HTTPS Tunnel 时，流量还受该服务商的隐私条款约束。</p>
+      <p className="privacy-note"><ShieldCheck size={14} />录音在电脑上转写，转写文字会通过电脑配置的 Claude 服务自动校对。发送前可直接修改输入框；模型服务与 HTTPS 转发服务适用各自的隐私条款。</p>
     </div>;
   }
 
@@ -1470,7 +1466,7 @@ function PanelApp() {
                     : result && !busy ? <div className="result-screen"><span className="screen-label">TASK COMPLETE</span><strong>{taskTitle}</strong><p>{result}</p><button onClick={async () => { await navigator.clipboard.writeText(result); setCopied(true); window.setTimeout(() => setCopied(false), 1500); }}>{copied ? <Check size={14} /> : <Copy size={14} />}{copied ? '已复制' : '复制结果'}</button></div>
                     : busy ? <div className="running-screen"><span className="screen-label">NOW RUNNING</span><strong>{taskTitle || '正在启动 Agent'}</strong><p>{latestProgress}</p><div className="progress-track"><i /></div></div>
                     : isRecoveringJob ? <div className="running-screen recovering-screen"><span className="screen-label">RESTORING SESSION</span><strong>正在恢复上次任务</strong><p>正在连接 Agent 并读取最新进度</p><div className="progress-track"><i /></div></div>
-                    : <div className="command-screen">{isListening && <div className="waveform" aria-hidden="true">{Array.from({ length: 28 }, (_, index) => <i key={index} />)}</div>}<div className="screen-label">{nativeSelection ? 'NATIVE SESSION' : isListening ? 'LISTENING' : isTranscribing ? 'TRANSCRIBING' : 'COMMAND DRAFT'}</div>{nativeSelection && <div className="native-selected-session"><strong>{nativeSelection.title}</strong><small>{nativeSelection.canResume === false ? '电脑终端占用中：退出后可继续' : '已连接，输入内容将继续此会话'}</small>{nativeSelection.canResume === false && (nativeSelection.provider === 'codex' || nativeSelection.provider === 'claude') && (confirmNativeRelease ? <span className="release-native-confirm"><span>退出当前电脑终端？</span><button type="button" className="release-native-cancel" onClick={() => setConfirmNativeRelease(false)}>取消</button><button type="button" className="release-native-button danger" onClick={() => void releaseNativeTerminal()}>确认退出</button></span> : <button type="button" className="release-native-button" onClick={() => setConfirmNativeRelease(true)}>请求退出电脑终端</button>)}</div>}<label htmlFor="command">任务指令</label><textarea id="command" ref={promptRef} value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void execute(); } }} rows={3} maxLength={3000} placeholder={isListening ? '正在录音，再按一次结束…' : isTranscribing ? '正在把语音转成文字…' : nativeSelection ? '继续这个原生会话…' : '按下语音键，或在这里输入…'} /></div>}
+                    : <div className="command-screen">{isListening && <div className="waveform" aria-hidden="true">{Array.from({ length: 28 }, (_, index) => <i key={index} />)}</div>}<div className="screen-label">{nativeSelection ? 'NATIVE SESSION' : isListening ? 'LISTENING' : isTranscribing ? 'TRANSCRIBING' : 'COMMAND DRAFT'}</div>{nativeSelection && <div className="native-selected-session"><strong>{nativeSelection.title}</strong><small>{nativeSelection.canResume === false ? '电脑终端占用中：退出后可继续' : '已连接，输入内容将继续此会话'}</small>{nativeSelection.canResume === false && (nativeSelection.provider === 'codex' || nativeSelection.provider === 'claude') && (confirmNativeRelease ? <span className="release-native-confirm"><span>退出当前电脑终端？</span><button type="button" className="release-native-cancel" onClick={() => setConfirmNativeRelease(false)}>取消</button><button type="button" className="release-native-button danger" onClick={() => void releaseNativeTerminal()}>确认退出</button></span> : <button type="button" className="release-native-button" onClick={() => setConfirmNativeRelease(true)}>请求退出电脑终端</button>)}</div>}<label htmlFor="command">任务指令</label><textarea id="command" ref={promptRef} value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void execute(); } }} rows={3} maxLength={3000} placeholder={isListening ? '正在录音，再按一次结束…' : isTranscribing ? '正在转写与校对…' : nativeSelection ? '继续这个原生会话…' : '按下语音键，或在这里输入…'} /></div>}
                 </div>
                 {layout === 'hardware-micro' && result && !busy && <textarea id="command" className="micro-followup" ref={promptRef} aria-label="继续当前任务" rows={2} value={prompt} maxLength={3000} placeholder={isListening ? '正在录音…' : isTranscribing ? '正在转写…' : '继续当前任务…'} onChange={(event) => setPrompt(event.target.value)} />}
                 <div className="activity-strip">{recentActivity.length ? recentActivity.map((item) => <div key={item.id}><span>{item.type === 'tool' ? 'CMD' : item.type === 'status' ? 'SYS' : 'AI'}</span><p>{item.text}</p></div>) : <div><span>SYS</span><p>{capturePath ? '图片上下文已准备' : '等待输入'}</p></div>}</div>

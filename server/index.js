@@ -10,6 +10,8 @@ import { PairingStore, isLoopbackRequest, readCookie } from './pairing.js';
 import { buildWhisperArgs, resolveWhisperModel, resolveWhisperTimeout, resolveWhisperBackend, resolveWhisperBinary } from './whisper-options.js';
 import { resolveFfmpeg } from './ffmpeg.js';
 import { decodeRecording } from './audio-decode.js';
+import { createTranscriptCorrector } from './transcript-correction.js';
+const correctTranscript = createTranscriptCorrector();
 import { agentProviders, defaultAgentProvider, probeAgentProviders, buildAgentInvocation, normalizeAgentProvider, parseAgentLine } from './agent-providers.js';
 import { NativeSessions } from './native-sessions.js';
 import { CodexRuntime } from './codex-runtime.js';
@@ -573,7 +575,10 @@ app.use('/api', async (req, res, next) => {
 
 app.post('/api/transcriptions', async (req, res) => {
   try {
-    const text = await transcribeAudio(req.body?.audio, req.body?.language);
+    const started = Date.now();
+    const original = await transcribeAudio(req.body?.audio, req.body?.language);
+    // Leave room to deliver the original text before the Relay's 60s deadline.
+    const text = await correctTranscript(original, { timeoutMs: 50000 - (Date.now() - started) });
     res.json({ text });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || '录音转写失败' });
