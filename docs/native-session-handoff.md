@@ -35,7 +35,8 @@ portable graceful-exit mechanism.
 - `node scripts/test-real-cli.mjs` runs official CLIs with temporary homes and a
   loopback model endpoint using a dummy API key. It checks actual session files,
   Panel discovery/read, workspace isolation, same-ID resume, restoration of both
-  user and assistant context in the next provider request, and released ownership.
+  user and assistant context in the next provider request, and active/released
+  ownership while the real CLI is awaiting its model response and after it exits.
   CI gates release on Codex 0.152.0 / 0.153.4 and Claude 2.1.265 / 2.1.266 on
   macOS ARM/Intel, Windows x64 and Linux x64. It does not test model quality,
   account authentication, or interactive-terminal process handoff.

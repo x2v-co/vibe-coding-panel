@@ -24,6 +24,7 @@ Object.assign(env, {
   PANEL_CLAUDE_BIN: process.env.PANEL_CLAUDE_BIN || 'claude',
 });
 const requests = [];
+let observeRequest = async () => {};
 const server = createServer(async (req, res) => {
   try {
     let body = ''; for await (const chunk of req) body += chunk;
@@ -33,6 +34,7 @@ const server = createServer(async (req, res) => {
     }
     const provider = req.url.includes('messages') ? 'claude' : 'codex';
     requests.push({ provider, input });
+    await observeRequest(provider);
     const reply = 'COMPATIBILITY_READY';
     res.setHeader('Content-Type', 'text/event-stream');
     const event = (type, data) => res.write(`event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`);
@@ -93,9 +95,15 @@ try {
     assert.equal((await sessions.list(provider, other)).sessions.length, 0);
     await assert.rejects(sessions.read(provider, other, id));
     const before = requests.length;
+    const ownership = [];
+    observeRequest = async activeProvider => {
+      if (activeProvider === provider) ownership.push((await sessions.read(provider, workspace, id)).canResume);
+    };
     const resume = provider === 'codex' ? ['exec', 'resume', '--skip-git-repo-check', '--json', id]
       : [...args, '--resume', id];
     await run(bin, [...resume, 'SECOND_TURN_MARKER. What did I ask you to remember?']);
+    observeRequest = async () => {};
+    assert(ownership.length > 0 && ownership.every(canResume => canResume === false), `${provider}: a real active writer must block resume`);
     const sent = requests.slice(before).filter(r => r.provider === provider);
     assert(sent.length > 0, `${provider}: resume made a real provider request`);
     assert(sent.some(r => JSON.stringify(r.input).includes('FIRST_TURN_MARKER')), `${provider}: resume restores first turn context`);
@@ -104,7 +112,7 @@ try {
     assert(resumed.messages.some(m => m.role === 'user' && m.text.includes('SECOND_TURN_MARKER')));
     assert.equal(resumed.canResume, true);
     assert.equal((await sessions.list(provider, workspace)).sessions.length, 1, 'resume must keep the same session');
-    console.log(`${provider}: create/list/read/workspace isolation/resume/history/released ownership passed`);
+    console.log(`${provider}: create/list/read/workspace isolation/resume/history/active and released ownership passed`);
   }
 } finally {
   sessions.close();
