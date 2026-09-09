@@ -164,7 +164,7 @@ export function createRelayServer(options = {}) {
   app.get(['/', '/app'], (req, res, next) => {
     const requested = String(req.query.relay || '');
     if (!requested) return next();
-    if (!connectors.has(requested)) return res.status(503).send('This Desktop Connector is offline.');
+    if (!connectors.has(requested)) return res.status(503).type('html').send('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>电脑未连接 · Vibe Panel</title><body style="font:16px/1.8 system-ui,sans-serif;background:#f1f3ee;color:#1c211c;margin:0"><main style="max-width:600px;margin:60px auto;padding:0 24px"><h1>电脑 Connector 未连接</h1><p>请唤醒电脑并重新打开 Vibe Panel Connector，保持终端窗口运行。终端显示已连接后，刷新此页面。</p><p>已经配对的设备通常无需重新配对。如果这是首次配对且配对码已过期，请使用电脑上新生成的链接。</p><p><a href="/download">查看安装与启动说明</a></p></main></body></html>');
     res.setHeader('Set-Cookie', `vibe_relay_connector=${encodeURIComponent(requested)}; HttpOnly; SameSite=Lax; Secure; Path=/; Max-Age=31536000`);
     const pairingCode = String(req.query.pair || '');
     res.redirect(pairingCode ? `/app?pair=${encodeURIComponent(pairingCode)}` : '/app');

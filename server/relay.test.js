@@ -141,6 +141,13 @@ test('relay rejects API traffic when its Mac connector is offline', async () => 
     });
     assert.equal(response.status, 503);
     assert.equal((await response.json()).code, 'CONNECTOR_OFFLINE');
+    const entry = await fetch(`http://127.0.0.1:${port}/app?relay=missing_connector&pair=private-pair-code`);
+    assert.equal(entry.status, 503);
+    assert.match(entry.headers.get('content-type'), /text\/html.*utf-8/);
+    const page = await entry.text();
+    assert.match(page, /终端显示已连接后，刷新此页面/);
+    assert.match(page, /name="viewport"/);
+    assert.doesNotMatch(page, /private-pair-code/);
   } finally {
     await new Promise((resolve) => relay.server.close(resolve));
   }
