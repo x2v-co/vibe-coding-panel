@@ -428,6 +428,11 @@ main { padding: 28px 0 76px; }
 .native-selected-session { display: flex; flex-direction: column; gap: 4px; margin: 8px 0 12px; padding: 8px 10px; border-left: 2px solid var(--green); background: rgba(92, 172, 106, .08); }
 .native-selected-session strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .native-selected-session small { color: var(--muted); font: 10px/1.4 'DM Mono', monospace; }
+.release-native-confirm { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 6px; color: var(--ink); font-size: 11px; font-weight: 700; }
+.release-native-confirm button { min-height: 30px; padding: 0 10px; border-radius: 3px; cursor: pointer; font-size: 10px; font-weight: 700; }
+.release-native-cancel { color: var(--ink); border: 1px solid var(--line); background: var(--page); }
+.release-native-button { color: #20120e; border: 1px solid var(--orange-dark); background: var(--orange); }
+.release-native-button.danger { color: #fff; border-color: #a83d29; background: #c95136; }
 
 .waveform { height: 40px; margin-bottom: 10px; display: flex; align-items: center; gap: 5px; overflow: hidden; }
 .waveform i { width: 3px; height: 8px; flex: 0 0 3px; background: var(--green); animation: voice-wave 900ms ease-in-out infinite alternate; }

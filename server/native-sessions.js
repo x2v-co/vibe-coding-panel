@@ -100,6 +100,20 @@ export class NativeSessions {
     return false;
   }
   async release(provider, id) {
+    if (provider === 'claude') {
+      const dir = path.join(this.claudeRoot, 'sessions'); let names;
+      try { names = await readdir(dir); } catch { return false; }
+      let released = false;
+      for (const name of names.filter((n) => /^\d+\.json$/.test(n))) {
+        try {
+          const { rows } = await transcript(path.join(dir, name), 16384);
+          for (const row of rows) if (row.sessionId === id && Number.isInteger(row.pid) && row.pid > 1) {
+            try { process.kill(row.pid, 'SIGINT'); released = true; } catch {}
+          }
+        } catch {}
+      }
+      return released;
+    }
     if (provider !== 'codex') throw error('当前 Agent 不支持远程释放终端', 409);
     const lock = path.join(this.env.CODEX_HOME || path.join(homedir(), '.codex'), 'thread-writer-locks', `${id}.lock`);
     return new Promise((resolve) => {
