@@ -124,7 +124,8 @@ The existing settings panel shows the web revision, running Connector revision,
 Node/platform/architecture, Codex/Claude versions and login state, selected speech
 backend/model, Whisper package version when its interpreter can be identified,
 and the runnable ffmpeg version. A web/Connector revision mismatch recommends
-updating and restarting the computer Connector, then refreshing the page.
+refreshing the page first, then updating/restarting the computer Connector if
+the mismatch persists (a cached web page may itself be older).
 
 `node scripts/launch.mjs --doctor --json` includes the same optional speech probe
 and release identity; missing voice components do not block text-only startup.

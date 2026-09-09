@@ -1485,7 +1485,7 @@ function PanelApp() {
             <dt>录音解码</dt><dd>ffmpeg {runtimeDiagnostics.speech.ffmpeg.version || '版本未知'} · {runtimeDiagnostics.speech.ffmpeg.status === 'ok' ? '可运行' : '需检查安装'}</dd>
           </>}
         </dl>
-        {connectorRevision && __PANEL_REVISION__ !== 'unknown' && connectorRevision !== __PANEL_REVISION__ && <p role="status">网页与电脑版本不同。请更新并重启电脑 Connector，再刷新此页面。配对状态会保留。</p>}
+        {connectorRevision && __PANEL_REVISION__ !== 'unknown' && connectorRevision !== __PANEL_REVISION__ && <p role="status">网页与电脑版本不同。先刷新页面；若仍提示不同，再更新并重启电脑 Connector。配对状态会保留。</p>}
         {diagnosticsError && <p role="status">{diagnosticsError}</p>}
         {runtimeDiagnostics && (runtimeDiagnostics.speech.whisper.status !== 'ok' || runtimeDiagnostics.speech.ffmpeg.status !== 'ok') && <p>语音组件未就绪，可继续输入文字。请在电脑按<a href="https://github.com/x2v-co/vibe-coding-panel/blob/main/docs/configuration.md" target="_blank" rel="noreferrer">安装说明</a>检查 Whisper 和 ffmpeg。</p>}
       </fieldset>}
