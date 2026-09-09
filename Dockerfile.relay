@@ -1,4 +1,6 @@
 FROM node:24-alpine AS build
+ARG VERSION=unknown
+ENV PANEL_BUILD_REVISION=$VERSION
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
