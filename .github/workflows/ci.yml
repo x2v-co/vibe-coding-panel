@@ -34,9 +34,31 @@ jobs:
       - if: runner.os == 'Linux'
         run: python3 deploy/test-release.py
 
+  cli-compatibility:
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, macos-15-intel, windows-latest]
+        versions:
+          - { codex: '0.152.0', claude: '2.1.265' }
+          - { codex: '0.153.4', claude: '2.1.266' }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Install official pinned CLIs
+        run: npm install --global @openai/codex@${{ matrix.versions.codex }} @anthropic-ai/claude-code@${{ matrix.versions.claude }}
+      - name: Real CLI session persistence and resume
+        run: node scripts/test-real-cli.mjs
+
   release:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: test
+    needs: [test, cli-compatibility]
     runs-on: ubuntu-latest
     permissions:
       contents: write

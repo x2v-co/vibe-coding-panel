@@ -210,7 +210,8 @@ export class NativeSessions {
   async list(provider, workspace, cursor) {
     const cwd = await workspacePath(workspace);
     if (provider === 'codex') {
-      const r = await this.codex.call('thread/list', { cwd, limit: 50, cursor: cursor || null, modelProviders: [], sortKey: 'updated_at' });
+      const r = await this.codex.call('thread/list', { cwd, limit: 50, cursor: cursor || null, modelProviders: [],
+        sourceKinds: ['cli', 'vscode', 'exec', 'appServer'], sortKey: 'updated_at' });
       const seen = new Set(), sessions = [];
       for (const t of r.data || []) {
         if (seen.has(t.id)) continue;

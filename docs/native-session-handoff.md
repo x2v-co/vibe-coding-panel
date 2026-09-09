@@ -29,6 +29,17 @@ portable graceful-exit mechanism.
 
 ## Validation and limits
 
+- The native picker explicitly includes Codex CLI, VS Code, exec and app-server
+  sessions. Codex's default list filter excludes exec sessions; child-agent
+  sources remain excluded.
+- `node scripts/test-real-cli.mjs` runs official CLIs with temporary homes and a
+  loopback model endpoint using a dummy API key. It checks actual session files,
+  Panel discovery/read, workspace isolation, same-ID resume, restoration of both
+  user and assistant context in the next provider request, and released ownership.
+  CI gates release on Codex 0.152.0 / 0.153.4 and Claude 2.1.265 / 2.1.266 on
+  macOS ARM/Intel, Windows x64 and Linux x64. It does not test model quality,
+  account authentication, or interactive-terminal process handoff.
+
 - macOS: real interactive Claude Code 2.1.266 and Codex CLI 0.153.4 were started in
   an isolated test workspace, observed attached, and released with actual process
   exit before the server reported success. Codex was exercised through browser
