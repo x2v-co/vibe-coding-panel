@@ -52,9 +52,12 @@ inside the package, so they survive replacement. Do not copy this private state
 into a package or share it. Delete the extracted application folder to uninstall;
 remove pairing state separately only if you intend to revoke existing devices.
 
-Known release gates: real-phone voice accuracy, iPhone/PWA reconnect acceptance,
-and occupied native-terminal handoff still need verification. This is an internal
-beta package, not a declaration that all product acceptance has passed.
+Android PWA core flows and native-terminal handoff to the tested Mac passed
+physical acceptance. iPhone Safari core flows and home-screen launch/microphone
+also passed; the remaining iPhone checks were paused by the tester. Real
+interactive Windows/Linux handoff and clean phone reinstall remain unverified.
+See [device results and known limitations](known-issues.md) for exact scope.
+This remains an internal beta package.
 
 Report issues: https://github.com/x2v-co/vibe-coding-panel/issues
 Source and configuration: https://github.com/x2v-co/vibe-coding-panel

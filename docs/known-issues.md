@@ -3,6 +3,22 @@
 Updated 2026-09-10. Passing CI is not evidence that every phone, CLI version or
 native-session format is supported.
 
+## Physical-device acceptance — 2026-09-10
+
+These results combine user-operated physical-device checks with Connector task
+and session records. They cover the tested configurations, not every device.
+
+| Configuration | Verified scope |
+| --- | --- |
+| OPPO Find X9 Pro, Android 16, PLG110 Build/BP2A.250605.015, Chrome 152.0.7977.75, installed PWA | Pairing; workspace roundtrip; Codex/Claude tasks; voice and editable drafts; images; stop and subsequent execution; background and network recovery; installation/reopen; existing-install update with pairing/history retained; both agents' native-session discovery, reading, occupied warning, actual Mac terminal exit and same-ID context continuation. |
+| iPhone 15, user-reported iOS 26.6.1, Safari | Pairing; voice; keyboard editing and Codex submission; image answer accuracy; background recovery; network recovery with retained result; bottom controls visible above the Safari toolbar after the viewport fix. |
+| Same iPhone, home-screen web app | Panel launch, connection, retained task history and microphone operation. |
+
+Reported voice-to-draft latency was about 5–6 seconds on both phones with the
+acceptance Mac's MLX turbo q4 backend and automatic correction enabled. This is
+an observed result, not a performance guarantee for the portable CPU setup.
+Device and browser versions above are user-reported.
+
 ## Current limitations
 
 - Portable packages support macOS Apple Silicon/Intel, Windows x64 and Linux x64
@@ -17,17 +33,24 @@ native-session format is supported.
 - Mandarin homophone errors can remain after recognition and automatic correction.
   Corrected text is an editable draft, never an automatically executed command.
   Correction can call the configured Claude service before SEND, costs may apply,
-  and failure preserves the original. Real-phone accuracy acceptance is pending.
+  and failure preserves the original. Tested phone samples passed; this does not
+  establish accuracy for every speaker, accent or recording environment.
 - Relay requests have a 10 MiB encoded-body limit; base64 adds overhead, so keep
   recordings and images below roughly 7 MiB per request. Long recordings should
   be split. Requests may be limited or time out; keep the computer awake and
   Connector terminal open.
-- Physical iPhone Safari/Android Chrome microphone, images, background recovery,
-  PWA reopen and full reconnect acceptance are not complete. Mobile viewport
-  checks and synthetic audio do not replace those tests.
+- iPhone acceptance was stopped at the tester's request. Remaining checks include
+  stop/subsequent execution, Claude task execution, native-session handoff,
+  workspace roundtrip, and voice-to-draft/image/background/network behavior in
+  the installed iPhone web app. Android clean uninstall/reinstall was not tested
+  separately from installation/reopen and existing-install updates. Mobile
+  viewport checks and synthetic audio do not replace these physical tests.
 - Real interactive native handoff was verified on macOS with Codex 0.153.4 and
-  Claude Code 2.1.266. Other CLI versions and real Windows/Linux CLI sessions
-  still need acceptance. Windows terminal release requires manual exit. Shared
+  Claude Code 2.1.266, including Android PWA handoff. CI also verifies actual
+  Codex 0.152.0/0.153.4 and Claude 2.1.265/2.1.266 executables against a local model
+  fixture on all four supported OS/architecture runners. Real interactive
+  Windows/Linux terminal handoff and other CLI versions still need acceptance.
+  Windows terminal release requires manual exit. Shared
   Codex daemon sessions cannot be terminated remotely; process identity or
   ownership uncertainty blocks handoff. See [handoff recovery](native-session-handoff.md).
 - Browser history and project screenshots persist locally. Shared Relay traffic

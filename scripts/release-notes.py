@@ -47,8 +47,10 @@ installs managed Python, CPU Whisper, ffmpeg and the small model.
 
 The release requires all four CI runners to pass server/startup tests, build,
 extracted-package pairing/task acceptance without global Node/npm, and actual
-isolated speech installation/transcription. CI uses fixture agents for cross-OS
-task execution; this does not certify real CLI compatibility or physical phones.
+isolated speech installation/transcription. A separate eight-job matrix runs
+actual Codex 0.152.0/0.153.4 and Claude 2.1.265/2.1.266 executables against a local
+model fixture on those runners. These checks do not certify arbitrary CLI
+versions, real interactive terminal handoff or physical phones.
 The release job also verifies the public production revision after deployment.
 
 Verify each downloaded file against SHA256SUMS. Relay production applies the
@@ -62,6 +64,7 @@ is stored outside the package.
 
 ## More information
 
+- [Physical-device acceptance and remaining limits]({repo}/blob/{args.revision}/docs/known-issues.md)
 - [Package instructions]({repo}/blob/{args.revision}/docs/portable-connector.md)
 - [Native handoff and recovery]({repo}/blob/{args.revision}/docs/native-session-handoff.md)
 - [Privacy](https://vibe.tooluse.app/privacy/) · [Terms](https://vibe.tooluse.app/terms/)

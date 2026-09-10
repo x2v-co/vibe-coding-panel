@@ -153,4 +153,10 @@ Not affiliated with or endorsed by OpenAI, Codex, Anthropic, or Claude Code.
 
 See [startup diagnostics, cross-platform acceptance, Relay limits and release/rollback operations](docs/release-operations.md).
 
+The four release-infrastructure workstreams are implemented and CI-verified.
+Android PWA core acceptance and both agents' handoff to the tested Mac passed.
+iPhone Safari core flows passed; remaining iPhone checks are paused. See
+[physical-device results and remaining limits](docs/known-issues.md) for exact
+devices and coverage. Distribution remains internal beta.
+
 Release information: [Changelog](CHANGELOG.md) · [Known limitations](docs/known-issues.md) · [Privacy notice (Chinese)](https://vibe.tooluse.app/privacy/) · [Terms (Chinese)](https://vibe.tooluse.app/terms/).

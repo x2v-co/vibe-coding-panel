@@ -45,6 +45,11 @@ portable graceful-exit mechanism.
   an isolated test workspace, observed attached, and released with actual process
   exit before the server reported success. Codex was exercised through browser
   confirmation and status updates.
+- Android PWA: physical OPPO Find X9 Pro acceptance verified both agents' session
+  discovery/read, occupied warning, computer-terminal exit and continuation with
+  the original context. Connector records confirmed the original session IDs
+  were retained. iPhone native handoff and real interactive Windows/Linux
+  terminal handoff remain unverified.
 - CI: workspace/ID isolation, already-released sessions, timeout/no-force-kill,
   unrelated live PID rejection, and live lock-handle detection are covered.
   Each supported OS runs its native lock probe. Fixture tests do not establish

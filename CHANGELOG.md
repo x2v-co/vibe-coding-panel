@@ -5,6 +5,21 @@ Portable packages use package version 0.1.0 plus an exact Git revision. Each
 four Connector ZIPs, the Relay image, SHA256SUMS and version-specific notes.
 The application remains an internal beta; see [known limitations](docs/known-issues.md).
 
+## 2026-09-10 — mobile acceptance and controller fixes
+
+- Align Codex Micro defaults and configurable controls with official documentation;
+  restore the reference hardware appearance and add dial/stick feedback.
+- Keep mobile layouts within the viewport, preserve input beside image previews,
+  and place copy/settings actions inline. Lock outer scrolling while retaining
+  internal content scrolling.
+- Restore connection state automatically after network loss and foregrounding.
+- Keep stopped status visible on narrow screens and refresh after stop requests.
+- Fit controls above Safari's toolbar, including removal of the inherited
+  minimum height that overrode the visible viewport.
+- Record Android PWA core acceptance, both agents' same-session handoff to Mac,
+  iPhone Safari core acceptance and limited iPhone home-screen-app checks.
+  [Device results](docs/known-issues.md) distinguish passes from untested scope.
+
 ## 2026-09-10 — actionable failure guidance
 
 - Handle proxy HTML and malformed API responses without exposing JSON parser errors.
