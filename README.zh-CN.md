@@ -137,8 +137,12 @@ npm run build
 
 本项目与 OpenAI、Codex、Anthropic、Claude Code 没有隶属或背书关系。
 
-## Release readiness
+## 发布验收状态
 
-See [startup diagnostics, cross-platform acceptance, Relay limits and release/rollback operations](docs/release-operations.md).
+四项发布基础工作已实现并通过 CI，详见[启动诊断、跨平台验收、Relay 防护与发布回滚](docs/release-operations.md)。
+
+Android PWA 核心流程、两种 Agent 与测试 Mac 的会话接管均已通过；独立卸载并清理站点数据后的重新配对、安装、桌面启动及 Codex 发送也已通过。此前语音、图片、停止及恢复结果来自早先验收，本次重装未重复测试。
+
+iPhone Safari 核心流程及部分主屏幕应用检查通过，剩余 iPhone 项目按测试者要求暂停。具体设备、覆盖范围和限制见[已知限制](docs/known-issues.md)。当前仍为内测版本。
 
 发布资料：[变更记录](CHANGELOG.md) · [已知限制](docs/known-issues.md) · [隐私说明](https://vibe.tooluse.app/privacy/) · [使用条款](https://vibe.tooluse.app/terms/)。

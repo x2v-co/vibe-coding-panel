@@ -57,6 +57,11 @@ actual exit for the same CLI versions. These checks do not certify arbitrary CLI
 versions, physical Windows 11/Linux UI, real-account authentication or physical phones.
 The release job also verifies the public production revision after deployment.
 
+Physical Android PWA acceptance includes an independent uninstall/site-data
+cleanup, fresh pairing, reinstall, home-icon launch and successful Codex task.
+Earlier Android voice/photo/stop/recovery passes were not repeated after this
+reinstall. Remaining iPhone checks are paused; see the linked device coverage.
+
 Verify each downloaded file against SHA256SUMS. Relay production applies the
 versioned image with health checks and rollback. For Connector rollback, stop it
 and extract the selected older release into a different directory; pairing state

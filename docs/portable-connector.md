@@ -53,12 +53,13 @@ into a package or share it. Delete the extracted application folder to uninstall
 remove pairing state separately only if you intend to revoke existing devices.
 
 Android PWA core flows and native-terminal handoff to the tested Mac passed
-physical acceptance. iPhone Safari core flows and home-screen launch/microphone
+physical acceptance. Independent Android uninstall/site-data cleanup, fresh
+pairing, reinstall, home-icon launch and Codex submission also passed. iPhone Safari core flows and home-screen launch/microphone
 also passed; the remaining iPhone checks were paused by the tester. Windows
 Server 2025 ConPTY interactive handoff is CI-tested with a local model fixture.
 Ubuntu 24.04 PTY handoff and remote release are also CI-tested. Physical Windows
-11/Linux desktop UI, real-account authentication on those systems and clean
-phone reinstall remain unverified.
+11/Linux desktop UI and real-account authentication on those systems remain
+unverified.
 See [device results and known limitations](known-issues.md) for exact scope.
 This remains an internal beta package.
 

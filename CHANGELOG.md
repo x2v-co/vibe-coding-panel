@@ -5,6 +5,13 @@ Portable packages use package version 0.1.0 plus an exact Git revision. Each
 four Connector ZIPs, the Relay image, SHA256SUMS and version-specific notes.
 The application remains an internal beta; see [known limitations](docs/known-issues.md).
 
+## 2026-09-10 — Android clean reinstall acceptance
+
+- Record independent OPPO Android PWA uninstall/site-data cleanup, fresh pairing,
+  reinstall, home-icon launch without re-pairing and a successful Codex task.
+- Preserve the distinction between this reinstall check and earlier Android
+  voice/photo/stop/recovery passes; remaining iPhone acceptance stays paused.
+
 ## 2026-09-10 — incomplete Claude ownership metadata
 
 - Keep continuation blocked when a live Claude PID file is empty, partially
