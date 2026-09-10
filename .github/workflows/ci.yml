@@ -71,11 +71,29 @@ jobs:
       - name: Interactive Windows terminal ownership and handoff
         run: node scripts/test-real-cli.mjs
         env:
-          PANEL_TEST_WINDOWS_TERMINAL: '1'
+          PANEL_TEST_INTERACTIVE_TERMINAL: '1'
+
+  linux-terminal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: sudo apt-get update && sudo apt-get install -y lsof
+      - run: npm install --no-save --package-lock=false node-pty@1.1.0 @xterm/headless@6.0.0
+      - run: npm install --global @openai/codex@0.153.4 @anthropic-ai/claude-code@2.1.266
+      - name: Interactive Linux terminal ownership and remote release
+        run: node scripts/test-real-cli.mjs
+        env:
+          PANEL_TEST_INTERACTIVE_TERMINAL: '1'
 
   release:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: [test, cli-compatibility, windows-terminal]
+    needs: [test, cli-compatibility, windows-terminal, linux-terminal]
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -1,5 +1,5 @@
 // Runs official CLIs against a loopback provider. No account or paid inference required.
-// Tests persistence/protocol compatibility, plus optional Windows ConPTY handoff.
+// Tests persistence/protocol compatibility, plus optional PTY/ConPTY handoff.
 // The local provider fixture does not test model quality or account authentication.
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import spawn from 'cross-spawn';
 import { NativeSessions } from '../server/native-sessions.js';
-import { checkWindowsTerminal } from './windows-interactive.mjs';
+import { checkInteractiveTerminal } from './interactive-terminal.mjs';
 
 const root = await mkdtemp(path.join(tmpdir(), 'vibe-real-cli-'));
 const workspace = path.join(root, 'workspace with spaces');
@@ -96,10 +96,10 @@ try {
     assert.equal(first.canResume, true);
     assert.equal((await sessions.list(provider, other)).sessions.length, 0);
     await assert.rejects(sessions.read(provider, other, id));
-    if (process.env.PANEL_TEST_WINDOWS_TERMINAL === '1') {
+    if (process.env.PANEL_TEST_INTERACTIVE_TERMINAL === '1') {
       if (provider === 'codex') await appendFile(path.join(codexHome, 'config.toml'),
         `\n[projects.${JSON.stringify(workspace)}]\ntrust_level = "trusted"\n`);
-      await checkWindowsTerminal({ provider, bin, id, workspace, env, sessions, requests });
+      await checkInteractiveTerminal({ provider, bin, id, workspace, env, sessions, requests });
     }
     const before = requests.length;
     const ownership = [];
