@@ -55,7 +55,14 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
       for (const [name, label] of [['security', 'Security notes'], ['trust', 'Yes, I trust this folder']]) {
         if (!onboarding.has(name) && text.includes(label)) {
           onboarding.add(name);
-          onboardingTimers.push(setTimeout(() => { console.log(`claude: confirming ${name} for isolated fixture`); type('\r'); }, 1500));
+          onboardingTimers.push(setTimeout(async () => {
+            console.log(`claude: confirming ${name} for isolated fixture`);
+            if (name === 'trust' && visible().includes('❯ No, exit')) {
+              terminal.write(win32Input ? '\x1b[40;80;0;1;0;1_\x1b[40;80;0;0;0;1_' : '\x1b[B');
+              await delay(300);
+            }
+            type('\r');
+          }, 1500));
         }
       }
     });
