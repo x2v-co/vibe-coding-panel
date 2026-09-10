@@ -620,7 +620,8 @@ main { padding: 28px 0 76px; }
 .micro-control-knob .knob-left { inset: 0 70% 0 0; display: grid; align-items: end; justify-items: center; padding-bottom: 8px; }
 .micro-control-knob .knob-right { inset: 0 0 0 70%; display: grid; align-items: end; justify-items: center; padding-bottom: 8px; }
 .micro-control-knob .knob-push { inset: 8% 28%; transform: rotate(42deg); background: linear-gradient(90deg, #8f9a94, #f2f5f3 46%, #6d7972 48%, #8e9a93); border-radius: 4px; box-shadow: 2px 2px 3px #6e7772; touch-action: none; }
-.micro-control-knob .knob-push:active { filter: brightness(.9); }
+.micro-control-knob .knob-push:active { filter: brightness(.9); transform: rotate(42deg) translate(2px, 2px); box-shadow: 1px 1px 1px #59635e; }
+.micro-control-knob:has(.knob-push:active) { animation: micro-dial-press 180ms ease-out; }
 .micro-knob-target { outline: 2px solid #8fdaa9 !important; outline-offset: 2px; }
 .micro-command-key { min-height: 0; padding: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #202622; background: linear-gradient(145deg, var(--micro-light), color-mix(in srgb, var(--micro-light) 68%, #8c938e)); box-shadow: 0 6px 0 var(--micro-base), 0 8px 11px rgba(22,25,23,0.2), 0 0 16px var(--micro-glow); touch-action: none; user-select: none; -webkit-touch-callout: none; }
 .micro-command-key span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
@@ -645,7 +646,12 @@ i.micro-keycap-glyph { background: currentColor; mask-size: contain; mask-positi
 .joystick-right { top: 28%; right: -3%; }
 .joystick-down { bottom: -3%; left: 28%; }
 .joystick-left { top: 28%; left: -3%; }
-.micro-connection { grid-column: 1; grid-row: 4; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.micro-mic-status { grid-column: 1; grid-row: 4; display: grid; place-items: center; align-content: center; gap: 5px; color: #28322c; border-radius: 7px; background: linear-gradient(145deg, #eef5f0, #b7c3bb); box-shadow: inset 0 1px 2px rgba(255,255,255,.85), 0 4px 0 #8b948e; opacity: .82; pointer-events: none; }
+.micro-mic-status > span { width: 6px; height: 6px; border-radius: 50%; background: #7d8981; box-shadow: 0 0 0 2px rgba(40,50,44,.12); }
+.micro-mic-status.active { color: #146b5c; background: linear-gradient(145deg, #d7fff1, #8bd9c0); box-shadow: 0 0 18px rgba(71,221,183,.55), inset 0 1px 2px white, 0 4px 0 #5b9d8a; }
+.micro-mic-status.active > span { background: #31c9a5; box-shadow: 0 0 9px 3px rgba(49,201,165,.65); animation: micro-led-pulse 700ms ease-in-out infinite alternate; }
+.micro-mic-status.processing { color: #6f746f; }
+.micro-mic-status.processing > span { background: #fff; box-shadow: 0 0 9px 3px rgba(255,255,255,.7); animation: micro-led-pulse 500ms ease-in-out infinite alternate; }
 .micro-connection > button { width: 42%; aspect-ratio: 1; border: 3px solid #929d96; border-radius: 50%; background: #101612; box-shadow: inset 0 0 0 2px #030604; cursor: pointer; }
 .micro-connection-leds { display: grid; gap: 5px; }
 .micro-connection-leds i { width: 5px; height: 3px; background: #909b94; box-shadow: 0 1px 0 white; }
@@ -1278,3 +1284,7 @@ footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto
 .micro-joystick.pushed-right .joystick-cap { transform: translateX(8px); }
 
 .micro-command-key.draft-ready { --micro-light: #fff; --micro-glow: rgba(255,255,255,.45); }
+@keyframes micro-dial-press { 0% { filter: brightness(1); } 45% { filter: brightness(.82); transform: translateY(2px); } 100% { filter: brightness(1); transform: translateY(0); } }
+@keyframes micro-led-pulse { from { opacity: .45; transform: scale(.8); } to { opacity: 1; transform: scale(1.25); } }
+.micro-joystick:has(.joystick-cap:active) { box-shadow: 0 2px 0 #080908, 0 0 14px rgba(114,145,128,.35); filter: brightness(.92); }
+.micro-joystick .joystick-cap:active { box-shadow: 0 1px 2px #080908, 0 0 10px rgba(126,239,194,.55); }

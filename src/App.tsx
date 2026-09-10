@@ -1449,7 +1449,7 @@ function PanelApp() {
         {microDirections.map(({id,label})=>{const binding=microPreferences.joystick[id];const unavailable=unavailableMicroAction(binding.action);const description=`摇杆向${label}：${microActions.find(a=>a.id===binding.action)?.label}`;return <button type="button" key={id} className={`joystick-${id}`} disabled={!unavailable&&microActionDisabled(binding)} aria-disabled={Boolean(unavailable)||undefined} aria-label={description} title={description} onClick={()=>fireMicroJoystick(id)}>{id==='up'?<ArrowUp size={14}/>:id==='right'?<ArrowRight size={14}/>:id==='down'?<ArrowDown size={14}/>:<ArrowLeft size={14}/>}</button>;})}
       </div>
       {microKeys.slice(0, 4).map(renderMicroCommandKey)}
-      <div className={`micro-connection ${connectionState}`}><span className="micro-connection-leds" aria-hidden="true"><i /><i /><i /></span><button type="button" onClick={() => setShowSettings(true)} title="连接与配对" aria-label="连接与配对" /></div>
+      <div className={`micro-mic-status ${isListening ? 'active' : ''} ${isTranscribing || isFinalizingVoice ? 'processing' : ''}`} role="img" aria-label="麦克风状态：不可点击" title="麦克风状态（不可点击）"><Mic size={22} /><span aria-hidden="true" /></div>
       {microKeys.slice(4).map(renderMicroCommandKey)}
     </>;
     return <>{renderStopKey()}{renderCaptureKey()}{renderVoiceKey()}{renderExecuteKey()}</>;
