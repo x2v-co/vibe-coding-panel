@@ -56,8 +56,9 @@ Android PWA core flows and native-terminal handoff to the tested Mac passed
 physical acceptance. iPhone Safari core flows and home-screen launch/microphone
 also passed; the remaining iPhone checks were paused by the tester. Windows
 Server 2025 ConPTY interactive handoff is CI-tested with a local model fixture.
-Physical Windows 11 UI and real-account authentication, interactive Linux
-handoff and clean phone reinstall remain unverified.
+Ubuntu 24.04 PTY handoff and remote release are also CI-tested. Physical Windows
+11/Linux desktop UI, real-account authentication on those systems and clean
+phone reinstall remain unverified.
 See [device results and known limitations](known-issues.md) for exact scope.
 This remains an internal beta package.
 
