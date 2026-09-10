@@ -1211,46 +1211,45 @@ footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto
 .footer-links a { color: inherit; text-underline-offset: 3px; }
 .site-footer > span:last-child { flex-wrap: wrap; justify-content: flex-end; }
 
-/* Keep Micro's bottom-row microphone reachable in mobile and PWA focus mode.
-   The screen scrolls internally; content must not grow the physical key bank. */
+/* All mobile layouts share a viewport frame and one content scroll area. */
 @media (max-width: 800px) {
-  .layout-hardware-micro .device {
+  .app-shell .device {
     height: 100vh;
     height: 100dvh;
     min-height: 0;
   }
-  .layout-hardware-micro .device-rail,
-  .layout-hardware-micro .device-footer { display: none; }
-  .layout-hardware-micro .display-status > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .layout-hardware-micro .display-quick-actions { flex-shrink: 0; gap: 4px; }
-  .layout-hardware-micro .micro-toolbar-action { display: grid; }
-  .layout-hardware-micro .result-screen > .screen-label { display: none; }
-  .layout-hardware-micro .result-screen p { max-height: none; overflow: visible; }
-  .layout-hardware-micro .display-bezel {
+  .app-shell .device-rail,
+  .app-shell .device-footer { display: none; }
+  .app-shell .display-status > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .app-shell .display-quick-actions { flex-shrink: 0; gap: 4px; }
+  .app-shell .micro-toolbar-action { display: grid; }
+  .app-shell .result-screen > .screen-label { display: none; }
+  .app-shell .result-screen p { max-height: none; overflow: visible; }
+  .app-shell .display-bezel {
     flex: 1 1 0;
     min-height: 0;
     overflow: hidden;
   }
-  .layout-hardware-micro .display {
+  .app-shell .display {
     min-height: 0;
     grid-template-rows: minmax(0, 1fr) auto;
   }
-  .layout-hardware-micro .display-main {
+  .app-shell .display-main {
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
   }
-  .layout-hardware-micro .display-main > * { flex-shrink: 0; }
-  .layout-hardware-micro .display-content {
+  .app-shell .display-main > * { flex-shrink: 0; }
+  .app-shell .display-content {
     flex: 0 0 auto;
     align-items: flex-start;
     padding: 10px 0 8px;
   }
-  .layout-hardware-micro .capture-preview { grid-template-columns: 48px minmax(0, 1fr) 34px; gap: 8px; margin-bottom: 6px; }
-  .layout-hardware-micro .capture-preview img { width: 48px; height: 36px; object-fit: contain; }
-  .layout-hardware-micro .capture-preview span,
-  .layout-hardware-micro .has-capture > .screen-label { display: none; }
-  .layout-hardware-micro .capture-preview strong { margin: 0; font-size: 12px; }
+  .app-shell .capture-preview { grid-template-columns: 48px minmax(0, 1fr) 34px; gap: 8px; margin-bottom: 6px; }
+  .app-shell .capture-preview img { width: 48px; height: 36px; object-fit: contain; }
+  .app-shell .capture-preview span,
+  .app-shell .has-capture > .screen-label { display: none; }
+  .app-shell .capture-preview strong { margin: 0; font-size: 12px; }
   .layout-hardware-micro .control-bank {
     width: min(100%, 380px, max(250px, calc(100dvh - 320px - env(safe-area-inset-top) - env(safe-area-inset-bottom))));
     flex: 0 0 auto;
@@ -1304,3 +1303,15 @@ footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto
 .micro-joystick .joystick-up { top: -3%; left: 36%; } .micro-joystick .joystick-down { bottom: -3%; left: 36%; }
 .micro-joystick .joystick-left { left: -3%; top: 36%; } .micro-joystick .joystick-right { right: -3%; top: 36%; }
 @media (prefers-reduced-motion: reduce) { .micro-control-knob .knob-push, .micro-control-knob .dial-face, .micro-joystick .joystick-cap { transition: none !important; } }
+
+@media (max-width: 800px) {
+  .app-shell .control-bank { flex-shrink: 0; }
+  .app-shell.layout-console .control-bank { height: clamp(192px, 40dvh, 290px); grid-template-rows: 1.2fr 1fr .85fr; }
+  .app-shell.layout-console .console-key { min-height: 0; padding: 8px; gap: 5px; }
+  .app-shell.layout-console .console-key small { display: none; }
+  .app-shell.layout-console .console-key span { font-size: 10px; }
+  .app-shell.layout-console .console-key svg { width: 24px; height: 24px; }
+  .app-shell .display-status > span:nth-child(2) { flex: 1; }
+  .app-shell .panel-notices { position: fixed; left: 10px; right: 10px; top: max(10px, env(safe-area-inset-top)); z-index: 10; max-height: 25dvh; overflow-y: auto; }
+  .app-shell .panel-notices:empty { display: none; }
+}
