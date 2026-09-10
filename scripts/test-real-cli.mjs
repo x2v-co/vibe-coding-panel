@@ -3,7 +3,7 @@
 // The local provider fixture does not test model quality or account authentication.
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdtemp, mkdir, writeFile, appendFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, appendFile, rm, readdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import spawn from 'cross-spawn';
@@ -36,7 +36,7 @@ const server = createServer(async (req, res) => {
     }
     const provider = req.url.includes('messages') ? 'claude' : 'codex';
     requests.push({ provider, input });
-    await observeRequest(provider);
+    await observeRequest(provider, input);
     const reply = 'COMPATIBILITY_READY';
     res.setHeader('Content-Type', 'text/event-stream');
     const event = (type, data) => res.write(`event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`);
@@ -103,8 +103,24 @@ try {
     }
     const before = requests.length;
     const ownership = [];
-    observeRequest = async activeProvider => {
-      if (activeProvider === provider) ownership.push((await sessions.read(provider, workspace, id)).canResume);
+    observeRequest = async (activeProvider, input) => {
+      if (activeProvider === provider) {
+        const canResume = (await sessions.read(provider, workspace, id)).canResume;
+        ownership.push(canResume);
+        if (canResume) {
+          console.error('Unexpected available fixture session:', {
+            provider, model: input.model,
+            hasResumePrompt: JSON.stringify(input).includes('SECOND_TURN_MARKER'),
+            hasOriginalContext: JSON.stringify(input).includes('FIRST_TURN_MARKER'),
+          });
+          if (provider === 'claude') {
+            const dir = path.join(claudeHome, 'sessions');
+            for (const file of await readdir(dir).catch(() => [])) {
+              if (/^\d+\.json$/.test(file)) console.error('Fixture metadata:', await readFile(path.join(dir, file), 'utf8'));
+            }
+          }
+        }
+      }
     };
     const resume = provider === 'codex' ? ['exec', 'resume', '--skip-git-repo-check', '--json', id]
       : [...args, '--resume', id];

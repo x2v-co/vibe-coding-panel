@@ -130,12 +130,20 @@ export class NativeSessions {
       return result.code === null || ![0, 1].includes(result.code) || Boolean(result.output.trim());
     }
     const dir = path.join(this.claudeRoot, 'sessions');
-    let names; try { names = await readdir(dir); } catch { return false; }
+    let names; try { names = await readdir(dir); } catch (reason) { return reason.code !== 'ENOENT'; }
     for (const name of names.filter(n => /^\d+\.json$/.test(n))) {
+      const pid = Number(path.basename(name, '.json'));
+      if (!Number.isSafeInteger(pid) || pid <= 0 || !this.alive(pid)) continue;
       try {
         const { rows } = await transcript(path.join(dir, name), 16384);
-        if (rows.some(r => r.sessionId === id && Number.isInteger(r.pid) && r.pid > 0 && this.alive(r.pid))) return true;
-      } catch { /* A terminal can exit during enumeration. */ }
+        // Claude may rewrite its PID file while we inspect it. A live owner
+        // with empty/partial/invalid metadata is unknown, not a released session.
+        if (rows.length !== 1 || rows[0]?.pid !== pid || !uuid.test(rows[0]?.sessionId || '')) return true;
+        if (rows[0].sessionId === id && this.alive(pid)) return true;
+      } catch (reason) {
+        // Removal is a normal exit race; unreadable existing metadata fails closed.
+        if (reason.code !== 'ENOENT' && this.alive(pid)) return true;
+      }
     }
     return false;
   }

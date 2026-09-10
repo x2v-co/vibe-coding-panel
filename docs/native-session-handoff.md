@@ -20,6 +20,10 @@ app-server/remote-control daemons are never terminated for an individual session
 Claude release requires matching session/PID metadata and process name, plus the
 recorded process start identity, to reject stale/reused PIDs. Older metadata or
 unrecognized process wrappers require manual exit on the computer.
+If a live Claude PID's metadata is incomplete or cannot be read, ownership is
+unknown and continuation stays blocked until metadata is readable or that
+process exits. The Connector does not remove the file or terminate an unverified
+owner. Valid metadata for an unrelated session does not block continuation.
 
 On Windows, Codex ownership is checked by a non-mutating exclusive-open probe of
 its existing writer lock. An inspection timeout/error is treated as occupied.
