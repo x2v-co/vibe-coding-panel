@@ -2,7 +2,11 @@
 
 ## First run
 
-Install Node.js 24 LTS. Run `Vibe Panel.command` (macOS), `Vibe Panel.bat`
+For end users, download a [portable Connector](portable-connector.md), extract
+it fully and run its platform launcher. Node.js 24 and locked dependencies are
+included; install and authenticate Codex or Claude separately.
+
+For a source checkout, install Node.js 24 LTS. Run `Vibe Panel.command` (macOS), `Vibe Panel.bat`
 (Windows), or `bash "Vibe Panel.sh"` (Linux). All use `scripts/launch.mjs`;
 missing packages are installed with `npm ci`. Already installed: `npm run connect`.
 Run `node scripts/launch.mjs --doctor --json` without installing dependencies
@@ -47,14 +51,20 @@ Update those ranges when Cloudflare changes them.
 
 ## Automated release
 
-After all three CI jobs pass on main, CI builds `vibe-panel:<full-commit-sha>`,
-publishes `relay-image.tar.gz` and `SHA256SUMS` on a `relay-<sha>` GitHub Release,
+After all test gates pass on main, CI builds `vibe-panel:<full-commit-sha>`.
+The gates comprise four platform build/package/voice jobs, eight pinned CLI
+compatibility jobs and separate Windows ConPTY and Linux PTY interactive jobs.
+See [native-session validation](native-session-handoff.md) for versions and scope.
+CI publishes `relay-image.tar.gz`, four portable Connector ZIPs and `SHA256SUMS`
+on a `relay-<sha>` GitHub Release,
 and waits for the public health endpoint to report that SHA. The production
 systemd timer polls only this repository's latest release every two minutes.
 It verifies SHA256 before Docker load, serializes deployment with flock, records
 the previous image digest, health-checks both local and public endpoints and
-restores the previous image on failure. Release packages contain only the image;
-private deployment notes are excluded from Docker's context and copy allowlist.
+restores the previous image on failure. The host updater applies only the Relay
+image; Connector updates are downloaded and launched on users' computers.
+Private deployment notes are excluded from Docker's context and the portable
+package copy allowlist.
 Checksums provide integrity; repository release write access is the trust boundary.
 
 Bootstrap on the host: install the tracked deploy scripts, Compose files and
