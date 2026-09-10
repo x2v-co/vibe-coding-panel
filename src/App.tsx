@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { readApiResponse, userError } from './api';
+import { monitorConnection } from './connection-monitor';
 import { MIN_RECORDING_MS, recordingMimeTypes, validateRecording } from './recording';
 import { Fragment, ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { defaultMicroKeys, microActions, microColors, microIconOptions, microKeycapAssets, readMicroConfiguration, updateMicroConfiguration, unavailableMicroAction, MicroVoiceGesture } from './micro';
@@ -190,6 +191,7 @@ function PanelApp() {
   const [layout, setLayout] = useState<LayoutId>(readLayout);
   const [connection, setConnection] = useState<AgentConnection>(readConnection);
   const [connectionState, setConnectionState] = useState<ConnectionState>(() => readConnection().mode === 'local' ? 'online' : 'unknown');
+  const [connectionNotice, setConnectionNotice] = useState('');
   const [agentLabel, setAgentLabel] = useState('LOCAL AGENT');
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnostics | null>(null);
   const [diagnosticsError, setDiagnosticsError] = useState('');
@@ -616,42 +618,33 @@ function PanelApp() {
   // Discover tasks from other paired browsers, even when our selected task is
   // finished. Selection and drafts stay local; task state comes from Connector.
   useEffect(() => {
-    if (!authReady || connection.mode === 'demo') return;
-    let cancelled = false;
-    let pending = false;
-    const controller = new AbortController();
-    const sync = async () => {
-      if (pending || document.hidden) return;
-      pending = true;
-      try {
-        const response = await fetch('/api/jobs', { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]), cache: 'no-store' });
-        if (!response.ok) return;
+    if (!authReady || connection.mode === 'demo') { setConnectionNotice(''); return; }
+    return monitorConnection({
+      load: async signal => {
+        const response = await fetch('/api/jobs', { signal, cache: 'no-store' });
         const payload = await readApiResponse(response) as { jobs?: SavedJob[] };
-        if (cancelled || !Array.isArray(payload.jobs)) return;
-        // Replace browser history with this Connector's list. Do not mix task
-        // records from another computer or demo into a newly paired session.
-        setHistory(payload.jobs);
-        const selected = selectedJobRef.current && payload.jobs.find((job) => job.id === selectedJobRef.current);
+        if (!response.ok || !Array.isArray(payload.jobs)) throw new Error('无法读取电脑任务状态');
+        return payload.jobs;
+      },
+      onState: (state, reason) => {
+        setConnectionState(state);
+        setConnectionNotice(state === 'online' ? '' : state === 'checking' ? '网络已恢复，正在重新连接电脑…'
+          : !navigator.onLine ? '手机网络已断开，恢复网络后将自动重连。原任务结果已保留。'
+          : reason ? userError(reason, '与电脑的连接中断，正在自动重连。请勿重复发送任务。')
+          : '与电脑的连接中断，正在自动重连。请勿重复发送任务。');
+      },
+      onData: jobs => {
+        // Keep the Connector authoritative without changing selection or drafts.
+        setHistory(jobs);
+        const selected = selectedJobRef.current && jobs.find(job => job.id === selectedJobRef.current);
         if (selected && selected.revision !== undefined && selected.revision >= jobRevisionRef.current) {
           jobRevisionRef.current = selected.revision;
           setStatus(selected.status);
           if (selected.startedAt) setStartedAt(selected.startedAt);
           if (['completed', 'failed', 'stopped'].includes(selected.status)) void refreshJob(selected.id);
         }
-      } catch { /* Keep the last list during a temporary disconnect. */ }
-      finally { pending = false; }
-    };
-    void sync();
-    const timer = window.setInterval(() => { void sync(); }, 2000);
-    window.addEventListener('focus', sync);
-    document.addEventListener('visibilitychange', sync);
-    return () => {
-      cancelled = true;
-      controller.abort();
-      window.clearInterval(timer);
-      window.removeEventListener('focus', sync);
-      document.removeEventListener('visibilitychange', sync);
-    };
+      },
+    });
   }, [authReady, connection.mode]);
 
   useEffect(() => {
@@ -1533,6 +1526,7 @@ function PanelApp() {
             <div className="device-footer"><span><Keyboard size={14} /> TEXT + VOICE</span><button type="button" className="theme-shortcut" onClick={() => setShowSettings(true)}><Palette size={14} /> PANEL / {activeLayout.label}</button></div>
             {showSettings && renderSettingsPopover()}
           </div>
+          {connectionNotice && <div className="error-banner" role="status" aria-live="polite"><Wifi size={16} /><span>{connectionNotice}</span></div>}
           {error && <div className="error-banner" role="alert"><Terminal size={16} /><span>{error}</span>{canImportRecording && <button type="button" className="audio-import-action" onClick={() => audioInputRef.current?.click()}><FileAudio size={15} />系统录音</button>}<button onClick={() => { setError(''); setCanImportRecording(false); }} aria-label="关闭"><X size={15} /></button></div>}
         </section>
 
