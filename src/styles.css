@@ -1232,6 +1232,11 @@ footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto
     overflow-y: auto;
     overscroll-behavior: contain;
   }
+  .layout-hardware-micro .display-main > * { flex-shrink: 0; }
+  .layout-hardware-micro .display-content {
+    flex: 0 0 auto;
+    align-items: flex-start;
+  }
   .layout-hardware-micro .control-bank {
     width: min(100%, 380px, max(250px, calc(100dvh - 320px - env(safe-area-inset-top) - env(safe-area-inset-bottom))));
     flex: 0 0 auto;
