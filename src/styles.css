@@ -1182,7 +1182,6 @@ footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto
   .speaker-grill { gap: 5px; }
   .activity-strip > div:nth-last-child(-n+2) { display: none; }
   .display-side { grid-template-columns: 62px 62px minmax(0,1fr); }
-  .display-status > span:nth-child(2) { max-width: 86px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .display-time { display: none; }
   .signal-bars { display: none; }
   .console-key span { font-size: 13px; }
@@ -1220,7 +1219,7 @@ footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto
   }
   .app-shell .device-rail,
   .app-shell .device-footer { display: none; }
-  .app-shell .display-status > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .app-shell .task-status-label { min-width: 0; }
   .app-shell .display-quick-actions { flex-shrink: 0; gap: 4px; }
   .app-shell .micro-toolbar-action { display: grid; }
   .app-shell .result-screen > .screen-label { display: none; }
@@ -1311,7 +1310,7 @@ footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto
   .app-shell.layout-console .console-key small { display: none; }
   .app-shell.layout-console .console-key span { font-size: 10px; }
   .app-shell.layout-console .console-key svg { width: 24px; height: 24px; }
-  .app-shell .display-status > span:nth-child(2) { flex: 1; }
+  .app-shell .task-status-label { flex: 1; }
   .app-shell .panel-notices { position: fixed; left: 10px; right: 10px; top: max(10px, env(safe-area-inset-top)); z-index: 10; max-height: 25dvh; overflow-y: auto; }
   .app-shell .panel-notices:empty { display: none; }
 }
@@ -1335,3 +1334,7 @@ footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto
     overscroll-behavior: contain;
   }
 }
+
+.task-status-label { display: flex; align-items: center; min-width: 0; white-space: nowrap; }
+.task-status-text { flex: none; }
+.task-agent-label { overflow: hidden; text-overflow: ellipsis; white-space: pre; }
