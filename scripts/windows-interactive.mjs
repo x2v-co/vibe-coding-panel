@@ -43,6 +43,21 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
         onboarding.add('theme');
         onboardingTimers.push(setTimeout(() => { console.log('claude: selecting default terminal theme'); type('\r'); }, 1500));
       }
+      if (!onboarding.has('key') && text.includes('Do you want to use this API key?') && text.includes('l-compatibility-only')) {
+        onboarding.add('key');
+        onboardingTimers.push(setTimeout(async () => {
+          console.log('claude: accepting the local fixture API key');
+          terminal.write(win32Input ? '\x1b[38;72;0;1;0;1_\x1b[38;72;0;0;0;1_' : '\x1b[A');
+          await delay(300);
+          type('\r');
+        }, 1500));
+      }
+      for (const [name, label] of [['security', 'Security notes'], ['trust', 'Yes, I trust this folder']]) {
+        if (!onboarding.has(name) && text.includes(label)) {
+          onboarding.add(name);
+          onboardingTimers.push(setTimeout(() => { console.log(`claude: confirming ${name} for isolated fixture`); type('\r'); }, 1500));
+        }
+      }
     });
     // Codex queries cursor position during terminal initialization.
     if (chunk.includes('\x1b[6n')) terminal.write('\x1b[1;1R');
