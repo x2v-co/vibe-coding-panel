@@ -15,11 +15,15 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
     cwd: workspace, env: { ...env, TERM: 'xterm-256color' }, cols: 120, rows: 36,
     useConpty: true,
   });
-  let output = '', exited = false, exitCode;
+  let output = '', exited = false, exitCode, trusted = false;
   terminal.onData(chunk => {
     output = (output + chunk).slice(-40000);
     // Codex queries cursor position during terminal initialization.
     if (chunk.includes('\x1b[6n')) terminal.write('\x1b[1;1R');
+    if (!trusted && provider === 'codex' && stripVTControlCharacters(output).includes('Press enter to continue and create a sandbox')) {
+      trusted = true;
+      terminal.write('\r'); // Trust only the empty workspace created by this test.
+    }
   });
   terminal.onExit(event => { exited = true; exitCode = event.exitCode; });
   const waitFor = async (description, condition, timeout = 45000) => {
