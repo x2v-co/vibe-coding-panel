@@ -151,6 +151,26 @@ function imageDataUrl(file: File) {
 }
 
 function PanelApp() {
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    const root = document.documentElement;
+    const update = () => {
+      // Pinch zoom must not reflow the controller underneath the gesture.
+      if (viewport && Math.abs(viewport.scale - 1) > 0.01) return;
+      root.style.setProperty("--panel-visible-height", `${viewport?.height ?? window.innerHeight}px`);
+    };
+    update();
+    viewport?.addEventListener("resize", update);
+    window.addEventListener("resize", update);
+    window.addEventListener("pageshow", update);
+    return () => {
+      viewport?.removeEventListener("resize", update);
+      window.removeEventListener("resize", update);
+      window.removeEventListener("pageshow", update);
+      root.style.removeProperty("--panel-visible-height");
+    };
+  }, []);
+
   const [prompt, setPrompt] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
   const [cwd, setCwd] = useState(localStorage.getItem('vibe-panel-cwd') || '.');
