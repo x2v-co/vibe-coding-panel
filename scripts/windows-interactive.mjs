@@ -12,7 +12,7 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
     screen.buffer.active.getLine(screen.buffer.active.viewportY + i)?.translateToString(true) || '').join('\n');
   const args = provider === 'codex'
     ? ['resume', '--no-alt-screen', id]
-    : ['--resume', id, '--setting-sources', '', '--tools', '', '--model', 'claude-sonnet-4-6'];
+    : ['--resume', id, '--setting-sources=', '--tools=', '--model', 'claude-sonnet-4-6'];
   const quote = text => `'${text.replaceAll("'", "''")}'`;
   const command = `& ${[bin, ...args].map(quote).join(' ')}; exit $LASTEXITCODE`;
   const terminal = spawn('powershell.exe', ['-NoLogo', '-NoProfile', '-Command', command], {
