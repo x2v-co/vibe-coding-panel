@@ -15,7 +15,7 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
     cwd: workspace, env: { ...env, TERM: 'xterm-256color' }, cols: 120, rows: 36,
     useConpty: true,
   });
-  let output = '', exited = false, exitCode, trusted = false;
+  let output = '', exited = false, exitCode, trusted = false, trustTimer;
   const type = text => {
     // ConPTY enables Win32-input mode; plain CR is not a key event in this mode.
     const win32 = output.lastIndexOf('\x1b[?9001h') > output.lastIndexOf('\x1b[?9001l');
@@ -33,7 +33,11 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
     if (chunk.includes('\x1b[6n')) terminal.write('\x1b[1;1R');
     if (!trusted && provider === 'codex' && stripVTControlCharacters(output).includes('Press enter to continue and create a sandbox')) {
       trusted = true;
-      type('\r'); // Trust only the empty workspace created by this test.
+      // Wait for the TUI to finish switching console input modes after painting.
+      trustTimer = setTimeout(() => {
+        console.log(`${provider}: confirming isolated workspace trust`);
+        type('\r');
+      }, 1500);
     }
   });
   terminal.onExit(event => { exited = true; exitCode = event.exitCode; });
@@ -76,6 +80,7 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
     console.error('Raw terminal tail:', JSON.stringify(output.slice(-8000)));
     throw error;
   } finally {
+    clearTimeout(trustTimer);
     if (!exited) terminal.kill();
   }
 }
