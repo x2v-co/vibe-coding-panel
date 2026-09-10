@@ -1,5 +1,6 @@
 // Runs official CLIs against a loopback provider. No account or paid inference required.
-// This tests CLI persistence/protocol compatibility, not model quality or TUI handoff.
+// Tests persistence/protocol compatibility, plus optional Windows ConPTY handoff.
+// The local provider fixture does not test model quality or account authentication.
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdtemp, mkdir, writeFile, appendFile, rm } from 'node:fs/promises';
