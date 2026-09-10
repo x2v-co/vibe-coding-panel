@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { stripVTControlCharacters } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createRequire } from 'node:module';
+import { readdir, readFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import path from 'node:path';
 
 export async function checkInteractiveTerminal({ provider, bin, id, workspace, env, sessions, requests }) {
   assert(['linux', 'win32'].includes(process.platform));
@@ -133,6 +136,15 @@ export async function checkInteractiveTerminal({ provider, bin, id, workspace, e
       await delay(500);
       type('\r');
     } else {
+      if (provider === 'claude') {
+        const dir = path.join(env.CLAUDE_CONFIG_DIR, 'sessions');
+        for (const file of await readdir(dir)) {
+          if (!/^\d+\.json$/.test(file)) continue;
+          const row = JSON.parse(await readFile(path.join(dir, file), 'utf8'));
+          console.log('Fixture Claude process identity:', { pid: row.pid, procStart: row.procStart });
+          console.log(execFileSync('ps', ['-p', String(row.pid), '-o', 'pid=,comm=,lstart='], { encoding: 'utf8' }));
+        }
+      }
       const released = await sessions.release(provider, workspace, id);
       assert.equal(released.released, true);
       assert.equal(released.state, 'released');
