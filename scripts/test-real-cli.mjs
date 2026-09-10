@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import spawn from 'cross-spawn';
 import { NativeSessions } from '../server/native-sessions.js';
+import { checkWindowsTerminal } from './windows-interactive.mjs';
 
 const root = await mkdtemp(path.join(tmpdir(), 'vibe-real-cli-'));
 const workspace = path.join(root, 'workspace with spaces');
@@ -94,6 +95,9 @@ try {
     assert.equal(first.canResume, true);
     assert.equal((await sessions.list(provider, other)).sessions.length, 0);
     await assert.rejects(sessions.read(provider, other, id));
+    if (process.env.PANEL_TEST_WINDOWS_TERMINAL === '1') {
+      await checkWindowsTerminal({ provider, bin, id, workspace, env, sessions, requests });
+    }
     const before = requests.length;
     const ownership = [];
     observeRequest = async activeProvider => {
