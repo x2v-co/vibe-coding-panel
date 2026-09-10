@@ -1315,3 +1315,23 @@ footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto
   .app-shell .panel-notices { position: fixed; left: 10px; right: 10px; top: max(10px, env(safe-area-inset-top)); z-index: 10; max-height: 25dvh; overflow-y: auto; }
   .app-shell .panel-notices:empty { display: none; }
 }
+
+/* The mobile panel is an app surface: only explicit inner scrollports may move.
+   Matching content height alone does not suppress browser overscroll/pull-to-refresh. */
+@media (max-width: 800px) {
+  html:has(.app-shell),
+  body:has(.app-shell) {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  body:has(.app-shell) { position: fixed; inset: 0; }
+  #root:has(.app-shell) { height: 100%; overflow: hidden; }
+  .app-shell { position: fixed; inset: 0; height: 100dvh; overflow: clip; overscroll-behavior: none; }
+  .app-shell > main, .app-shell .console-zone { height: 100%; min-height: 0; overflow: clip; }
+  .app-shell .device { height: 100%; }
+  .app-shell :is(.display-main, .settings-popover, .history-drawer, .workspace-picker, .workspace-directory-list, .native-session-dialog, .native-session-messages, .onboarding-card, .panel-notices, textarea) {
+    overscroll-behavior: contain;
+  }
+}
