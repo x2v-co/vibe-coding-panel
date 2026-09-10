@@ -207,6 +207,8 @@ function PanelApp() {
   const [microRead, setMicroRead] = useState<Record<string,string>>(() => { try { const v=JSON.parse(localStorage.getItem('vibe-panel-micro-read') || '{}'); return v && typeof v==='object' && !Array.isArray(v) ? v : {}; } catch { return {}; } });
   const pendingMicroSlot = useRef<number | null>(null);
   const joystickDrag = useRef<{x:number;y:number;fired:boolean}|null>(null);
+  const [dialAngle,setDialAngle] = useState(0);
+  const joystickFeedbackTimer = useRef<ReturnType<typeof setTimeout>|null>(null);
   const [joystickDirection,setJoystickDirection] = useState<MicroDirection|null>(null);
   const knobDrag = useRef<{y:number;moved:boolean}|null>(null);
   const [knobIndex, setKnobIndex] = useState<number | null>(null);
@@ -577,7 +579,7 @@ function PanelApp() {
 
   useEffect(() => {
     if (layout !== 'hardware-micro') return;
-    const cancel = () => { cancelMicroVoice(); if (knobHoldTimerRef.current) clearTimeout(knobHoldTimerRef.current); };
+    const cancel = () => { cancelMicroVoice(); if(joystickFeedbackTimer.current)clearTimeout(joystickFeedbackTimer.current); joystickDrag.current=null; setJoystickDirection(null); if (knobHoldTimerRef.current) clearTimeout(knobHoldTimerRef.current); };
     const hidden = () => { if (document.hidden) cancel(); };
     window.addEventListener('blur', cancel);
     document.addEventListener('visibilitychange', hidden);
@@ -1318,6 +1320,7 @@ function PanelApp() {
     if(document.activeElement instanceof HTMLElement) document.activeElement.blur();
   }
   function turnMicroKnob(direction: number) {
+    setDialAngle(angle=>angle+direction*30);
     if(microPreferences.knobMode==='custom') { triggerMicroAction(microPreferences.knob[direction>0?'right':'left']); return; }
     if(microPreferences.knobMode==='scroll') { const area=document.querySelector('.layout-hardware-micro .display-main'); area?.scrollBy({top:direction*80}); return; }
     const targets=composerElements();
@@ -1333,7 +1336,12 @@ function PanelApp() {
     if(target instanceof HTMLTextAreaElement)target.focus();else target.click();
   }
   function holdMicroKnob() { if(microPreferences.knobMode==='custom')triggerMicroAction(microPreferences.knob.hold);else setShowSettings(true); }
-  function fireMicroJoystick(direction:MicroDirection) { triggerMicroAction(microPreferences.joystick[direction]); }
+  function fireMicroJoystick(direction:MicroDirection) {
+    setJoystickDirection(direction);
+    if(joystickFeedbackTimer.current)clearTimeout(joystickFeedbackTimer.current);
+    joystickFeedbackTimer.current=setTimeout(()=>{if(!joystickDrag.current)setJoystickDirection(null);},180);
+    triggerMicroAction(microPreferences.joystick[direction]);
+  }
   function navigateMicro(direction: number) {
     if (busy || voiceBusy || isRecoveringJob || isAddingContext) return;
     const next = microNavigationIndex + direction;
@@ -1434,7 +1442,7 @@ function PanelApp() {
           onContextMenu={event=>event.preventDefault()}
           onKeyDown={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();if(event.repeat)return;knobHeldRef.current=false;knobHoldTimerRef.current=setTimeout(()=>{knobHeldRef.current=true;holdMicroKnob();},600);}}}
           onKeyUp={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();if(knobHoldTimerRef.current)clearTimeout(knobHoldTimerRef.current);selectMicroKnob();}}}
-          onClick={selectMicroKnob}><span /></button>
+          onClick={selectMicroKnob}><span className="dial-face" style={{transform:`rotate(${dialAngle}deg)`}} /></button>
         <button type="button" className="knob-right" onClick={() => turnMicroKnob(1)} title="顺时针：下一项" aria-label="旋钮顺时针"><RotateCw size={13} /></button>
       </div>
       {Array.from({ length: 6 }, (_, index) => renderMicroAgentKey(index))}
@@ -1449,7 +1457,7 @@ function PanelApp() {
         {microDirections.map(({id,label})=>{const binding=microPreferences.joystick[id];const unavailable=unavailableMicroAction(binding.action);const description=`摇杆向${label}：${microActions.find(a=>a.id===binding.action)?.label}`;return <button type="button" key={id} className={`joystick-${id}`} disabled={!unavailable&&microActionDisabled(binding)} aria-disabled={Boolean(unavailable)||undefined} aria-label={description} title={description} onClick={()=>fireMicroJoystick(id)}>{id==='up'?<ArrowUp size={14}/>:id==='right'?<ArrowRight size={14}/>:id==='down'?<ArrowDown size={14}/>:<ArrowLeft size={14}/>}</button>;})}
       </div>
       {microKeys.slice(0, 4).map(renderMicroCommandKey)}
-      <div className={`micro-mic-status ${isListening ? 'active' : ''} ${isTranscribing || isFinalizingVoice ? 'processing' : ''}`} role="img" aria-label="麦克风状态：不可点击" title="麦克风状态（不可点击）"><Mic size={22} /><span aria-hidden="true" /></div>
+      <div className="micro-connection" role="img" aria-label="黑色圆形部件与三颗指示灯（装饰）"><span className="micro-connection-leds" aria-hidden="true"><i /><i /><i /></span><span className="micro-black-disc" aria-hidden="true" /></div>
       {microKeys.slice(4).map(renderMicroCommandKey)}
     </>;
     return <>{renderStopKey()}{renderCaptureKey()}{renderVoiceKey()}{renderExecuteKey()}</>;
@@ -1509,7 +1517,7 @@ function PanelApp() {
           {Array.from({ length: 6 }, (_, index) => <span key={index} className={`micro-preview-agent slot-${index + 1}`}>{index + 1}</span>)}
           <span className="micro-preview-joystick" title="摇杆" aria-label="摇杆"><Plus size={18} /></span>
           {microKeys.map((key) => <button type="button" key={key.id} className={`micro-keycap-option micro-${key.id} micro-color-${key.color}`} aria-pressed={editingMicroKey === key.id} onClick={() => setEditingMicroKey(key.id)} title={`编辑 ${key.label}`} aria-label={`编辑键位 ${key.id}`}>{renderMicroIcon(key.icon, 19)}<span>{key.label || 'KEY'}</span></button>)}
-          <span className="micro-preview-connection" title="连接触控区" aria-label="连接触控区"><i /></span>
+          <span className="micro-preview-connection" title="黑色圆形装饰" aria-label="黑色圆形装饰"><i /></span>
         </div>
         {activeMicroKey && <div className="micro-key-editor">
           <label htmlFor="micro-key-label">键帽文字</label>
