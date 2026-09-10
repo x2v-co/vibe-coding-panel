@@ -157,3 +157,33 @@ test('Linux Claude identity uses exact kernel start ticks and rejects stale meta
     await rm(root, { recursive: true, force: true });
   }
 });
+
+
+test('incomplete live Claude metadata blocks resume until ownership is readable', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'vibe-partial-owner-'));
+  const id = '77777777-7777-4777-8777-777777777777';
+  const dir = path.join(root, 'sessions');
+  const sessions = new NativeSessions({ env: { CLAUDE_CONFIG_DIR: root }, codex: { close() {} } });
+  try {
+    await mkdir(dir);
+    const file = path.join(dir, `${process.pid}.json`);
+    for (const partial of ['', '{"pid":', '{}', '{"pid":1,"sessionId":"invalid"}']) {
+      await writeFile(file, partial);
+      assert.equal(await sessions.attached('claude', id), true, `live incomplete metadata: ${partial}`);
+    }
+    await writeFile(file, JSON.stringify({ pid: process.pid, sessionId: '88888888-8888-4888-8888-888888888888' }));
+    assert.equal(await sessions.attached('claude', id), false, 'valid unrelated owner must not block this session');
+    await writeFile(file, JSON.stringify({ pid: process.pid, sessionId: id }));
+    assert.equal(await sessions.attached('claude', id), true);
+    await rm(file);
+    assert.equal(await sessions.attached('claude', id), false);
+    await writeFile(file, '{');
+    const dead = new NativeSessions({ env: { CLAUDE_CONFIG_DIR: root }, codex: { close() {} }, alive: () => false });
+    assert.equal(await dead.attached('claude', id), false, 'dead incomplete metadata must not block recovery');
+    await rm(dir, { recursive: true });
+    await writeFile(dir, 'invalid directory');
+    assert.equal(await sessions.attached('claude', id), true, 'uninspectable ownership directory must fail closed');
+    await rm(dir);
+    assert.equal(await sessions.attached('claude', id), false, 'missing directory is an unused Claude installation');
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

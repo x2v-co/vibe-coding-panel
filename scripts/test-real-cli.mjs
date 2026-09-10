@@ -108,7 +108,11 @@ try {
         const canResume = (await sessions.read(provider, workspace, id)).canResume;
         ownership.push(canResume);
         if (canResume) {
-          console.error('Unexpected available fixture session:', { provider, input });
+          console.error('Unexpected available fixture session:', {
+            provider, model: input.model,
+            hasResumePrompt: JSON.stringify(input).includes('SECOND_TURN_MARKER'),
+            hasOriginalContext: JSON.stringify(input).includes('FIRST_TURN_MARKER'),
+          });
           if (provider === 'claude') {
             const dir = path.join(claudeHome, 'sessions');
             for (const file of await readdir(dir).catch(() => [])) {

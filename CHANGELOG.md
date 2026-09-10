@@ -5,6 +5,14 @@ Portable packages use package version 0.1.0 plus an exact Git revision. Each
 four Connector ZIPs, the Relay image, SHA256SUMS and version-specific notes.
 The application remains an internal beta; see [known limitations](docs/known-issues.md).
 
+## 2026-09-10 — incomplete Claude ownership metadata
+
+- Keep continuation blocked when a live Claude PID file is empty, partially
+  written or invalid, or its ownership directory cannot be inspected. Previously
+  these states could appear released. Valid unrelated sessions and stale files
+  for exited processes still allow continuation.
+- Add regression coverage for temporary metadata writes and safe recovery.
+
 ## 2026-09-10 — Linux terminal handoff
 
 - Fix Claude remote release on Linux: compare its recorded kernel start ticks
