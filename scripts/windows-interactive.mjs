@@ -6,6 +6,10 @@ import { setTimeout as delay } from 'node:timers/promises';
 export async function checkWindowsTerminal({ provider, bin, id, workspace, env, sessions, requests }) {
   assert.equal(process.platform, 'win32');
   const { spawn } = await import('node-pty');
+  const { Terminal } = (await import('@xterm/headless')).default;
+  const screen = new Terminal({ cols: 120, rows: 36, allowProposedApi: true });
+  const visible = () => Array.from({ length: screen.rows }, (_, i) =>
+    screen.buffer.active.getLine(screen.buffer.active.viewportY + i)?.translateToString(true) || '').join('\n');
   const args = provider === 'codex'
     ? ['resume', '--no-alt-screen', id]
     : ['--resume', id, '--setting-sources', '', '--tools', '', '--model', 'claude-sonnet-4-6'];
@@ -29,6 +33,7 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
   };
   terminal.onData(chunk => {
     output = (output + chunk).slice(-40000);
+    screen.write(chunk);
     // Codex queries cursor position during terminal initialization.
     if (chunk.includes('\x1b[6n')) terminal.write('\x1b[1;1R');
     if (!trusted && provider === 'codex' && stripVTControlCharacters(output).includes('Press enter to continue and create a sandbox')) {
@@ -65,7 +70,11 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
     await assert.rejects(sessions.release(provider, workspace, id), /Ctrl\+C|退出 CLI/);
     assert.equal(exited, false, 'unsupported remote release must leave the terminal running');
     assert.equal((await sessions.read(provider, workspace, id)).canResume, false);
-    await waitFor('waiting for resumed transcript in terminal', () => stripVTControlCharacters(output).includes('COMPATIBILITY_READY'), 90000);
+    await waitFor('waiting for resumed transcript in terminal', () => {
+      const text = visible();
+      return text.includes('COMPATIBILITY_READY') && !text.includes('Set up default sandbox') && !text.includes('Do you trust');
+    }, 90000);
+    await delay(1500);
     const before = requests.length;
     type('INTERACTIVE_TURN_MARKER. Recall the earlier marker.\r');
     await waitFor('waiting for interactive model request', () => requests.slice(before).some(r =>
@@ -85,11 +94,13 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
     console.log(`${provider}: Windows ConPTY interactive prompt, occupied/release refusal, terminal /exit and released state PASS`);
   } catch (error) {
     console.error(stripVTControlCharacters(output));
+    console.error('Final terminal screen:', visible());
     console.error('Raw terminal tail:', JSON.stringify(output.slice(-8000)));
     throw error;
   } finally {
     clearTimeout(trustTimer);
     clearTimeout(sandboxTimer);
     if (!exited) terminal.kill();
+    screen.dispose();
   }
 }
