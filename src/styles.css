@@ -1327,7 +1327,7 @@ footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto
   }
   body:has(.app-shell) { position: fixed; inset: 0; }
   #root:has(.app-shell) { height: 100%; overflow: hidden; }
-  .app-shell { position: fixed; inset: 0; height: min(100svh, var(--panel-visible-height, 100dvh)); overflow: clip; overscroll-behavior: none; }
+  .app-shell { position: fixed; inset: 0; min-height: 0; height: min(100svh, var(--panel-visible-height, 100dvh)); overflow: clip; overscroll-behavior: none; }
   .app-shell > main, .app-shell .console-zone { height: 100%; min-height: 0; overflow: clip; }
   .app-shell .device { height: 100%; }
   .app-shell :is(.display-main, .settings-popover, .history-drawer, .workspace-picker, .workspace-directory-list, .native-session-dialog, .native-session-messages, .onboarding-card, .panel-notices, textarea) {
