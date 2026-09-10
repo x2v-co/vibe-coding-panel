@@ -21,6 +21,7 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
   });
   screen.onData(data => terminal.write(data));
   let output = '', exited = false, exitCode, trusted = false, trustTimer, sandboxTimer, sandboxSelected = false, win32Input = false;
+  const onboarding = new Set(), onboardingTimers = [];
   const type = text => {
     // ConPTY enables Win32-input mode; plain CR is not a key event in this mode.
     if (!win32Input) { terminal.write(text); return; }
@@ -35,7 +36,14 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
     output = (output + chunk).slice(-40000);
     const enabled = output.lastIndexOf('\x1b[?9001h'), disabled = output.lastIndexOf('\x1b[?9001l');
     if (enabled >= 0 || disabled >= 0) win32Input = enabled > disabled;
-    screen.write(chunk);
+    screen.write(chunk, () => {
+      if (provider !== 'claude') return;
+      const text = visible();
+      if (!onboarding.has('theme') && text.includes('Choose the text style that looks best with your terminal')) {
+        onboarding.add('theme');
+        onboardingTimers.push(setTimeout(() => { console.log('claude: selecting default terminal theme'); type('\r'); }, 1500));
+      }
+    });
     // Codex queries cursor position during terminal initialization.
     if (chunk.includes('\x1b[6n')) terminal.write('\x1b[1;1R');
     if (!trusted && provider === 'codex' && stripVTControlCharacters(output).includes('Press enter to continue and create a sandbox')) {
@@ -108,6 +116,7 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
   } finally {
     clearTimeout(trustTimer);
     clearTimeout(sandboxTimer);
+    onboardingTimers.forEach(clearTimeout);
     if (!exited) terminal.kill();
     screen.dispose();
   }
