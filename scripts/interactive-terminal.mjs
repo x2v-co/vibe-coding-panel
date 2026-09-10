@@ -1,11 +1,12 @@
-// Real Windows ConPTY acceptance. Only created test terminals are controlled.
+// Real PTY/ConPTY acceptance. Only created test terminals are controlled.
 import assert from 'node:assert/strict';
 import { stripVTControlCharacters } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createRequire } from 'node:module';
 
-export async function checkWindowsTerminal({ provider, bin, id, workspace, env, sessions, requests }) {
-  assert.equal(process.platform, 'win32');
+export async function checkInteractiveTerminal({ provider, bin, id, workspace, env, sessions, requests }) {
+  assert(['linux', 'win32'].includes(process.platform));
+  const windows = process.platform === 'win32';
   assert.equal(createRequire(import.meta.url)('node-pty/package.json').version, '1.1.0',
     'Review the ConPTY cleanup workaround before upgrading node-pty');
   const { spawn } = await import('node-pty');
@@ -18,7 +19,8 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
     : ['--resume', id, '--setting-sources=', '--tools=', '--model', 'claude-sonnet-4-6'];
   const quote = text => `'${text.replaceAll("'", "''")}'`;
   const command = `& ${[bin, ...args].map(quote).join(' ')}; exit $LASTEXITCODE`;
-  const terminal = spawn('powershell.exe', ['-NoLogo', '-NoProfile', '-Command', command], {
+  const terminal = spawn(windows ? 'powershell.exe' : bin, windows
+    ? ['-NoLogo', '-NoProfile', '-Command', command] : args, {
     cwd: workspace, env: { ...env, TERM: 'xterm-256color' }, cols: 120, rows: 36,
     useConpty: true,
   });
@@ -101,8 +103,8 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
     await waitFor('waiting for occupied session', async () => !(await sessions.read(provider, workspace, id)).canResume);
     const occupied = await sessions.read(provider, workspace, id);
     assert.equal(occupied.status, 'attached');
-    assert.equal(occupied.canRelease, false, 'Windows must direct users to exit the terminal');
-    await assert.rejects(sessions.release(provider, workspace, id), /Ctrl\+C|退出 CLI/);
+    assert.equal(occupied.canRelease, !windows);
+    if (windows) await assert.rejects(sessions.release(provider, workspace, id), /Ctrl\+C|退出 CLI/);
     assert.equal(exited, false, 'unsupported remote release must leave the terminal running');
     assert.equal((await sessions.read(provider, workspace, id)).canResume, false);
     await waitFor('waiting for resumed transcript in terminal', () => {
@@ -125,14 +127,20 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
       const marker = messages.findIndex(m => m.role === 'user' && m.text.includes('INTERACTIVE_TURN_MARKER'));
       return marker >= 0 && messages.slice(marker + 1).some(m => m.role === 'assistant' && m.text.includes('COMPATIBILITY_READY'));
     });
-    // Simulates the supported user action: type /exit in this owned terminal.
-    type('/exit');
-    await delay(500);
-    type('\r');
+    if (windows) {
+      // Windows requires manual exit instead of remote signals.
+      type('/exit');
+      await delay(500);
+      type('\r');
+    } else {
+      const released = await sessions.release(provider, workspace, id);
+      assert.equal(released.released, true);
+      assert.equal(released.state, 'released');
+    }
     await waitFor('waiting for terminal exit', () => exited);
-    assert.equal(exitCode, 0);
+    if (windows) assert.equal(exitCode, 0);
     assert.equal((await sessions.read(provider, workspace, id)).canResume, true);
-    console.log(`${provider}: Windows ConPTY interactive prompt, occupied/release refusal, terminal /exit and released state PASS`);
+    console.log(`${provider}: ${windows ? "Windows ConPTY manual exit" : "Linux PTY verified remote release"}, interactive prompt and released state PASS`);
   } catch (error) {
     console.error(stripVTControlCharacters(output));
     console.error('Final terminal screen:', visible());
@@ -146,8 +154,10 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
     // node-pty 1.1.0 closes the output pipe on normal exit but leaves its input
     // pipe and ConoutConnection worker open. Dispose only this driver's resources;
     // do not call kill after /exit (it queries a PID which may already be reused).
-    terminal._agent.inSocket.destroy();
-    terminal._agent._conoutSocketWorker.dispose();
+    if (windows) {
+      terminal._agent.inSocket.destroy();
+      terminal._agent._conoutSocketWorker.dispose();
+    }
     screen.dispose();
   }
 }

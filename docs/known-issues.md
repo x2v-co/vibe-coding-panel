@@ -50,9 +50,10 @@ Device and browser versions above are user-reported.
   Codex 0.152.0/0.153.4 and Claude 2.1.265/2.1.266 executables against a local model
   fixture on all four supported OS/architecture runners. A separate Windows
   Server 2025 ConPTY gate verifies interactive handoff for Codex 0.153.4 and
-  Claude 2.1.266 with a local model fixture. Physical Windows 11 desktop,
-  phone-to-Windows UI, real Windows account authentication, interactive Linux
-  terminal handoff and other CLI versions still need acceptance.
+  Claude 2.1.266 with a local model fixture. An Ubuntu 24.04 PTY gate also
+  verifies both agents' interactive replies and remote release with actual exit.
+  Physical Windows 11/Linux desktop and phone-to-these-desktops UI, real account
+  authentication on those systems and other CLI versions still need acceptance.
   Windows terminal release requires manual exit. Shared
   Codex daemon sessions cannot be terminated remotely; process identity or
   ownership uncertainty blocks handoff. See [handoff recovery](native-session-handoff.md).

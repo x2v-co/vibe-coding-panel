@@ -156,7 +156,8 @@ See [startup diagnostics, cross-platform acceptance, Relay limits and release/ro
 The four release-infrastructure workstreams are implemented and CI-verified.
 Windows Server 2025 ConPTY CI covers interactive Codex/Claude session handoff
 using a local model fixture; physical Windows 11 UI and real-account login
-remain outside that automated coverage.
+remain outside that automated coverage. Ubuntu 24.04 PTY CI also verifies both
+agents' interactive replies, remote release and same-session continuation.
 Android PWA core acceptance and both agents' handoff to the tested Mac passed.
 iPhone Safari core flows passed; remaining iPhone checks are paused. See
 [physical-device results and remaining limits](docs/known-issues.md) for exact

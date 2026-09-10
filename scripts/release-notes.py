@@ -52,8 +52,9 @@ actual Codex 0.152.0/0.153.4 and Claude 2.1.265/2.1.266 executables against a lo
 model fixture on those runners. A separate Windows Server 2025 ConPTY gate tests
 interactive Codex 0.153.4/Claude 2.1.266 session handoff against a local model
 fixture, including occupied state, manual terminal exit and same-ID continuation.
-These checks do not certify arbitrary CLI versions, physical Windows 11 UI,
-real-account authentication, interactive Linux handoff or physical phones.
+An Ubuntu 24.04 PTY gate verifies interactive replies and remote release with
+actual exit for the same CLI versions. These checks do not certify arbitrary CLI
+versions, physical Windows 11/Linux UI, real-account authentication or physical phones.
 The release job also verifies the public production revision after deployment.
 
 Verify each downloaded file against SHA256SUMS. Relay production applies the

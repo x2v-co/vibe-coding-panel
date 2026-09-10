@@ -1,4 +1,4 @@
-import { open, readdir, realpath, stat } from 'node:fs/promises';
+import { open, readFile, readdir, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { homedir } from 'node:os';
 import { createInterface } from 'node:readline';
@@ -95,7 +95,19 @@ export async function verifiedAgentPid(pid, provider, metadataTime = Infinity, e
     const birth = await inspectProcess('ps', ['-p', String(pid), '-o', 'lstart='], { ...process.env, LC_ALL: 'C', TZ: 'UTC' });
     const started = Date.parse(birth.output.trim() + ' UTC');
     if (birth.code !== 0 || !Number.isFinite(started) || started > metadataTime) return false;
-    if (expectedStart && birth.output.trim().replace(/\s+/g, ' ') !== expectedStart.trim().replace(/\s+/g, ' ')) return false;
+    if (expectedStart) {
+      if (process.platform === 'linux') {
+        // Claude records Linux /proc/<pid>/stat field 22 (starttime ticks),
+        // whereas macOS metadata records ps lstart. Keep the birth/mtime check
+        // above too, to reject metadata retained from an earlier boot.
+        if (!/^\d+$/.test(expectedStart)) return false;
+        let procStat;
+        try { procStat = await readFile(`/proc/${pid}/stat`, 'utf8'); } catch { return false; }
+        // comm is parenthesized and may contain spaces or closing parentheses.
+        const fields = procStat.slice(procStat.lastIndexOf(')') + 1).trim().split(/\s+/);
+        if (fields[19] !== expectedStart) return false;
+      } else if (birth.output.trim().replace(/\s+/g, ' ') !== expectedStart.trim().replace(/\s+/g, ' ')) return false;
+    }
   }
   return true;
 }

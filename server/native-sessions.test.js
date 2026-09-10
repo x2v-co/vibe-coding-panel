@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile, rm, realpath, appendFile } from 'node:fs/pro
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { NativeSessions } from './native-sessions.js';
+import { NativeSessions, verifiedAgentPid } from './native-sessions.js';
 
 test('native sessions are filtered by canonical workspace for Codex and Claude', async () => {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vibe-native-sessions-')));
@@ -132,4 +132,28 @@ test('stale Claude session metadata cannot signal an unrelated live process', as
     assert.equal(child.exitCode,null);
     process.kill(child.pid,0);
   } finally {child.kill();await new Promise(resolve=>child.once('close',resolve));await rm(root,{recursive:true,force:true});}
+});
+
+
+test('Linux Claude identity uses exact kernel start ticks and rejects stale metadata', { skip: process.platform !== 'linux' }, async () => {
+  const { fork } = await import('node:child_process');
+  const { readFile } = await import('node:fs/promises');
+  const root = await mkdtemp(path.join(tmpdir(), 'vibe-linux-identity-'));
+  const script = path.join(root, 'owner.cjs');
+  await writeFile(script, "process.title = 'claude'; process.send('ready'); setInterval(() => {}, 1000);");
+  const child = fork(script, [], { stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
+  try {
+    await new Promise((resolve, reject) => { child.once('message', resolve); child.once('error', reject); });
+    const raw = await readFile(`/proc/${child.pid}/stat`, 'utf8');
+    const ticks = raw.slice(raw.lastIndexOf(')') + 1).trim().split(/\s+/)[19];
+    assert.equal(await verifiedAgentPid(child.pid, 'claude', Date.now(), ticks), true);
+    assert.equal(await verifiedAgentPid(child.pid, 'claude', Date.now(), String(BigInt(ticks) + 1n)), false);
+    assert.equal(await verifiedAgentPid(child.pid, 'claude', 0, ticks), false);
+    assert.equal(await verifiedAgentPid(child.pid, 'claude', Date.now(), 'Thu Sep 10 00:00:00 2026'), false);
+    assert.equal(child.exitCode, null, 'identity checks must never signal the process');
+  } finally {
+    const closed = new Promise(resolve => child.once('close', resolve));
+    child.kill(); await closed;
+    await rm(root, { recursive: true, force: true });
+  }
 });

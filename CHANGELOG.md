@@ -5,6 +5,15 @@ Portable packages use package version 0.1.0 plus an exact Git revision. Each
 four Connector ZIPs, the Relay image, SHA256SUMS and version-specific notes.
 The application remains an internal beta; see [known limitations](docs/known-issues.md).
 
+## 2026-09-10 — Linux terminal handoff
+
+- Fix Claude remote release on Linux: compare its recorded kernel start ticks
+  against the current process instead of expecting a macOS date string. Keep
+  process-name and birth-time checks, and reject stale identities.
+- Add Ubuntu 24.04 PTY acceptance for Codex 0.153.4 and Claude 2.1.266:
+  interactive replies, occupied state, remote release with actual terminal exit
+  and same-ID continuation against an isolated local model fixture.
+
 ## 2026-09-10 — Windows interactive terminal acceptance
 
 - Gate releases on real Windows Server 2025 ConPTY terminal tests for Codex
