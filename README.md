@@ -154,6 +154,9 @@ Not affiliated with or endorsed by OpenAI, Codex, Anthropic, or Claude Code.
 See [startup diagnostics, cross-platform acceptance, Relay limits and release/rollback operations](docs/release-operations.md).
 
 The four release-infrastructure workstreams are implemented and CI-verified.
+Windows Server 2025 ConPTY CI covers interactive Codex/Claude session handoff
+using a local model fixture; physical Windows 11 UI and real-account login
+remain outside that automated coverage.
 Android PWA core acceptance and both agents' handoff to the tested Mac passed.
 iPhone Safari core flows passed; remaining iPhone checks are paused. See
 [physical-device results and remaining limits](docs/known-issues.md) for exact

@@ -5,6 +5,15 @@ Portable packages use package version 0.1.0 plus an exact Git revision. Each
 four Connector ZIPs, the Relay image, SHA256SUMS and version-specific notes.
 The application remains an internal beta; see [known limitations](docs/known-issues.md).
 
+## 2026-09-10 — Windows interactive terminal acceptance
+
+- Gate releases on real Windows Server 2025 ConPTY terminal tests for Codex
+  0.153.4 and Claude Code 2.1.266, using isolated homes and a local model fixture.
+- Verify interactive replies, preserved context, occupied/released state,
+  refusal of remote termination, normal terminal exit and same-ID continuation.
+- Dispose owned ConPTY resources after exit so acceptance completes cleanly.
+  Physical Windows 11 UI and real-provider accounts remain unverified.
+
 ## 2026-09-10 — mobile acceptance and controller fixes
 
 - Align Codex Micro defaults and configurable controls with official documentation;

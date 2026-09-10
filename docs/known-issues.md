@@ -48,8 +48,11 @@ Device and browser versions above are user-reported.
 - Real interactive native handoff was verified on macOS with Codex 0.153.4 and
   Claude Code 2.1.266, including Android PWA handoff. CI also verifies actual
   Codex 0.152.0/0.153.4 and Claude 2.1.265/2.1.266 executables against a local model
-  fixture on all four supported OS/architecture runners. Real interactive
-  Windows/Linux terminal handoff and other CLI versions still need acceptance.
+  fixture on all four supported OS/architecture runners. A separate Windows
+  Server 2025 ConPTY gate verifies interactive handoff for Codex 0.153.4 and
+  Claude 2.1.266 with a local model fixture. Physical Windows 11 desktop,
+  phone-to-Windows UI, real Windows account authentication, interactive Linux
+  terminal handoff and other CLI versions still need acceptance.
   Windows terminal release requires manual exit. Shared
   Codex daemon sessions cannot be terminated remotely; process identity or
   ownership uncertainty blocks handoff. See [handoff recovery](native-session-handoff.md).

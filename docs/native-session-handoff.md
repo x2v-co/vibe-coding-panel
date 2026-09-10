@@ -39,7 +39,15 @@ portable graceful-exit mechanism.
   ownership while the real CLI is awaiting its model response and after it exits.
   CI gates release on Codex 0.152.0 / 0.153.4 and Claude 2.1.265 / 2.1.266 on
   macOS ARM/Intel, Windows x64 and Linux x64. It does not test model quality,
-  account authentication, or interactive-terminal process handoff.
+  account authentication, or interactive-terminal process handoff in that matrix.
+
+- Windows: the separate `windows-terminal` CI gate uses Windows Server 2025
+  (10.0.26100), Node 24, Codex 0.153.4 and Claude Code 2.1.266 in real ConPTY
+  terminals with isolated homes and a local model fixture. It checks interactive
+  input and reply persistence, original context, occupied state, refusal of remote
+  release, normal `/exit`, released state and subsequent same-ID continuation.
+  No real account credentials are used. This does not verify a physical Windows
+  11 desktop, phone-to-Windows UI or live provider authentication.
 
 - macOS: real interactive Claude Code 2.1.266 and Codex CLI 0.153.4 were started in
   an isolated test workspace, observed attached, and released with actual process
@@ -48,8 +56,8 @@ portable graceful-exit mechanism.
 - Android PWA: physical OPPO Find X9 Pro acceptance verified both agents' session
   discovery/read, occupied warning, computer-terminal exit and continuation with
   the original context. Connector records confirmed the original session IDs
-  were retained. iPhone native handoff and real interactive Windows/Linux
-  terminal handoff remain unverified.
+  were retained. iPhone native handoff and real interactive Linux terminal
+  handoff remain unverified.
 - CI: workspace/ID isolation, already-released sessions, timeout/no-force-kill,
   unrelated live PID rejection, and live lock-handle detection are covered.
   Each supported OS runs its native lock probe. Fixture tests do not establish
