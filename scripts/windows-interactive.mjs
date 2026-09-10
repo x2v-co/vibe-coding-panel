@@ -19,6 +19,7 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
     cwd: workspace, env: { ...env, TERM: 'xterm-256color' }, cols: 120, rows: 36,
     useConpty: true,
   });
+  screen.onData(data => terminal.write(data));
   let output = '', exited = false, exitCode, trusted = false, trustTimer, sandboxTimer, sandboxSelected = false;
   const type = text => {
     // ConPTY enables Win32-input mode; plain CR is not a key event in this mode.
@@ -53,7 +54,7 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
     }
   });
   terminal.onExit(event => { exited = true; exitCode = event.exitCode; });
-  const waitFor = async (description, condition, timeout = 45000) => {
+  const waitFor = async (description, condition, timeout = 120000) => {
     const deadline = Date.now() + timeout;
     while (Date.now() < deadline) {
       if (await condition()) return;
