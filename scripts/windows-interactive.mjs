@@ -62,6 +62,7 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
     console.log(`${provider}: Windows ConPTY interactive prompt, occupied/release refusal, terminal /exit and released state PASS`);
   } catch (error) {
     console.error(stripVTControlCharacters(output));
+    console.error('Raw terminal tail:', JSON.stringify(output.slice(-8000)));
     throw error;
   } finally {
     if (!exited) terminal.kill();

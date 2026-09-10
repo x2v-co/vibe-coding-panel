@@ -2,7 +2,7 @@
 // This tests CLI persistence/protocol compatibility, not model quality or TUI handoff.
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, appendFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import spawn from 'cross-spawn';
@@ -96,6 +96,8 @@ try {
     assert.equal((await sessions.list(provider, other)).sessions.length, 0);
     await assert.rejects(sessions.read(provider, other, id));
     if (process.env.PANEL_TEST_WINDOWS_TERMINAL === '1') {
+      if (provider === 'codex') await appendFile(path.join(codexHome, 'config.toml'),
+        `\n[projects.${JSON.stringify(workspace)}]\ntrust_level = "trusted"\n`);
       await checkWindowsTerminal({ provider, bin, id, workspace, env, sessions, requests });
     }
     const before = requests.length;
