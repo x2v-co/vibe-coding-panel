@@ -1207,3 +1207,33 @@ footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto
 .footer-links { display: flex; gap: 16px; flex-wrap: wrap; }
 .footer-links a { color: inherit; text-underline-offset: 3px; }
 .site-footer > span:last-child { flex-wrap: wrap; justify-content: flex-end; }
+
+/* Keep Micro's bottom-row microphone reachable in mobile and PWA focus mode.
+   The screen scrolls internally; content must not grow the physical key bank. */
+@media (max-width: 800px) {
+  .layout-hardware-micro .device {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+  }
+  .layout-hardware-micro .device-rail,
+  .layout-hardware-micro .device-footer { flex-shrink: 0; }
+  .layout-hardware-micro .display-bezel {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .layout-hardware-micro .display {
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .layout-hardware-micro .display-main {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .layout-hardware-micro .control-bank {
+    width: min(100%, 380px, max(250px, calc(100dvh - 320px - env(safe-area-inset-top) - env(safe-area-inset-bottom))));
+    flex: 0 0 auto;
+  }
+}
