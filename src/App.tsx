@@ -4,6 +4,9 @@ import {
   MessageCircle, Palette, Play, Plus, RotateCcw, RotateCw, Send, Server, ShieldCheck,
   Smartphone, Sparkles, Terminal, Trash2, Wifi, X, Zap,
 } from 'lucide-react';
+import { MicroSettings, MicroActionOptions } from './MicroSettings';
+import { readMicroPreferences, microDirections, microDragDirection, microSlots, microTaskState, microTaskVersion } from './micro';
+import type { MicroPreferences, MicroBinding, MicroDirection } from './micro';
 import QRCode from 'qrcode';
 import { readApiResponse, userError } from './api';
 import { monitorConnection } from './connection-monitor';
@@ -200,6 +203,12 @@ function PanelApp() {
   const [providers, setProviders] = useState<AgentProviderInfo[]>([]);
   const [microKeys, setMicroKeys] = useState<MicroKeyConfig[]>(readMicroKeys);
   const [editingMicroKey, setEditingMicroKey] = useState<MicroKeyId | null>(null);
+  const [microPreferences, setMicroPreferences] = useState<MicroPreferences>(() => { try { return readMicroPreferences(JSON.parse(localStorage.getItem('vibe-panel-micro-preferences') || '{}')); } catch { return readMicroPreferences(null); } });
+  const [microRead, setMicroRead] = useState<Record<string,string>>(() => { try { const v=JSON.parse(localStorage.getItem('vibe-panel-micro-read') || '{}'); return v && typeof v==='object' && !Array.isArray(v) ? v : {}; } catch { return {}; } });
+  const pendingMicroSlot = useRef<number | null>(null);
+  const joystickDrag = useRef<{x:number;y:number;fired:boolean}|null>(null);
+  const [joystickDirection,setJoystickDirection] = useState<MicroDirection|null>(null);
+  const knobDrag = useRef<{y:number;moved:boolean}|null>(null);
   const [knobIndex, setKnobIndex] = useState<number | null>(null);
   const [microNavigation, setMicroNavigation] = useState<string[]>([]);
   const [microNavigationIndex, setMicroNavigationIndex] = useState(-1);
@@ -245,6 +254,11 @@ function PanelApp() {
     jobRevisionRef.current = 0;
     jobMutationRef.current += 1;
     setJobId(id);
+    if (id && pendingMicroSlot.current !== null) {
+      const slot = pendingMicroSlot.current;
+      pendingMicroSlot.current = null;
+      setMicroPreferences(p => ({...p, assignments:p.assignments.map((old,i)=>i===slot?id:old)}));
+    }
   }
 
   const busy = status === 'queued' || status === 'running';
@@ -262,10 +276,8 @@ function PanelApp() {
     id: jobId, prompt: taskTitle || prompt || '当前任务', cwd, status, result,
     agentProvider, createdAt: history.find((job) => job.id === jobId)?.createdAt || startedAt || 0, startedAt, events: activity,
   } : null;
-  const microTaskSlots = [
-    ...(currentMicroJob ? [currentMicroJob] : []),
-    ...history.filter((job) => job.id !== jobId),
-  ].sort((a, b) => (b.createdAt - a.createdAt) || a.id.localeCompare(b.id)).slice(0, 6);
+  const microTasks = [...(currentMicroJob ? [{...history.find(j=>j.id===jobId), ...currentMicroJob, revision:jobRevisionRef.current || history.find(j=>j.id===jobId)?.revision, finishedAt:history.find(j=>j.id===jobId)?.finishedAt}] : []), ...history.filter(j=>j.id!==jobId)];
+  const microTaskSlots = microSlots(microTasks,microPreferences,microRead);
   const runningTaskCount = history.filter((job) => job.status === 'running' || job.status === 'queued').length;
   const completedTaskCount = history.filter((job) => job.status === 'completed').length;
   const activeMicroKey = microKeys.find((key) => key.id === editingMicroKey) || null;
@@ -527,6 +539,7 @@ function PanelApp() {
   function resetMicroKeys() {
     const defaults = defaultMicroKeys.map((item) => ({ ...item }));
     setMicroKeys(defaults);
+    setMicroPreferences(p=>({...p,joystick:readMicroPreferences(null).joystick}));
     setEditingMicroKey(null);
     localStorage.setItem('vibe-panel-micro-keys', JSON.stringify(defaults));
     localStorage.setItem('vibe-panel-micro-keys-version', MICRO_KEYS_VERSION);
@@ -541,13 +554,26 @@ function PanelApp() {
   }, [busy, startedAt]);
 
   useEffect(() => { latestPromptRef.current = prompt; }, [prompt]);
+  useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&knobIndex!==null)cancelMicroKnob();};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[knobIndex]);
+  useEffect(()=>{ localStorage.setItem('vibe-panel-micro-preferences',JSON.stringify(microPreferences)); },[microPreferences]);
+  useEffect(()=>{
+    if(!jobId?.startsWith('demo-') || !result)return;
+    const task=history.find(t=>t.id===jobId);
+    if(task?.result===result)markMicroRead(task);
+  },[jobId,result,history]);
+  function markMicroRead(task:SavedJob) {
+    if(task.status!=='completed' || !task.result || document.hidden)return;
+    const version=microTaskVersion(task);
+    setMicroRead(old=>{if(old[task.id]===version)return old;const next={...old,[task.id]:version};localStorage.setItem('vibe-panel-micro-read',JSON.stringify(next));return next;});
+  }
 
   useEffect(() => {
     if (layout !== 'hardware-micro' || knobIndex === null) return;
-    const target = document.querySelector(composerTargets[knobIndex]);
+    const target = composerElements()[knobIndex];
+    target?.scrollIntoView({block:'nearest'});
     target?.classList.add('micro-knob-target');
     return () => target?.classList.remove('micro-knob-target');
-  }, [knobIndex, layout, result]);
+  }, [knobIndex, layout, result, capturePreview, busy]);
 
   useEffect(() => {
     if (layout !== 'hardware-micro') return;
@@ -759,6 +785,7 @@ function PanelApp() {
       setStatus(job.status);
       setActivity(Array.isArray(job.events) ? job.events : []);
       setResult(job.result || '');
+      markMicroRead(job);
       if (job.startedAt) setStartedAt(job.startedAt);
     } catch { /* Connection errors are shown by the event stream. */ }
   }
@@ -780,6 +807,7 @@ function PanelApp() {
     setStatus(job.status);
     setActivity(Array.isArray(job.events) ? job.events : []);
     setResult(job.result || '');
+    markMicroRead(job);
     setStartedAt(jobStartedAt);
     setElapsed(Math.max(0, (job.finishedAt || Date.now()) - jobStartedAt));
     selectJob(job.id);
@@ -899,6 +927,7 @@ function PanelApp() {
   }
 
   function reset() {
+    pendingMicroSlot.current=null;
     if (busy || voiceBusy || isAddingContext || isRecoveringJob) return;
     setNativeSelection(null); setTerminalReleased(false);
     demoRunRef.current += 1;
@@ -1205,6 +1234,7 @@ function PanelApp() {
   }
 
   function loadJob(job: SavedJob) {
+    pendingMicroSlot.current=null;
     if (busy || voiceBusy || isRecoveringJob || isAddingContext) return;
     setNativeSelection(null);
     if (jobId !== job.id) {
@@ -1219,7 +1249,7 @@ function PanelApp() {
     if (!job.id.startsWith('demo-')) void refreshJob(job.id);
   }
 
-  function triggerMicroAction(key: MicroKeyConfig) {
+  function triggerMicroAction(key: MicroBinding) {
     const unavailable = unavailableMicroAction(key.action);
     if (unavailable) { setError(unavailable); return; }
     if (microActionDisabled(key)) return;
@@ -1227,6 +1257,9 @@ function PanelApp() {
     else if (key.action === 'execute') void execute();
     else if (key.action === 'stop') void stop();
     else if (key.action === 'new') reset();
+    else if (key.action === 'back') navigateMicro(-1);
+    else if (key.action === 'forward') navigateMicro(1);
+    else if (key.action === 'sidebar') setShowHistory(open=>!open);
     else if (key.action === 'history') setShowHistory(true);
     else if (key.action === 'workspace') openWorkspacePicker();
     else if (key.action === 'capture') addVisualContext();
@@ -1235,12 +1268,14 @@ function PanelApp() {
     else if (key.action === 'prompt') { setPrompt(key.prompt.trim()); promptRef.current?.focus(); }
   }
 
-  function microActionDisabled(key: MicroKeyConfig) {
+  function microActionDisabled(key: MicroBinding) {
     if (unavailableMicroAction(key.action)) return true;
+    if (key.action === 'back' && microNavigationIndex <= 0) return true;
+    if (key.action === 'forward' && microNavigationIndex >= microNavigation.length-1) return true;
     if (key.action === 'stop') return !busy;
     if (key.action === 'execute') return !canExecute;
     if (key.action === 'voice') return busy || isFinalizingVoice || isTranscribing || isAddingContext || isRecoveringJob;
-    if (key.action === 'history' || key.action === 'fullscreen' || key.action === 'settings') return false;
+    if (key.action === 'sidebar' || key.action === 'history' || key.action === 'fullscreen' || key.action === 'settings') return false;
     return busy || voiceBusy || isAddingContext || isRecoveringJob || (key.action === 'prompt' && !key.prompt.trim());
   }
 
@@ -1275,17 +1310,30 @@ function PanelApp() {
     stopListening(false);
   }
 
-  const composerTargets = ['#command', '.context-action', '.workspace-readout'];
+  function composerElements() {
+    return ['#command','.context-action','.workspace-readout'].flatMap(selector=>Array.from(document.querySelectorAll<HTMLButtonElement|HTMLTextAreaElement>(selector))).filter(e=>!e.disabled&&e.getBoundingClientRect().height>0);
+  }
+  function cancelMicroKnob() {
+    setKnobIndex(null); setShowWorkspacePicker(false); setShowHistory(false);
+    if(document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  }
   function turnMicroKnob(direction: number) {
-    setKnobIndex((index) => ((index ?? (direction > 0 ? -1 : 0)) + direction + composerTargets.length) % composerTargets.length);
+    if(microPreferences.knobMode==='custom') { triggerMicroAction(microPreferences.knob[direction>0?'right':'left']); return; }
+    if(microPreferences.knobMode==='scroll') { const area=document.querySelector('.layout-hardware-micro .display-main'); area?.scrollBy({top:direction*80}); return; }
+    const targets=composerElements();
+    if(targets.length) setKnobIndex(index=>((index??(direction>0?-1:0))+direction+targets.length)%targets.length);
   }
   function selectMicroKnob() {
     if (knobHeldRef.current) { knobHeldRef.current = false; return; }
-    const target = document.querySelector<HTMLButtonElement | HTMLTextAreaElement>(composerTargets[knobIndex ?? 0]);
-    if (!target || target.disabled) return;
-    if (target instanceof HTMLTextAreaElement) target.focus();
-    else target.click();
+    if(microPreferences.knobMode==='custom') { triggerMicroAction(microPreferences.knob.press); return; }
+    if(microPreferences.knobMode==='scroll') { const area=document.querySelector('.layout-hardware-micro .display-main'); area?.scrollTo({top:area.scrollHeight}); return; }
+    const target=composerElements()[knobIndex??0];
+    if(!target)return;
+    setKnobIndex(knobIndex??0);
+    if(target instanceof HTMLTextAreaElement)target.focus();else target.click();
   }
+  function holdMicroKnob() { if(microPreferences.knobMode==='custom')triggerMicroAction(microPreferences.knob.hold);else setShowSettings(true); }
+  function fireMicroJoystick(direction:MicroDirection) { triggerMicroAction(microPreferences.joystick[direction]); }
   function navigateMicro(direction: number) {
     if (busy || voiceBusy || isRecoveringJob || isAddingContext) return;
     const next = microNavigationIndex + direction;
@@ -1299,17 +1347,17 @@ function PanelApp() {
 
   function renderMicroAgentKey(index: number) {
     const task = microTaskSlots[index];
-    const slotState = task?.status === 'completed' && task.id === jobId ? 'idle' : task?.status || 'empty';
+    const slotState = microTaskState(task,microRead);
     const title = task ? `${statusLabels[task.status]} · ${task.prompt}` : '空任务槽 · 新建任务';
     const cancel = index === 0 && knobIndex !== null;
-    return <button type="button" key={`agent-${index}`} className={`micro-agent-key slot-${index + 1} ${slotState} ${task?.id === jobId ? 'selected' : ''} ${cancel ? 'cancel' : ''}`} disabled={!cancel && (busy || voiceBusy || isRecoveringJob || isAddingContext)} onClick={() => { if (cancel) { setKnobIndex(null); return; } task ? loadJob(task) : reset(); }} title={cancel ? '取消旋钮选择' : title} aria-label={cancel ? '取消旋钮选择' : `任务槽 ${index + 1}：${title}`}><i /><span>{index + 1}</span></button>;
+    return <button type="button" key={`agent-${index}`} className={`micro-agent-key slot-${index + 1} ${slotState} ${task?.id === jobId ? 'selected' : ''} ${cancel ? 'cancel' : ''}`} disabled={!cancel && (busy || voiceBusy || isRecoveringJob || isAddingContext)} onClick={() => { if (cancel) { cancelMicroKnob(); return; } if(task)loadJob(task);else { reset(); pendingMicroSlot.current=microPreferences.agentMode==='custom'?index:null; } }} title={cancel ? '取消旋钮选择' : title} aria-label={cancel ? '取消旋钮选择' : `任务槽 ${index + 1}：${title}`}><i /><span>{index + 1}</span></button>;
   }
 
   function renderMicroCommandKey(key: MicroKeyConfig) {
     const voice = key.action === 'voice';
     const unavailable = unavailableMicroAction(key.action);
     const label = `${key.label} · ${unavailable || microActions.find((action) => action.id === key.action)?.label || ''}`;
-    return <button type="button" key={key.id} className={`micro-command-key micro-${key.id} micro-color-${key.color} ${voice && isListening ? 'listening' : ''} ${voice && (isPreparingVoice || isTranscribing) ? 'transcribing' : ''} ${unavailable ? 'unavailable' : ''}`}
+    return <button type="button" key={key.id} className={`micro-command-key micro-${key.id} micro-color-${key.color} ${voice && isListening ? 'listening' : ''} ${voice && (isPreparingVoice || isFinalizingVoice || isTranscribing) ? 'transcribing' : ''} ${voice && !voiceBusy && prompt.trim() ? 'draft-ready' : ''} ${unavailable ? 'unavailable' : ''}`}
       aria-label={label} aria-disabled={Boolean(unavailable) || undefined} title={label}
       disabled={!unavailable && microActionDisabled(key)}
       onPointerDown={voice ? (event) => { if (event.button !== 0) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); pressMicroVoice(); } : undefined}
@@ -1375,22 +1423,30 @@ function PanelApp() {
       {renderVoiceKey('aha-key-one')}{renderExecuteKey('aha-key-two', true)}{renderStopKey('aha-key-three')}{renderCaptureKey('aha-key-four')}
     </>;
     if (layout === 'hardware-micro') return <>
-      <div className="micro-control-knob" role="group" aria-label="旋钮：输入区导航" onWheel={(event) => turnMicroKnob(event.deltaY >= 0 ? 1 : -1)}>
+      <div className="micro-control-knob" role="group" aria-label={`旋钮：${microPreferences.knobMode==='composer'?'编辑器导航':microPreferences.knobMode==='scroll'?'对话滚动':'自定义分配'}`} onKeyDown={event=>{ if(event.key==='Escape')cancelMicroKnob(); if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();turnMicroKnob(event.key==='ArrowRight'?1:-1);} }} onWheel={(event) => { if(event.deltaY)turnMicroKnob(event.deltaY > 0 ? 1 : -1); }}>
         <button type="button" className="knob-left" onClick={() => turnMicroKnob(-1)} title="逆时针：上一项" aria-label="旋钮逆时针"><RotateCcw size={13} /></button>
-        <button type="button" className="knob-push" aria-label="按下旋钮选择，长按打开设置" title="选择输入区控件；长按打开设置"
-          onPointerDown={(event) => { if (event.button !== 0) return; event.currentTarget.setPointerCapture(event.pointerId); knobHeldRef.current = false; knobHoldTimerRef.current = setTimeout(() => { knobHeldRef.current = true; setShowSettings(true); }, 600); }}
-          onPointerUp={() => { if (knobHoldTimerRef.current) clearTimeout(knobHoldTimerRef.current); }}
-          onPointerCancel={() => { if (knobHoldTimerRef.current) clearTimeout(knobHoldTimerRef.current); knobHeldRef.current = true; }}
+        <button type="button" className="knob-push" aria-label="按下旋钮" title={microPreferences.knobMode==='custom'?'执行分配操作；长按执行自定义操作':'按下选择；长按打开设置'}
+          onPointerDown={(event) => { if(event.button!==0)return;event.currentTarget.setPointerCapture(event.pointerId);knobDrag.current={y:event.clientY,moved:false};knobHeldRef.current=false;knobHoldTimerRef.current=setTimeout(()=>{knobHeldRef.current=true;holdMicroKnob();},600); }}
+          onPointerMove={event=>{const drag=knobDrag.current;if(!drag)return;const delta=drag.y-event.clientY;if(Math.abs(delta)>=18){if(knobHoldTimerRef.current)clearTimeout(knobHoldTimerRef.current);drag.moved=true;knobHeldRef.current=true;drag.y=event.clientY;turnMicroKnob(delta>0?1:-1);}}}
+          onPointerUp={()=>{if(knobHoldTimerRef.current)clearTimeout(knobHoldTimerRef.current);knobDrag.current=null;}}
+          onPointerCancel={()=>{if(knobHoldTimerRef.current)clearTimeout(knobHoldTimerRef.current);knobDrag.current=null;knobHeldRef.current=true;}}
+          onLostPointerCapture={()=>{if(knobHoldTimerRef.current)clearTimeout(knobHoldTimerRef.current);knobDrag.current=null;}}
+          onContextMenu={event=>event.preventDefault()}
+          onKeyDown={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();if(event.repeat)return;knobHeldRef.current=false;knobHoldTimerRef.current=setTimeout(()=>{knobHeldRef.current=true;holdMicroKnob();},600);}}}
+          onKeyUp={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();if(knobHoldTimerRef.current)clearTimeout(knobHoldTimerRef.current);selectMicroKnob();}}}
           onClick={selectMicroKnob}><span /></button>
         <button type="button" className="knob-right" onClick={() => turnMicroKnob(1)} title="顺时针：下一项" aria-label="旋钮顺时针"><RotateCw size={13} /></button>
       </div>
       {Array.from({ length: 6 }, (_, index) => renderMicroAgentKey(index))}
-      <div className="micro-joystick" role="group" aria-label="摇杆">
-        <span className="joystick-cap" aria-hidden="true" />
-        <button type="button" className="joystick-up" aria-disabled="true" aria-label="摇杆向上：计划模式（Bridge 未支持）" title="计划模式（Bridge 未支持）" onClick={() => setError('当前 Bridge 尚未支持原生计划模式')}><ArrowUp size={14} /></button>
-        <button type="button" className="joystick-right" disabled={busy || voiceBusy || microNavigationIndex >= microNavigation.length - 1} aria-label="摇杆向右：前进" title="前进" onClick={() => navigateMicro(1)}><ArrowRight size={14} /></button>
-        <button type="button" className="joystick-down" aria-label="摇杆向下：切换任务侧栏" title="切换任务侧栏" onClick={() => setShowHistory((open) => !open)}><ArrowDown size={14} /></button>
-        <button type="button" className="joystick-left" disabled={busy || voiceBusy || microNavigationIndex <= 0} aria-label="摇杆向左：后退" title="后退" onClick={() => navigateMicro(-1)}><ArrowLeft size={14} /></button>
+      <div className={`micro-joystick ${joystickDirection?'pushed-'+joystickDirection:''}`} role="group" aria-label="摇杆"
+        onKeyDown={event=>{const direction=({ArrowUp:'up',ArrowRight:'right',ArrowDown:'down',ArrowLeft:'left'} as const)[event.key as 'ArrowUp'];if(direction){event.preventDefault();if(!event.repeat)fireMicroJoystick(direction);}}}>
+        <button type="button" className="joystick-cap" aria-label="拖动摇杆，或使用方向键"
+          onPointerDown={event=>{if(event.button!==0)return;event.currentTarget.setPointerCapture(event.pointerId);joystickDrag.current={x:event.clientX,y:event.clientY,fired:false};}}
+          onPointerMove={event=>{const drag=joystickDrag.current;if(!drag||drag.fired)return;const direction=microDragDirection(event.clientX-drag.x,event.clientY-drag.y);if(direction){drag.fired=true;setJoystickDirection(direction);fireMicroJoystick(direction);}}}
+          onPointerUp={()=>{joystickDrag.current=null;setJoystickDirection(null);}}
+          onPointerCancel={()=>{joystickDrag.current=null;setJoystickDirection(null);}}
+          onLostPointerCapture={()=>{joystickDrag.current=null;setJoystickDirection(null);}} onContextMenu={event=>event.preventDefault()} />
+        {microDirections.map(({id,label})=>{const binding=microPreferences.joystick[id];const unavailable=unavailableMicroAction(binding.action);const description=`摇杆向${label}：${microActions.find(a=>a.id===binding.action)?.label}`;return <button type="button" key={id} className={`joystick-${id}`} disabled={!unavailable&&microActionDisabled(binding)} aria-disabled={Boolean(unavailable)||undefined} aria-label={description} title={description} onClick={()=>fireMicroJoystick(id)}>{id==='up'?<ArrowUp size={14}/>:id==='right'?<ArrowRight size={14}/>:id==='down'?<ArrowDown size={14}/>:<ArrowLeft size={14}/>}</button>;})}
       </div>
       {microKeys.slice(0, 4).map(renderMicroCommandKey)}
       <div className={`micro-connection ${connectionState}`}><span className="micro-connection-leds" aria-hidden="true"><i /><i /><i /></span><button type="button" onClick={() => setShowSettings(true)} title="连接与配对" aria-label="连接与配对" /></div>
@@ -1445,8 +1501,9 @@ function PanelApp() {
 
       <fieldset className="layout-fieldset"><legend>面板结构</legend><div className="layout-options">{layouts.map((item) => <button type="button" key={item.id} className={`layout-option ${item.id}`} aria-pressed={layout === item.id} onClick={() => selectLayout(item.id)} title={item.description}><i aria-hidden="true"><span /><b>{Array.from({ length: item.previewKeys }, (_, index) => <em key={index} />)}</b></i><strong>{item.label}</strong></button>)}</div></fieldset>
       {layout === 'hardware-micro' && <fieldset className="micro-customizer">
-        <legend>自定义键帽</legend>
-        <div className="micro-customizer-heading"><span>COMMAND KEYS</span><button type="button" onClick={resetMicroKeys} title="恢复默认键帽"><RotateCcw size={14} />重置</button></div>
+        <legend>Codex Micro</legend>
+        <MicroSettings value={microPreferences} onChange={next=>{setMicroPreferences(next);setKnobIndex(null);}} tasks={history} />
+        <div className="micro-customizer-heading"><span>COMMAND KEYS</span><button type="button" onClick={resetMicroKeys} title="恢复默认命令键和摇杆分配"><RotateCcw size={14} />重置布局</button></div>
         <div className="micro-keycap-list">
           <span className="micro-preview-knob" title="旋钮" aria-label="旋钮"><RotateCw size={18} /></span>
           {Array.from({ length: 6 }, (_, index) => <span key={index} className={`micro-preview-agent slot-${index + 1}`}>{index + 1}</span>)}
@@ -1458,11 +1515,11 @@ function PanelApp() {
           <label htmlFor="micro-key-label">键帽文字</label>
           <input id="micro-key-label" value={activeMicroKey.label} maxLength={12} onChange={(event) => updateMicroKey(activeMicroKey.id, { label: event.target.value.toUpperCase() })} />
           <label htmlFor="micro-key-action">按键动作</label>
-          <select id="micro-key-action" value={activeMicroKey.action} onChange={(event) => updateMicroKey(activeMicroKey.id, { action: event.target.value as MicroActionId })}>{microActions.map((action) => <option key={action.id} value={action.id}>{action.label}</option>)}</select>
+          <select id="micro-key-action" value={activeMicroKey.action} onChange={(event) => updateMicroKey(activeMicroKey.id, { action: event.target.value as MicroActionId })}><MicroActionOptions /></select>
           {activeMicroKey.action === 'prompt' && <><label htmlFor="micro-key-prompt">快捷指令</label><textarea id="micro-key-prompt" rows={3} maxLength={1000} value={activeMicroKey.prompt} onChange={(event) => updateMicroKey(activeMicroKey.id, { prompt: event.target.value })} /></>}
           <span className="micro-editor-label">键帽图标</span>
           <div className="micro-icon-options">{microIconOptions.map((icon) => <button type="button" key={icon.id} aria-pressed={activeMicroKey.icon === icon.id} onClick={() => updateMicroKey(activeMicroKey.id, { icon: icon.id })} title={icon.label} aria-label={icon.label}>{renderMicroIcon(icon.id, 18)}</button>)}</div>
-          <span className="micro-editor-label">灯光颜色</span>
+          <span className="micro-editor-label">键帽配色（外观）</span>
           <div className="micro-color-options">{microColors.map((color) => <button type="button" key={color.id} className={`micro-color-${color.id}`} aria-pressed={activeMicroKey.color === color.id} onClick={() => updateMicroKey(activeMicroKey.id, { color: color.id })} title={color.label} aria-label={color.label}><i /></button>)}</div>
         </div>}
       </fieldset>}

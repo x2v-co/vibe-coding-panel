@@ -626,7 +626,7 @@ main { padding: 28px 0 76px; }
 .micro-command-key span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .micro-command-key:disabled { cursor: not-allowed; color: #7a847e; }
 .micro-command-key.unavailable { cursor: help; color: #7a847e; }
-.micro-command-key.listening { --micro-light: #8df0a3; --micro-base: #3f9457; --micro-glow: rgba(80,230,120,0.48); }
+.micro-command-key.listening { --micro-light: #82e3cf; --micro-base: #368978; --micro-glow: rgba(80,230,200,0.48); }
 .micro-command-key.transcribing { --micro-light: #fff; --micro-glow: rgba(255,255,255,0.6); }
 .micro-command-key.transcribing .micro-keycap-glyph { animation: status-pulse .7s ease-in-out infinite alternate; }
 .micro-keycap-glyph { display: inline-block; flex: 0 0 auto; }
@@ -1257,3 +1257,24 @@ footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto
     flex: 0 0 auto;
   }
 }
+
+/* Micro configuration is explanatory; the mobile controller keeps its compact footprint. */
+.micro-behavior-settings details { margin: 8px 0; border: 1px solid #ccd4cd; border-radius: 5px; padding: 10px; }
+.micro-behavior-settings summary { cursor: pointer; font-size: 13px; font-weight: 650; }
+.micro-behavior-settings p, .micro-behavior-settings a { font-size: 12px; line-height: 1.65; }
+.micro-behavior-settings label { display: block; margin: 10px 0; }
+.micro-behavior-settings select, .micro-binding-editor textarea { display: block; width: 100%; min-width: 0; margin-top: 6px; }
+.micro-status-legend { list-style: none; padding: 0; display: grid; gap: 10px; }
+.micro-status-legend li { display: flex; align-items: start; gap: 8px; }
+.micro-status-legend i { flex: 0 0 12px; height: 12px; margin-top: 4px; border: 1px solid #777; border-radius: 50%; }
+.micro-status-legend strong, .micro-status-legend small { display: block; font-size: 12px; line-height: 1.5; }
+.legend-idle { background: white; } .legend-running { background: #6aaeff; } .legend-completed { background: #67e68f; } .legend-waiting { background: #efb34d; } .legend-failed { background: #ff6b6b; } .legend-empty { background: #64716b; }
+.micro-pin-list label { display: flex; align-items: center; gap: 8px; overflow-wrap: anywhere; }
+.micro-pin-list input[type='checkbox'] { width: 18px; flex: 0 0 18px; }
+.micro-joystick button.joystick-cap { inset: auto; left: 50%; top: 50%; translate: -50% -50%; width: max(42%, 44px); height: max(42%, 44px); z-index: 2; touch-action: none; background: radial-gradient(circle at 35% 25%,#64716a,#131914); box-shadow: 0 3px 5px #080908; transition: transform 100ms; }
+.micro-joystick.pushed-up .joystick-cap { transform: translateY(-8px); }
+.micro-joystick.pushed-down .joystick-cap { transform: translateY(8px); }
+.micro-joystick.pushed-left .joystick-cap { transform: translateX(-8px); }
+.micro-joystick.pushed-right .joystick-cap { transform: translateX(8px); }
+
+.micro-command-key.draft-ready { --micro-light: #fff; --micro-glow: rgba(255,255,255,.45); }

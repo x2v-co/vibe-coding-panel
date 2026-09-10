@@ -14,7 +14,7 @@ try {
 } finally {
   await rm(directory, { recursive: true, force: true });
 }
-const { defaultMicroKeys, microKeycapAssets, readMicroConfiguration, updateMicroConfiguration, unavailableMicroAction, MicroVoiceGesture } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
+const { readMicroPreferences, defaultMicroJoystick, microTaskVersion, microTaskState, microSlots, microDragDirection, defaultMicroKeys, microKeycapAssets, readMicroConfiguration, updateMicroConfiguration, unavailableMicroAction, MicroVoiceGesture } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
 
 test('Micro brand asset is a standard SVG, never a raster keycap crop', async () => {
   assert.deepEqual(microKeycapAssets, { codex: '/keycaps/micro/codex.svg' });
@@ -93,4 +93,38 @@ test('double tap window is measured from press, cancellation clears all gesture 
   gesture.reset();
   assert.equal(gesture.release(400), 'none');
   assert.equal(gesture.press(410), 'start');
+});
+
+
+test('unread completion becomes idle after reading and green again after new revision',()=>{
+  const t={id:'a',status:'completed',createdAt:1,revision:2};
+  assert.equal(microTaskState(t,{}),'completed');
+  const read={a:microTaskVersion(t)};
+  assert.equal(microTaskState(t,read),'idle');
+  assert.equal(microTaskState({...t,revision:3},read),'completed');
+  assert.equal(microTaskState({...t,status:'stopped'},read),'idle');
+  assert.equal(microTaskState(undefined,read),'empty');
+});
+test('Agent slots follow updates, pin order and fixed assignments without mutating history',()=>{
+  const tasks=[{id:'old',status:'completed',createdAt:1,finishedAt:100},{id:'new',status:'running',createdAt:2}];
+  const prefs=readMicroPreferences(null);
+  assert.equal(microSlots(tasks,prefs,{})[0].id,'old');
+  assert.equal(microSlots(tasks,{...prefs,agentMode:'priority'},{old:microTaskVersion(tasks[0])})[0].id,'new');
+  assert.deepEqual(microSlots(tasks,{...prefs,agentMode:'pinned',pinned:['new','old']},{}).map(t=>t.id),['new','old']);
+  const slots=microSlots(tasks,{...prefs,agentMode:'custom',assignments:['','old','','','','']},{});
+  assert.equal(slots[0],undefined);assert.equal(slots[1].id,'old');assert.equal(slots.length,6);
+  assert.equal(tasks[0].id,'old');
+});
+test('invalid knob and joystick settings fall back to safe documented defaults',()=>{
+  const prefs=readMicroPreferences({knobMode:'execute-now',joystick:{up:{action:'bad',prompt:3}},assignments:[42],pinned:['a','a',null]});
+  assert.equal(prefs.knobMode,'composer');assert.deepEqual(prefs.joystick,defaultMicroJoystick);
+  assert.equal(prefs.assignments[0],'');assert.deepEqual(prefs.pinned,['a']);
+  assert.ok(unavailableMicroAction('plan'));assert.ok(unavailableMicroAction('reasoning'));
+  const saved=readMicroPreferences({knobMode:'custom',knob:{hold:{action:'prompt',prompt:'review'}}});
+  assert.equal(saved.knob.hold.action,'prompt');assert.equal(saved.knob.hold.prompt,'review');
+});
+test('joystick ignores central jitter and uses the dominant drag axis',()=>{
+  assert.equal(microDragDirection(8,8),null);
+  assert.equal(microDragDirection(24,10),'right');assert.equal(microDragDirection(-24,10),'left');
+  assert.equal(microDragDirection(10,-24),'up');assert.equal(microDragDirection(10,24),'down');
 });

@@ -106,6 +106,7 @@ This synchronizes saved conversation history and supports handoff; it does not m
 - Large controls, mobile focus mode, text/voice input, image uploads, and workspace directory selection.
 - Codex and Claude Code tasks with live output, stop, follow-up, and browser history.
 - Eight key layouts, four color themes, and custom Micro key actions, labels, colors, and SVG icons.
+- [Micro controls and official-documentation mapping](docs/micro-controls.md): task-light meanings, assignment modes, configurable joystick and dial, and supported action candidates.
 - Micro voice key: hold to talk and release to transcribe; double-tap within 350 ms to latch recording, then press again to stop.
 - Demo mode and installable HTTPS PWA. Demo mode does not execute real tasks.
 - One-time pairing and device revocation from local Settings.

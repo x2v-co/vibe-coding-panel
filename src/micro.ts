@@ -1,5 +1,5 @@
 export type MicroKeyId = 'quick' | 'approve' | 'decline' | 'fork' | 'mic' | 'send';
-export type MicroActionId = 'fast' | 'approve' | 'decline' | 'fork' | 'voice' | 'execute' | 'stop' | 'new' | 'history' | 'workspace' | 'capture' | 'fullscreen' | 'settings' | 'prompt';
+export type MicroActionId = 'fast' | 'approve' | 'decline' | 'fork' | 'voice' | 'execute' | 'stop' | 'new' | 'history' | 'workspace' | 'capture' | 'fullscreen' | 'settings' | 'prompt' | 'plan' | 'back' | 'forward' | 'sidebar' | 'browser' | 'terminal' | 'review' | 'git' | 'pr' | 'plugins' | 'schedule' | 'reasoning' | 'skill';
 export type MicroIconId = 'zap' | 'check' | 'decline' | 'stop' | 'fork' | 'mic' | 'send' | 'codex' | 'history' | 'folder' | 'capture' | 'grid' | 'brain' | 'message';
 export type MicroColorId = 'white' | 'mint' | 'blue' | 'amber' | 'pink';
 export type MicroKeyConfig = { id: MicroKeyId; label: string; action: MicroActionId; icon: MicroIconId; color: MicroColorId; prompt: string };
@@ -19,6 +19,10 @@ export const defaultMicroKeys: MicroKeyConfig[] = [
 ];
 
 export const microActions: { id: MicroActionId; label: string }[] = [
+  { id: 'plan', label: '切换计划模式（未支持）' },
+  { id: 'back', label: '应用历史后退' },
+  { id: 'forward', label: '应用历史前进' },
+  { id: 'sidebar', label: '显示或隐藏任务侧栏' },
   { id: 'fast', label: 'Fast mode（Bridge 未支持）' },
   { id: 'approve', label: '批准请求（Bridge 未支持）' },
   { id: 'decline', label: '拒绝请求（Bridge 未支持）' },
@@ -33,6 +37,7 @@ export const microActions: { id: MicroActionId; label: string }[] = [
   { id: 'fullscreen', label: '切换全屏' },
   { id: 'settings', label: '打开设置' },
   { id: 'prompt', label: '填入快捷指令（不发送）' },
+  ...(['browser','terminal','review','git','pr','plugins','schedule','reasoning','skill'] as const).map((id,i)=>({id,label:['打开浏览器','打开终端','审查更改','Git 操作','Pull Request 操作','打开插件','计划任务','调整推理力度','运行已启用技能'][i]+'（未支持）'})),
 ];
 
 export const microIconOptions: { id: MicroIconId; label: string }[] = [
@@ -50,6 +55,7 @@ export const microColors: { id: MicroColorId; label: string }[] = [
 
 export function unavailableMicroAction(action: MicroActionId): string | undefined {
   const names: Partial<Record<MicroActionId, string>> = {
+    plan:'原生计划模式', browser:'打开桌面浏览器', terminal:'打开桌面终端', review:'审查更改', git:'Git 操作', pr:'Pull Request 操作', plugins:'插件', schedule:'计划任务', reasoning:'推理力度调整', skill:'已启用技能',
     fast: '原生 Fast mode', approve: '批准请求', decline: '拒绝请求', fork: '保留上下文分叉会话',
   };
   return names[action] ? `当前 Bridge 尚未支持${names[action]}` : undefined;
@@ -113,4 +119,68 @@ export class MicroVoiceGesture {
   }
 
   reset() { this.downAt = null; this.lastTapAt = null; this.latched = false; this.suppressRelease = false; }
+}
+
+export type MicroDirection = 'up' | 'right' | 'down' | 'left';
+export type MicroBinding = { action: MicroActionId; prompt: string };
+export type MicroPreferences = {
+  agentMode: 'recent' | 'priority' | 'pinned' | 'custom';
+  assignments: string[];
+  pinned: string[];
+  joystick: Record<MicroDirection, MicroBinding>;
+  knobMode: 'composer' | 'scroll' | 'custom';
+  knob: Record<'left' | 'right' | 'press' | 'hold', MicroBinding>;
+};
+export const microDirections: { id: MicroDirection; label: string }[] = [
+  { id: 'up', label: '上' }, { id: 'right', label: '右' }, { id: 'down', label: '下' }, { id: 'left', label: '左' },
+];
+export const defaultMicroJoystick: MicroPreferences['joystick'] = {
+  up: { action: 'plan', prompt: '' }, right: { action: 'forward', prompt: '' },
+  down: { action: 'sidebar', prompt: '' }, left: { action: 'back', prompt: '' },
+};
+export function readMicroPreferences(value: unknown): MicroPreferences {
+  const v = value && typeof value === 'object' ? value as Partial<MicroPreferences> : {};
+  const binding = (value: MicroBinding | undefined, fallback: MicroBinding): MicroBinding => ({
+    action: microActions.some(a => a.id === value?.action) ? value!.action : fallback.action,
+    prompt: typeof value?.prompt === 'string' ? value.prompt.slice(0, 1000) : '',
+  });
+  return {
+    agentMode: ['recent', 'priority', 'pinned', 'custom'].includes(v.agentMode || '') ? v.agentMode! : 'recent',
+    assignments: Array.from({length:6}, (_,i) => typeof v.assignments?.[i] === 'string' ? v.assignments[i] : ''),
+    pinned: Array.isArray(v.pinned) ? [...new Set(v.pinned.filter(id => typeof id === 'string'))].slice(0,6) : [],
+    joystick: Object.fromEntries(microDirections.map(({id}) => [id,binding(v.joystick?.[id], defaultMicroJoystick[id])])) as MicroPreferences['joystick'],
+    knobMode: ['composer','scroll','custom'].includes(v.knobMode || '') ? v.knobMode! : 'composer',
+    knob: {
+      left: binding(v.knob?.left, {action:'back',prompt:''}), right: binding(v.knob?.right,{action:'forward',prompt:''}),
+      press: binding(v.knob?.press,{action:'history',prompt:''}), hold: binding(v.knob?.hold,{action:'settings',prompt:''}),
+    },
+  };
+}
+export const microStatusLegend = [
+  {id:'idle',color:'白色',label:'空闲',description:'没有正在执行的任务；完成消息已读或任务已停止。'},
+  {id:'running',color:'蓝色',label:'思考中',description:'任务正在排队或执行。'},
+  {id:'completed',color:'绿色',label:'完成 · 未读',description:'任务已完成，还有未读更新。'},
+  {id:'waiting',color:'琥珀色',label:'需要输入',description:'等待审批或回复；当前 Connector 尚不提供此状态。'},
+  {id:'failed',color:'红色',label:'错误',description:'任务失败。旋钮旁的红色取消键另表示可取消当前选择。'},
+  {id:'empty',color:'熄灭',label:'未分配',description:'没有跟踪任务；按下可新建任务。'},
+];
+type MicroTask = {id:string;status:string;createdAt:number;startedAt?:number|null;finishedAt?:number|null;revision?:number;events?:{at:number}[]};
+export function microTaskTime(task: MicroTask) { return Math.max(task.createdAt,task.startedAt || 0,task.finishedAt || 0,...(task.events || []).map(e=>e.at)); }
+export function microTaskVersion(task: MicroTask) { return `${task.status}:${task.revision ?? microTaskTime(task)}`; }
+export function microTaskState(task: MicroTask | undefined, read: Record<string,string>) {
+  if (!task) return 'empty';
+  if (task.status==='completed') return read[task.id] === microTaskVersion(task) ? 'idle' : 'completed';
+  if (task.status==='stopped') return 'idle';
+  return task.status;
+}
+export function microSlots<T extends MicroTask>(tasks:T[], prefs:MicroPreferences, read:Record<string,string>):(T|undefined)[] {
+  if(prefs.agentMode==='custom') return prefs.assignments.map(id=>tasks.find(t=>t.id===id));
+  if(prefs.agentMode==='pinned') return prefs.pinned.map(id=>tasks.find(t=>t.id===id));
+  const priority=(t:T)=>microTaskState(t,read)==='completed'?0:['running','queued'].includes(t.status)?1:2;
+  return [...tasks].sort((a,b)=>(prefs.agentMode==='priority'?priority(a)-priority(b):0)||microTaskTime(b)-microTaskTime(a)||a.id.localeCompare(b.id)).slice(0,6);
+}
+// A drag activates once after leaving the center dead zone; release rearms it.
+export function microDragDirection(x:number,y:number,threshold=18):MicroDirection|null {
+  if(Math.hypot(x,y)<threshold)return null;
+  return Math.abs(x)>Math.abs(y)?x>0?'right':'left':y>0?'down':'up';
 }
