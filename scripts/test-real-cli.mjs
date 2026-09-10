@@ -125,4 +125,5 @@ try {
   server.closeAllConnections();
   await new Promise(resolve => server.close(resolve));
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  console.log('CLI fixture server, sessions and temporary files cleaned up');
 }

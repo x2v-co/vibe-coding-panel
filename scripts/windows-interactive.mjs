@@ -2,9 +2,12 @@
 import assert from 'node:assert/strict';
 import { stripVTControlCharacters } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
+import { createRequire } from 'node:module';
 
 export async function checkWindowsTerminal({ provider, bin, id, workspace, env, sessions, requests }) {
   assert.equal(process.platform, 'win32');
+  assert.equal(createRequire(import.meta.url)('node-pty/package.json').version, '1.1.0',
+    'Review the ConPTY cleanup workaround before upgrading node-pty');
   const { spawn } = await import('node-pty');
   const { Terminal } = (await import('@xterm/headless')).default;
   const screen = new Terminal({ cols: 120, rows: 36, allowProposedApi: true });
@@ -140,6 +143,11 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
     clearTimeout(sandboxTimer);
     onboardingTimers.forEach(clearTimeout);
     if (!exited) terminal.kill();
+    // node-pty 1.1.0 closes the output pipe on normal exit but leaves its input
+    // pipe and ConoutConnection worker open. Dispose only this driver's resources;
+    // do not call kill after /exit (it queries a PID which may already be reused).
+    terminal._agent.inSocket.destroy();
+    terminal._agent._conoutSocketWorker.dispose();
     screen.dispose();
   }
 }
