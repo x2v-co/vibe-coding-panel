@@ -15,7 +15,7 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
     cwd: workspace, env: { ...env, TERM: 'xterm-256color' }, cols: 120, rows: 36,
     useConpty: true,
   });
-  let output = '', exited = false, exitCode, trusted = false, trustTimer;
+  let output = '', exited = false, exitCode, trusted = false, trustTimer, sandboxTimer, sandboxSelected = false;
   const type = text => {
     // ConPTY enables Win32-input mode; plain CR is not a key event in this mode.
     const win32 = output.lastIndexOf('\x1b[?9001h') > output.lastIndexOf('\x1b[?9001l');
@@ -39,6 +39,13 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
         type('\r');
       }, 1500);
     }
+    if (!sandboxSelected && provider === 'codex' && stripVTControlCharacters(output).includes('Set up default sandbox (requires Administrator permissions)')) {
+      sandboxSelected = true;
+      sandboxTimer = setTimeout(() => {
+        console.log('codex: selecting default Windows sandbox');
+        type('\r');
+      }, 1500);
+    }
   });
   terminal.onExit(event => { exited = true; exitCode = event.exitCode; });
   const waitFor = async (description, condition, timeout = 45000) => {
@@ -58,6 +65,7 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
     await assert.rejects(sessions.release(provider, workspace, id), /Ctrl\+C|退出 CLI/);
     assert.equal(exited, false, 'unsupported remote release must leave the terminal running');
     assert.equal((await sessions.read(provider, workspace, id)).canResume, false);
+    await waitFor('waiting for resumed transcript in terminal', () => stripVTControlCharacters(output).includes('COMPATIBILITY_READY'), 90000);
     const before = requests.length;
     type('INTERACTIVE_TURN_MARKER. Recall the earlier marker.\r');
     await waitFor('waiting for interactive model request', () => requests.slice(before).some(r =>
@@ -81,6 +89,7 @@ export async function checkWindowsTerminal({ provider, bin, id, workspace, env, 
     throw error;
   } finally {
     clearTimeout(trustTimer);
+    clearTimeout(sandboxTimer);
     if (!exited) terminal.kill();
   }
 }
