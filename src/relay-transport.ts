@@ -117,6 +117,7 @@ export async function apiFetch(input: string, init: RequestInit = {}): Promise<R
     if (health.paired) void provision();
   }
   if (response.ok && input === '/api/pair') { lastProvision = 0; await provision(); }
+  if (response.ok && input === '/api/jobs') void provision();
   return response;
 }
 
@@ -125,9 +126,10 @@ export class RelayEventSource {
   onerror: ((event: Event) => void) | null = null;
   private stream?: EventSource;
   private closed = false;
+  private path: string;
   private retry?: ReturnType<typeof setTimeout>;
   private reconnect = () => this.open();
-  constructor(private path: string) { routeEvents.addEventListener('change', this.reconnect); this.open(); }
+  constructor(path: string) { this.path = path; routeEvents.addEventListener('change', this.reconnect); this.open(); }
   private open() {
     if (this.closed) return;
     this.stream?.close();

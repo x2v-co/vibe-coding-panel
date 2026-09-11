@@ -94,9 +94,11 @@ if (!['1', 'true'].includes(String(process.env.PANEL_CONNECTOR_NO_SERVER || '').
     for (const uplink of uplinks) uplink.stop();
   });
 }
-void printPairingUrl(mobileUrl);
+let pairingPrinted = false;
 for (const origin of origins) {
-  const uplink = new RelayConnector({ origin, connectorId, credential: connectorCredential, apiPort, log: message => process.stdout.write(`${message}\n`) });
+  const uplink = new RelayConnector({ origin, connectorId, credential: connectorCredential, apiPort, log: message => process.stdout.write(`${message}\n`),
+    onReady: () => { if (!pairingPrinted) { pairingPrinted = true; void printPairingUrl(mobileUrl); } },
+  });
   uplinks.push(uplink);
   uplink.connect();
   process.stdout.write(`备用手机地址：${origin}/app?relay=${connectorId}\n`);

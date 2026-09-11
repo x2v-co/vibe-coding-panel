@@ -4,8 +4,8 @@ import { WebSocket } from 'ws';
 // Each uplink owns its requests and retry timer. Losing one region must never
 // cancel requests that are being served through the other region.
 export class RelayConnector {
-  constructor({ origin, connectorId, credential, apiPort, log = () => {} }) {
-    Object.assign(this, { origin, connectorId, credential, apiPort, log });
+  constructor({ origin, connectorId, credential, apiPort, log = () => {}, onReady = () => {} }) {
+    Object.assign(this, { origin, connectorId, credential, apiPort, log, onReady });
     this.inflight = new Map();
     this.delay = 1000;
     this.stopped = false;
@@ -20,7 +20,7 @@ export class RelayConnector {
       maxPayload: 14 * 1024 * 1024, handshakeTimeout: 15000,
     });
     const send = message => { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message)); };
-    socket.on('open', () => { this.delay = 1000; this.log(`${this.origin}: connected`); });
+    socket.on('open', () => { this.delay = 1000; this.log(`${this.origin}: connected`); this.onReady(); });
     socket.on('message', raw => {
       let message; try { message = JSON.parse(raw); } catch { return; }
       if (message?.type === 'cancel') { this.inflight.get(message.requestId)?.destroy(); this.inflight.delete(message.requestId); }
@@ -28,7 +28,8 @@ export class RelayConnector {
       if (typeof message.path !== 'string' || !message.path.startsWith('/api/') || /[\r\n]/.test(message.path)) return;
       // The configured endpoint, not a browser-supplied header, is the audience
       // for a cross-node authorization ticket.
-      const headers = { ...(message.headers || {}), host: `127.0.0.1:${this.apiPort}`, 'x-vibe-relay-origin': this.origin };
+      const headers = { ...(message.headers || {}), host: `127.0.0.1:${this.apiPort}`, 'x-vibe-relay-origin': this.origin,
+        'x-forwarded-for': message.headers?.['x-forwarded-for'] || 'relay', 'x-forwarded-proto': 'https' };
       const request = http.request({ host: '127.0.0.1', port: this.apiPort, method: message.method, path: message.path, headers }, response => {
         send({ type: 'response-start', requestId: message.requestId, status: response.statusCode, headers: response.headers });
         response.on('data', chunk => send({ type: 'response-chunk', requestId: message.requestId, data: chunk.toString('base64') }));
