@@ -141,3 +141,29 @@ template, configure renewal, validate and reload Nginx. On global, validate and
 reload the prepared `Caddyfile.ready` (which retains the legacy block). Then
 verify public HTTPS, WebSockets and pairing before distributing new Connectors.
 New regional services are not yet attached to an automatic release updater.
+
+## China public activation — 2026-09-11
+
+The product and China records now point directly to `82.157.206.149`.
+Both public HTTPS endpoints and WSS/API forwarding have passed verification.
+Nginx's separate `vibe.conf.template` is installed; Toolkit's own template is
+unchanged. Let's Encrypt issued certificate `vibe-panel-cn` for both names,
+expiring 2026-12-10. Host Certbot's timer renews it using HTTP-01 webroot.
+The root-owned deploy hook at
+`/etc/letsencrypt/renewal-hooks/deploy/vibe-cn.sh` installs a versioned certificate
+directory, switches the `certs/vibe` symlink and validates/reloads Nginx. The hook
+source is `deploy/renew-vibe-cn-certificate.sh`; the bootstrap HTTP-only template
+is retained as `deploy/nginx.vibe-cn.http.conf`.
+Certbot's staging renewal dry run passed for both names, the renewal timer is
+active, and the original Toolkit CN and legacy Vibe endpoints still return 200.
+
+Cloudflare warns because these DNS-only records expose an IP also used by the
+proxied `cn.toolkit.fun`. This is expected for the direct China endpoint: its
+traffic bypasses Cloudflare's proxy/WAF, and the shared origin IP is public.
+Do not enable the proxy merely to suppress the warning. If hiding/isolation of
+Toolkit's origin becomes a requirement, put Relay on a separate public IP;
+origin access controls must be scoped so they do not block direct Vibe traffic.
+
+At activation, `vibe-relay-global.toolkit.fun` was incorrectly set to the China
+IP. Correct it to `129.226.95.67` before activating global TLS and distributing
+the regional Connector release. The global service remains internally healthy.
