@@ -99,3 +99,45 @@ Acceptance includes three mainland carriers without VPN, Wi-Fi/cellular switchin
 computer VPN on/off, microphone upload, standby authorization, in-flight command
 failure, revocation and SSE recovery. Automated local tests do not establish
 mainland reachability or real iOS/Android behavior.
+
+## Prepared deployment — 2026-09-11
+
+Both hosts run `vibe-regional-vibe-regional-1` from `/opt/vibe-regional`, with
+application revision `4a7865c220be7c51aad2a048606968706748c89a` and loopback port
+8791. Existing Toolkit and legacy Vibe proxy routes have not been replaced.
+Public activation is pending the three DNS records above and public certificates.
+At verification time none of the three new names had an A answer.
+
+Global uses the standard Node 24 Relay image. The host's Docker 29 legacy builder
+produced an incomplete `docker save` archive, so Beijing uses its existing Node
+22 Bookworm base with a prebuilt runtime bundle from the SAME global container.
+`scripts/package-relay-runtime.mjs` copies the locked Express/WS dependency
+closure (69 packages), server files and built frontend; it does not install or
+fetch dependencies. `deploy/Dockerfile.regional-runtime` builds that bundle.
+The transferred archive was verified on both hosts:
+
+```text
+runtime-4a7865c.tgz
+sha256:12add8fca1db178112d723181ddbb8d790ba1c4ff9cd1fe40ad824c0f414bbd2
+```
+
+Validated: proxy-container access to each Relay; versioned internal health;
+simultaneous WebSocket registration and request forwarding through both deployed
+Relays with an isolated test identity; global forwarding after the China uplink
+closes. No real Agent task was submitted during server smoke testing.
+
+Local checks: 77 unit/integration tests passed, one platform-specific skip;
+three launcher acceptance tests passed; TypeScript and production build passed.
+A Chromium mobile viewport verified separate-host HTTPS pairing, automatic
+standby authorization, unchanged page origin during failover and execution of a
+fixture task afterward. Browser transport tests additionally cover ambiguous
+write deduplication, computer restart and a blackholed request. Real mainland
+carrier and mobile microphone validation remains pending public activation.
+
+Staged proxy configurations are in `/opt/vibe-regional` on the respective hosts.
+After DNS: install the China HTTP ACME route, issue a public certificate for
+`vibe.toolkit.fun` and `vibe-relay-cn.toolkit.fun`, install the prepared HTTPS
+template, configure renewal, validate and reload Nginx. On global, validate and
+reload the prepared `Caddyfile.ready` (which retains the legacy block). Then
+verify public HTTPS, WebSockets and pairing before distributing new Connectors.
+New regional services are not yet attached to an automatic release updater.
