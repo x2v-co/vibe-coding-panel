@@ -96,7 +96,12 @@ export async function apiFetch(input: string, init: RequestInit = {}): Promise<R
     requestHeaders.set('X-Vibe-Request-Id', crypto.randomUUID());
     requestHeaders.set('X-Vibe-Instance-Id', instanceId);
   }
-  const options = { ...init, headers: requestHeaders, signal: init.signal || AbortSignal.timeout(mutation ? 180000 : 15000) };
+  // Fail a stalled health/job poll before the UI monitor's 10s cancellation,
+  // leaving time to select a standby. Otherwise a blackholed node would keep
+  // being retried forever because every caller abort looked like navigation.
+  const timeout = mutation ? 180000 : input === '/api/jobs' || input === '/api/health' ? 6000 : 15000;
+  const requestSignal = () => init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout);
+  const options = { ...init, headers: requestHeaders, signal: requestSignal() };
   let response: Response | undefined;
   let failure: unknown;
   const previous = active;
@@ -107,7 +112,7 @@ export async function apiFetch(input: string, init: RequestInit = {}): Promise<R
     if (switched && safeReplay) {
       // Reuse the same id. The computer deduplicates even when both regional
       // requests reach it; its boot id prevents replay after a restart.
-      response = await raw(active, input, { ...options, signal: init.signal || AbortSignal.timeout(mutation ? 180000 : 15000) });
+      response = await raw(active, input, { ...options, signal: requestSignal() });
     }
   }
   if (!response) throw failure || new Error('电脑连接暂时不可用，请确认上次操作结果后重试');

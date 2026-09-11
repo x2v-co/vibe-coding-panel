@@ -13,6 +13,9 @@ test('browser retries ambiguous writes with one id, but never across a computer 
     if (input === '/relay/config') return json({ enabled: true, origins });
     const url = new URL(input);
     if (url.pathname === '/api/health') return json({ ok: true, paired: true, instanceId: boot });
+    if (url.pathname === '/api/jobs' && url.origin === fail) return new Promise((_resolve, reject) => {
+      init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true });
+    });
     if (url.pathname === '/api/action') {
       actions.push({ origin: url.origin, id: init.headers.get('X-Vibe-Request-Id'), boot: init.headers.get('X-Vibe-Instance-Id') });
       if (url.origin === fail) throw new TypeError('Connection lost after sending');
@@ -34,6 +37,11 @@ test('browser retries ambiguous writes with one id, but never across a computer 
     boot = 'boot-2';
     await assert.rejects(transport.apiFetch('/api/action', { method: 'POST', body: '{}' }), /Connection lost/);
     assert.equal(actions.length, 1, 'new boot must not replay a possibly executed command');
+    fail = values.get(`vibe-relay-node:${'a'.repeat(43)}`);
+    const outer = AbortSignal.timeout(10000);
+    assert.equal((await transport.apiFetch('/api/jobs', { signal: outer })).status, 200);
+    assert.equal(outer.aborted, false, 'blackhole switches before the monitor cancels');
+    assert.notEqual(values.get(`vibe-relay-node:${'a'.repeat(43)}`), fail);
   } finally {
     if (originalWindow === undefined) delete globalThis.window; else globalThis.window = originalWindow;
     if (originalLocation === undefined) delete globalThis.location; else globalThis.location = originalLocation;
