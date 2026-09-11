@@ -1,10 +1,10 @@
 # Vibe Coding Panel
 
-[简体中文](README.zh-CN.md) · [Website](https://vibe.tooluse.app/) · [Try the panel](https://vibe.tooluse.app/app)
+[简体中文](README.zh-CN.md) · [Website](https://vibe.toolkit.fun/) · [Try the panel](https://vibe.toolkit.fun/app)
 
 Control your computer's Codex or Claude Code from your phone. Speak a request, choose a workspace, press a large key, and watch the result. No hardware required.
 
-No Vibe Panel account, personal server, Tailscale, or tunnel setup is needed. The Connector runs on your computer and connects to the shared Relay at `https://vibe.tooluse.app`. Your agent keeps using its existing login and model provider.
+No Vibe Panel account, personal server, Tailscale, or tunnel setup is needed. The Connector runs on your computer and connects to the shared Relay at `https://vibe.toolkit.fun`. Your agent keeps using its existing login and model provider.
 
 ## Install with your Agent
 
@@ -25,7 +25,7 @@ permission to me. Do not report success until you have checked the service.
 
 ## Portable download
 
-[Download a portable Connector](https://vibe.tooluse.app/download) for macOS Apple Silicon/Intel, Windows x64 or Linux x64. Node.js 24 and locked application dependencies are included: extract the ZIP and run the platform launcher without installing Node or npm. An installed, authenticated Codex/Claude CLI is still required; Whisper/ffmpeg are optional for voice. Packages are unsigned internal-beta builds. [Package instructions and limitations](docs/portable-connector.md) · [Releases and checksums](https://github.com/x2v-co/vibe-coding-panel/releases/latest).
+[Download a portable Connector](https://vibe.toolkit.fun/download) for macOS Apple Silicon/Intel, Windows x64 or Linux x64. Node.js 24 and locked application dependencies are included: extract the ZIP and run the platform launcher without installing Node or npm. An installed, authenticated Codex/Claude CLI is still required; Whisper/ffmpeg are optional for voice. Packages are unsigned internal-beta builds. [Package instructions and limitations](docs/portable-connector.md) · [Releases and checksums](https://github.com/x2v-co/vibe-coding-panel/releases/latest).
 
 ## Install from source
 
@@ -164,4 +164,4 @@ iPhone Safari core flows passed; remaining iPhone checks are paused. See
 [physical-device results and remaining limits](docs/known-issues.md) for exact
 devices and coverage. Distribution remains internal beta.
 
-Release information: [Changelog](CHANGELOG.md) · [Known limitations](docs/known-issues.md) · [Privacy notice (Chinese)](https://vibe.tooluse.app/privacy/) · [Terms (Chinese)](https://vibe.tooluse.app/terms/).
+Release information: [Changelog](CHANGELOG.md) · [Known limitations](docs/known-issues.md) · [Privacy notice (Chinese)](https://vibe.toolkit.fun/privacy/) · [Terms (Chinese)](https://vibe.toolkit.fun/terms/).

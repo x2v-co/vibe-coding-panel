@@ -28,6 +28,10 @@ export function readCookie(cookieHeader, name) {
   return '';
 }
 
+export function deviceToken(cookieHeader) {
+  return readCookie(cookieHeader, '__Host-vibe_panel_device') || readCookie(cookieHeader, 'vibe_panel_device');
+}
+
 export function isLoopbackRequest(req) {
   if (req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for']) return false;
   const address = req.socket?.remoteAddress || '';

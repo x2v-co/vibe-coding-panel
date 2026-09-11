@@ -76,7 +76,7 @@ is stored outside the package.
 - [Physical-device acceptance and remaining limits]({repo}/blob/{args.revision}/docs/known-issues.md)
 - [Package instructions]({repo}/blob/{args.revision}/docs/portable-connector.md)
 - [Native handoff and recovery]({repo}/blob/{args.revision}/docs/native-session-handoff.md)
-- [Privacy](https://vibe.tooluse.app/privacy/) · [Terms](https://vibe.tooluse.app/terms/)
+- [Privacy](https://vibe.toolkit.fun/privacy/) · [Terms](https://vibe.toolkit.fun/terms/)
 - [Feedback]({repo}/issues): include revision, platform and reproduction steps;
   remove secrets, pairing links and private content from public reports.
 '''

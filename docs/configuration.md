@@ -4,7 +4,9 @@ Most users should use the default shared Relay and the launcher. These settings 
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `PANEL_RELAY_URL` | `https://vibe.tooluse.app` for `connect` | Connector Relay address |
+| `PANEL_RELAY_URL` | unset | Single private/legacy Relay override |
+| `PANEL_RELAY_URLS` | Toolkit CN + global | Comma-separated Relay origins; takes precedence over singular override |
+| `PANEL_RELAY_PUBLIC_URL` | `https://vibe.toolkit.fun` for managed defaults | Stable mobile pairing entry |
 | `PANEL_AGENT_PROVIDER` | `.vibe-panel/connector.json`, otherwise `codex` | `codex` or `claude`; environment overrides the file |
 | `PANEL_CODEX_BIN` | `codex` | Codex executable |
 | `PANEL_CLAUDE_BIN` | `claude` | Claude Code executable |
@@ -182,3 +184,5 @@ WHISPER_MISSING, SPEECH_CONFIGURATION, SPEECH_DEPENDENCIES, SPEECH_MODEL_DOWNLOA
 SPEECH_MEMORY and SPEECH_TIMEOUT. Unknown proxy/runtime messages are replaced with
 guidance rather than rendered as HTML or raw parser errors. Agent task logs retain
 diagnostic output; review them before retrying a task that may have changed files.
+
+Regional deployment, DNS and migration: [regional Relays](regional-relays.md).

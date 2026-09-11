@@ -1,3 +1,4 @@
+import { apiFetch as fetch, RelayEventSource as EventSource } from './relay-transport';
 import {
   ArrowUp, ArrowDown, ArrowLeft, ArrowRight, BrainCircuit, Camera, Check, ChevronRight, CircleCheck, CircleX, CircleStop, Clock3, Copy, Folder, FolderOpen, Grid2X2, History, Split,
   FileAudio, FlaskConical, ImagePlus, Keyboard, Laptop, Link2, Maximize2, Mic, MicOff, Minimize2,

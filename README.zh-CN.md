@@ -1,10 +1,10 @@
 # Vibe Coding Panel
 
-[English](README.md) · [项目官网](https://vibe.tooluse.app/) · [体验面板](https://vibe.tooluse.app/app)
+[English](README.md) · [项目官网](https://vibe.toolkit.fun/) · [体验面板](https://vibe.toolkit.fun/app)
 
 用手机控制电脑上的 Codex 或 Claude Code。说出需求、选择工作区、按下大按键，即可查看执行进度和结果，无需购买外设。
 
-无需注册 Vibe Panel 账号、租服务器或安装 Tailscale。电脑上的 Connector 默认连接项目共享 Relay：`https://vibe.tooluse.app`，继续使用你现有的 Agent 登录和模型服务商配置。
+无需注册 Vibe Panel 账号、租服务器或安装 Tailscale。电脑上的 Connector 默认连接项目共享 Relay：`https://vibe.toolkit.fun`，继续使用你现有的 Agent 登录和模型服务商配置。
 
 ## 让 Agent 帮你安装
 
@@ -24,7 +24,7 @@
 
 ## 下载便携运行包
 
-[下载 Connector](https://vibe.tooluse.app/download)：提供 macOS Apple Silicon／Intel、Windows x64 和 Linux x64 版本。内含 Node.js 24 和锁定依赖，完整解压后运行对应启动文件，无需另装 Node 或 npm。仍需安装并登录 Codex／Claude；语音所需 Whisper／ffmpeg 可选安装。当前为未签名的内测包。[运行包说明与限制](docs/portable-connector.md) · [版本与校验文件](https://github.com/x2v-co/vibe-coding-panel/releases/latest)。
+[下载 Connector](https://vibe.toolkit.fun/download)：提供 macOS Apple Silicon／Intel、Windows x64 和 Linux x64 版本。内含 Node.js 24 和锁定依赖，完整解压后运行对应启动文件，无需另装 Node 或 npm。仍需安装并登录 Codex／Claude；语音所需 Whisper／ffmpeg 可选安装。当前为未签名的内测包。[运行包说明与限制](docs/portable-connector.md) · [版本与校验文件](https://github.com/x2v-co/vibe-coding-panel/releases/latest)。
 
 ## 从源码安装：三步开始
 
@@ -145,4 +145,4 @@ Android PWA 核心流程、两种 Agent 与测试 Mac 的会话接管均已通�
 
 iPhone Safari 核心流程及部分主屏幕应用检查通过，剩余 iPhone 项目按测试者要求暂停。具体设备、覆盖范围和限制见[已知限制](docs/known-issues.md)。当前仍为内测版本。
 
-发布资料：[变更记录](CHANGELOG.md) · [已知限制](docs/known-issues.md) · [隐私说明](https://vibe.tooluse.app/privacy/) · [使用条款](https://vibe.tooluse.app/terms/)。
+发布资料：[变更记录](CHANGELOG.md) · [已知限制](docs/known-issues.md) · [隐私说明](https://vibe.toolkit.fun/privacy/) · [使用条款](https://vibe.toolkit.fun/terms/)。

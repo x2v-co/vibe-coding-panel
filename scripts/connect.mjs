@@ -9,7 +9,8 @@ import { managedSpeechEnv } from '../server/managed-speech.js';
 Object.assign(process.env, managedSpeechEnv());
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const relayUrl = String(process.env.PANEL_RELAY_URL || 'https://vibe.tooluse.app').trim();
+import { connectorRelayConfig } from '../server/relay-config.js';
+const relayConfig = connectorRelayConfig();
 
 function executable(name) {
   const lookup = process.platform === 'win32' ? 'where' : 'which';
@@ -65,7 +66,7 @@ function findWhisperPython() {
 }
 
 const apiPort = await choosePort();
-const env = { ...process.env, PANEL_API_PORT: String(apiPort), PANEL_RELAY_URL: relayUrl, PANEL_AGENT_PROVIDER: defaultAgentProvider() };
+const env = { ...process.env, PANEL_API_PORT: String(apiPort), PANEL_RELAY_URLS: relayConfig.origins.join(','), PANEL_RELAY_PUBLIC_URL: relayConfig.publicOrigin, PANEL_AGENT_PROVIDER: defaultAgentProvider() };
 const speech = speechConfiguration(env);
 const whisperCommand = speech.backend === 'mlx' ? 'mlx_whisper' : 'whisper';
 const venvWhisper = process.platform === 'win32'
@@ -99,7 +100,7 @@ process.stdout.write('\n========================================\n');
 process.stdout.write(' VIBE PANEL CONNECTOR\n');
 process.stdout.write('========================================\n');
 process.stdout.write(`Platform: ${process.platform}\n`);
-process.stdout.write(`Relay: ${relayUrl}\n`);
+process.stdout.write(`Relay: ${relayConfig.origins.join(', ')}\n`);
 process.stdout.write(`默认 Agent: ${agentProviders[env.PANEL_AGENT_PROVIDER].label}\n`);
 process.stdout.write(`本机端口: ${apiPort}${apiPort === Number(process.env.PANEL_API_PORT || 8787) ? '' : '（默认端口被占用，已自动切换）'}\n`);
 if (whisperBin) process.stdout.write(`Whisper: ${whisperBin} (${speech.backend} / ${speech.model})\n`);

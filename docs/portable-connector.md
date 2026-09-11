@@ -67,6 +67,6 @@ Report issues: https://github.com/x2v-co/vibe-coding-panel/issues
 Source and configuration: https://github.com/x2v-co/vibe-coding-panel
 
 Bundled release information: `CHANGELOG.md`, `docs/known-issues.md`, and
-`docs/native-session-handoff.md`. Read [privacy](https://vibe.tooluse.app/privacy/)
-and [terms](https://vibe.tooluse.app/terms/); offline copies are included under
+`docs/native-session-handoff.md`. Read [privacy](https://vibe.toolkit.fun/privacy/)
+and [terms](https://vibe.toolkit.fun/terms/); offline copies are included under
 `dist/privacy/index.html` and `dist/terms/index.html`.

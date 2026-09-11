@@ -6,7 +6,7 @@ import { access, copyFile, link, mkdir, mkdtemp, readFile, readdir, rm, symlink,
 import { homedir, hostname, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PairingStore, isLoopbackRequest, readCookie } from './pairing.js';
+import { PairingStore, isLoopbackRequest, deviceToken } from './pairing.js';
 import { buildWhisperArgs, resolveWhisperModel, resolveWhisperTimeout, resolveWhisperBackend, resolveWhisperBinary, speechConfiguration } from './whisper-options.js';
 import { managedSpeechEnv } from './managed-speech.js';
 Object.assign(process.env, managedSpeechEnv());
@@ -19,6 +19,10 @@ import { releaseInfo, speechDiagnostics, cachedDiagnostics } from './runtime-inf
 import { NativeSessions } from './native-sessions.js';
 import { speechFailure, agentFailure } from './user-errors.js';
 import { CodexRuntime } from './codex-runtime.js';
+import { connectorRelayConfig } from './relay-config.js';
+import { installRelayAuthorization } from './relay-authorization.js';
+import { requestDeduplication } from './request-deduplication.js';
+const deduplication = requestDeduplication();
 
 const app = express();
 const port = Number(process.env.PANEL_API_PORT || 8787);
@@ -68,7 +72,7 @@ function requestUsesHttps(req) {
 
 function setDeviceCookie(req, res, token) {
   const attributes = [
-    `vibe_panel_device=${encodeURIComponent(token)}`,
+    `${requestUsesHttps(req) ? '__Host-vibe_panel_device' : 'vibe_panel_device'}=${encodeURIComponent(token)}`,
     'HttpOnly', 'SameSite=Strict', 'Path=/', 'Max-Age=31536000',
   ];
   if (requestUsesHttps(req)) attributes.push('Secure');
@@ -105,7 +109,7 @@ function parsePublicUrl(input) {
 }
 
 async function authenticatedDevice(req) {
-  return pairingStore.authenticate(readCookie(req.headers.cookie, 'vibe_panel_device'));
+  return pairingStore.authenticate(deviceToken(req.headers.cookie));
 }
 
 function push(job, event) {
@@ -533,9 +537,12 @@ app.get('/api/health', async (req, res) => {
     device,
     demoAvailable: true,
     connector: connectorRelease,
+    instanceId: deduplication.instanceId,
     speech: speechConfiguration(),
   });
 });
+
+installRelayAuthorization(app, { store: pairingStore, origins: connectorRelayConfig().origins, setCookie: setDeviceCookie });
 
 app.post('/api/pair', async (req, res) => {
   if (!canAttemptPairing(req)) return res.status(429).json({ error: '配对尝试过多，请 10 分钟后重试' });
@@ -586,6 +593,8 @@ app.use('/api', async (req, res, next) => {
     res.status(500).json({ error: '无法验证设备授权' });
   }
 });
+
+app.use('/api', deduplication.middleware);
 
 app.get('/api/diagnostics', async (req, res) => {
   try { res.setHeader('Cache-Control', 'no-store'); res.json(await collectDiagnostics()); }
