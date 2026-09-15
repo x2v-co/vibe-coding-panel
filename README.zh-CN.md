@@ -6,6 +6,12 @@
 
 无需注册 Vibe Panel 账号、租服务器或安装 Tailscale。电脑上的 Connector 默认连接项目共享 Relay：`https://vibe.toolkit.fun`，继续使用你现有的 Agent 登录和模型服务商配置。
 
+## 电脑控制中心
+
+运行 `npm run connect -- --controller`，把手机文字和语音追加到电脑绑定会话，核对后明确发送。macOS 支持 Codex App / Claude App，Claude Code 使用托管控制台。原 Panel 继续通过 `npm run connect` 启动。
+
+[控制中心安装、配对与恢复指南](docs/controller-quickstart.md)。便携包启动文件同样支持 `--controller`，无需另装 npm。
+
 ## 让 Agent 帮你安装
 
 将下面这段话发给**运行在自己电脑上的** Codex、Claude Code 或其他编程 Agent：

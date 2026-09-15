@@ -15,7 +15,7 @@ async function download(url) {
 }
 try {
   await mkdir(app);
-  for (const file of ['server', 'scripts/connect.mjs', 'scripts/connect-relay.mjs', 'scripts/launch.mjs', 'scripts/setup-voice.mjs', 'dist', 'package.json', 'package-lock.json', 'LICENSE', 'CHANGELOG.md', 'docs/known-issues.md', 'docs/configuration.md', 'docs/regional-relays.md', 'docs/native-session-handoff.md', 'docs/portable-connector.md', 'Vibe Panel.command', 'Vibe Panel.sh', 'Vibe Panel.bat', 'Setup Voice.command', 'Setup Voice.sh', 'Setup Voice.bat']) {
+  for (const file of ['server', 'scripts/connect.mjs', 'scripts/connect-relay.mjs', 'scripts/launch.mjs', 'scripts/controller.mjs', 'scripts/controller-check.mjs', 'scripts/desktop-controller.swift', 'scripts/claude-desktop-controller.swift', 'scripts/live-whisper.py', 'public/controller.html', 'public/controller.css', 'public/live-capture.js', 'public/controller-bootstrap.js', 'public/relay-transport.js', 'public/claude-console.html', 'docs/controller-quickstart.md', 'scripts/setup-voice.mjs', 'dist', 'package.json', 'package-lock.json', 'LICENSE', 'CHANGELOG.md', 'docs/known-issues.md', 'docs/configuration.md', 'docs/regional-relays.md', 'docs/native-session-handoff.md', 'docs/portable-connector.md', 'Vibe Panel.command', 'Vibe Panel.sh', 'Vibe Panel.bat', 'Setup Voice.command', 'Setup Voice.sh', 'Setup Voice.bat']) {
     await cp(path.join(root, file), path.join(app, file), { recursive: true, filter: source => !source.endsWith('.test.js') && !source.includes(`${path.sep}fixtures`) });
   }
   const npm = spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], { cwd: app, shell: process.platform === 'win32', stdio: 'inherit' });

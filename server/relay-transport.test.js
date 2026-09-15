@@ -16,7 +16,7 @@ test('browser retries ambiguous writes with one id, but never across a computer 
     if (url.pathname === '/api/jobs' && url.origin === fail) return new Promise((_resolve, reject) => {
       init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true });
     });
-    if (url.pathname === '/api/action') {
+    if (url.pathname === '/api/action' || url.pathname === '/api/desktop-controller/command' || url.pathname === '/api/transcriptions') {
       actions.push({ origin: url.origin, id: init.headers.get('X-Vibe-Request-Id'), boot: init.headers.get('X-Vibe-Instance-Id') });
       if (url.origin === fail) throw new TypeError('Connection lost after sending');
       return json({ ok: true });
@@ -32,6 +32,16 @@ test('browser retries ambiguous writes with one id, but never across a computer 
     assert.equal(actions[0].id, actions[1].id);
     assert.ok(actions[0].id);
     assert.notEqual(actions[0].origin, actions[1].origin);
+    actions = [];
+    fail = values.get(`vibe-relay-node:${'a'.repeat(43)}`);
+    await assert.rejects(transport.apiFetch('/api/desktop-controller/command', {method:'POST', body:'{}'}), /Connection lost/);
+    assert.equal(actions.length, 1, 'controller commands must never automatically replay');
+    globalThis.location.pathname = '/api/desktop-controller/view';
+    actions = [];
+    fail = values.get(`vibe-relay-node:${'a'.repeat(43)}`);
+    await assert.rejects(transport.apiFetch('/api/transcriptions', {method:'POST', body:'{}'}), /Connection lost/);
+    assert.equal(actions.length, 1, 'controller recordings must never automatically replay');
+    globalThis.location.pathname = '/app';
     actions = [];
     fail = values.get(`vibe-relay-node:${'a'.repeat(43)}`);
     boot = 'boot-2';

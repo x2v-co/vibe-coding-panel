@@ -1008,7 +1008,7 @@ function PanelApp() {
     try {
       const response = await fetch('/api/transcriptions', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audio: await audioDataUrl(blob), language: 'zh' }),
+        body: JSON.stringify({ audio: await audioDataUrl(blob), language: 'zh', agentProvider: nativeSelection?.provider || agentProvider }),
       });
       const payload = await readApiResponse(response);
       if (!response.ok) throw new Error(payload.error || '录音转写失败');
@@ -1017,6 +1017,7 @@ function PanelApp() {
       if (!transcript) throw new Error('没有识别到语音，请靠近麦克风后重试');
       // Preserve edits made while transcription/correction was in flight.
       setPrompt(current => [current.trim(), transcript].filter(Boolean).join(' '));
+      if (payload.correction?.status === 'unavailable') setError('当前模式的文字纠错暂不可用，已保留语音识别原文');
     } catch (reason) {
       if (voiceSession === voiceSessionRef.current) {
         setCanImportRecording(true);

@@ -124,6 +124,11 @@ export function createRelayServer(options = {}) {
   });
 
   const parseBody = express.raw({ type: () => true, limit: maxBodyBytes, inflate: false });
+  if (routing) {
+    for (const [route, file] of Object.entries({view:'controller.html', 'controller.css':'controller.css', 'live-capture.js':'live-capture.js', 'controller-bootstrap.js':'controller-bootstrap.js', 'relay-transport.js':'relay-transport.js'})) {
+      app.get('/api/desktop-controller/' + route, (_req, res) => { res.set('Cache-Control', 'no-store'); res.sendFile(path.join(distDir, file)); });
+    }
+  }
   app.use('/api', (req, res, next) => {
     const ip = clientIp(req);
     const pairing = /^\/pair\/?$/i.test(req.path);
@@ -198,9 +203,15 @@ export function createRelayServer(options = {}) {
   app.get(['/', '/app'], (req, res, next) => {
     const requested = String(req.query.relay || '');
     if (!requested) return next();
-    if (routing && /^[A-Za-z0-9_-]{43}$/.test(requested)) return next();
+    if (routing && /^[A-Za-z0-9_-]{43}$/.test(requested)) {
+      if (req.query.next === 'controller') return res.redirect(`/api/desktop-controller/view?relay=${encodeURIComponent(requested)}${req.query.pair ? '&pair=' + encodeURIComponent(String(req.query.pair)) : ''}`);
+      return next();
+    }
     if (!connectors.has(requested)) return res.status(503).type('html').send('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>电脑未连接 · Vibe Panel</title><body style="font:16px/1.8 system-ui,sans-serif;background:#f1f3ee;color:#1c211c;margin:0"><main style="max-width:600px;margin:60px auto;padding:0 24px"><h1>电脑 Connector 未连接</h1><p>请唤醒电脑并重新打开 Vibe Panel Connector，保持终端窗口运行。终端显示已连接后，刷新此页面。</p><p>已经配对的设备通常无需重新配对。如果这是首次配对且配对码已过期，请使用电脑上新生成的链接。</p><p><a href="/download">查看安装与启动说明</a></p></main></body></html>');
     res.setHeader('Set-Cookie', `vibe_relay_connector=${encodeURIComponent(requested)}; HttpOnly; SameSite=Lax; Secure; Path=/; Max-Age=31536000`);
+    // A fixed destination lets a new phone pair inside the remote without a
+    // second scan. Never accept arbitrary redirect destinations.
+    if (req.query.next === 'controller') return res.redirect(`/api/desktop-controller/view${req.query.pair ? '?pair=' + encodeURIComponent(String(req.query.pair)) : ''}`);
     const pairingCode = String(req.query.pair || '');
     res.redirect(pairingCode ? `/app?pair=${encodeURIComponent(pairingCode)}` : '/app');
   });

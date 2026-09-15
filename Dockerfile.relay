@@ -8,6 +8,7 @@ COPY index.html tsconfig*.json vite.config.ts ./
 COPY src ./src
 COPY public ./public
 COPY server ./server
+COPY scripts/sync-controller-styles.mjs ./scripts/sync-controller-styles.mjs
 RUN npm run build
 
 FROM node:24-alpine

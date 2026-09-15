@@ -66,7 +66,7 @@ async function provision() {
 }
 
 export async function initializeRelayTransport() {
-  if (!['/', '/app'].includes(location.pathname)) return;
+  if (!['/', '/app', '/api/desktop-controller/view', '/controller.html'].includes(location.pathname)) return;
   try {
     const response = await nativeFetch('/relay/config', { cache: 'no-store', signal: AbortSignal.timeout(3000) });
     const config = await response.json();
@@ -89,7 +89,8 @@ export async function apiFetch(input: string, init: RequestInit = {}): Promise<R
   if (!active || !input.startsWith('/api/')) return nativeFetch(input, init);
   const method = (init.method || 'GET').toUpperCase();
   const mutation = !['GET', 'HEAD'].includes(method);
-  const noReplay = ['/api/pair', '/api/relay-tickets', '/api/relay-authorize', '/api/pairing-codes'].includes(input);
+  const controllerPage = ['/api/desktop-controller/view', '/controller.html'].includes(location.pathname);
+  const noReplay = ['/api/pair', '/api/relay-tickets', '/api/relay-authorize', '/api/pairing-codes'].includes(input) || input.startsWith('/api/desktop-controller/') || controllerPage;
   const requestHeaders = headersFor(init);
   const originalInstance = instanceId;
   if (mutation && !noReplay && instanceId) {
@@ -99,7 +100,7 @@ export async function apiFetch(input: string, init: RequestInit = {}): Promise<R
   // Fail a stalled health/job poll before the UI monitor's 10s cancellation,
   // leaving time to select a standby. Otherwise a blackholed node would keep
   // being retried forever because every caller abort looked like navigation.
-  const timeout = mutation ? 180000 : input === '/api/jobs' || input === '/api/health' ? 6000 : 15000;
+  const timeout = mutation ? 180000 : input === '/api/desktop-controller/status' ? 3000 : input === '/api/jobs' || input === '/api/health' ? 6000 : 15000;
   const requestSignal = () => init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout);
   const options = { ...init, headers: requestHeaders, signal: requestSignal() };
   let response: Response | undefined;
@@ -122,7 +123,7 @@ export async function apiFetch(input: string, init: RequestInit = {}): Promise<R
     if (health.paired) void provision();
   }
   if (response.ok && input === '/api/pair') { lastProvision = 0; await provision(); }
-  if (response.ok && input === '/api/jobs') void provision();
+  if (response.ok && (input === '/api/jobs' || input === '/api/desktop-controller/status')) void provision();
   return response;
 }
 

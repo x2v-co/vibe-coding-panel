@@ -33,6 +33,16 @@ with zipfile.ZipFile(sys.argv[1]) as z:
   assert.equal(report.ok, true);
   assert.equal(report.bundle.version, metadata.version);
   assert.ok(!report.checks.some(check => check.name === 'npm'));
+  const controllerHelp = spawnSync(runtime, ['scripts/controller.mjs', '--help'], {cwd:app, env, encoding:'utf8', timeout:10000});
+  assert.equal(controllerHelp.status, 0, controllerHelp.stderr);
+  assert.match(controllerHelp.stdout, /统一外设控制中心/);
+  const controllerCheck = spawnSync(runtime, ['scripts/launch.mjs', '--controller', '--claude', '--check'], {cwd:app, env, encoding:'utf8', timeout:15000});
+  assert.equal(controllerCheck.status, 0, controllerCheck.stderr + controllerCheck.stdout);
+  assert.match(controllerCheck.stdout, /Claude Code 登录：已登录/);
+  assert.ok(!controllerCheck.stdout.includes('OK agent login'), 'controller mode must use its own target diagnostics');
+  for (const file of ['public/controller.html', 'public/controller.css', 'public/controller-bootstrap.js', 'public/relay-transport.js', 'public/claude-console.html', 'scripts/controller-check.mjs', 'scripts/desktop-controller.swift', 'scripts/claude-desktop-controller.swift', 'scripts/live-whisper.py']) {
+    assert.ok((await readFile(path.join(app,file))).length > 0, `Missing controller runtime: ${file}`);
+  }
   const checks = spawnSync(process.execPath, ['--test', 'scripts/acceptance.test.mjs'], { cwd: root, env: { ...env, PANEL_ACCEPTANCE_ROOT: app }, stdio: 'inherit', timeout: 120000 });
   assert.equal(checks.status, 0, 'Extracted package acceptance failed');
   console.log('Portable launcher, no-global-Node/npm diagnostics, pairing and task execution passed.');

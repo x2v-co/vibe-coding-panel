@@ -81,11 +81,11 @@ async function printPairingUrl(mobileUrl) {
 }
 
 const { connectorId, connectorCredential } = await loadConnectorId();
-const mobileUrl = `${publicOrigin}/app?relay=${encodeURIComponent(connectorId)}`;
-verifyLocalAgents();
+const mobileUrl = `${publicOrigin}/app?relay=${encodeURIComponent(connectorId)}${process.env.PANEL_DESKTOP_CONTROLLER === '1' ? '&next=controller' : ''}`;
+if (process.env.PANEL_DESKTOP_CONTROLLER !== '1') verifyLocalAgents();
 if (!['1', 'true'].includes(String(process.env.PANEL_CONNECTOR_NO_SERVER || '').toLowerCase())) {
   serverProcess = spawn(process.execPath, ['server/index.js'], {
-    env: { ...process.env, PANEL_REQUIRE_PAIRING: '1', PANEL_PUBLIC_URL: mobileUrl, PANEL_RELAY_URLS: origins.join(',') },
+    env: { ...process.env, PANEL_REQUIRE_PAIRING: '1', PANEL_PUBLIC_URL: mobileUrl, PANEL_RELAY_URLS: origins.join(','), PANEL_RELAY_PUBLIC_URL: publicOrigin },
     stdio: 'inherit',
   });
   serverProcess.on('exit', (code) => {

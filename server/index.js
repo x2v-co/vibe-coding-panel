@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url';
 import { PairingStore, isLoopbackRequest, deviceToken } from './pairing.js';
 import { buildWhisperArgs, resolveWhisperModel, resolveWhisperTimeout, resolveWhisperBackend, resolveWhisperBinary, speechConfiguration } from './whisper-options.js';
 import { managedSpeechEnv } from './managed-speech.js';
+import { controllerSpeechEnv } from './controller-speech-config.js';
+if (process.env.PANEL_DESKTOP_CONTROLLER === '1') Object.assign(process.env, controllerSpeechEnv());
 Object.assign(process.env, managedSpeechEnv());
 import { resolveFfmpeg } from './ffmpeg.js';
 import { decodeRecording } from './audio-decode.js';
@@ -23,6 +25,10 @@ import { connectorRelayConfig } from './relay-config.js';
 import { installRelayAuthorization } from './relay-authorization.js';
 import { requestDeduplication } from './request-deduplication.js';
 const deduplication = requestDeduplication();
+import { DesktopController, desktopControllerRouter } from './desktop-controller.js';
+import { LiveSpeech } from './live-speech.js';
+import { ManagedClaude } from './managed-claude.js';
+import { ControllerHub } from './controller-hub.js';
 
 const app = express();
 const port = Number(process.env.PANEL_API_PORT || 8787);
@@ -582,6 +588,59 @@ app.delete('/api/devices/:id', async (req, res) => {
   res.status(revoked ? 200 : 404).json(revoked ? { ok: true } : { error: '设备不存在' });
 });
 
+// The controller serves a public pairing shell; its router independently
+// authenticates every status/control endpoint, even when Panel pairing is off.
+const controllerTarget = process.env.PANEL_CONTROLLER_TARGET || 'codex-app';
+let controllerHub;
+if (process.env.PANEL_DESKTOP_CONTROLLER === '1' && !['codex-app', 'claude-code', 'claude-app'].includes(controllerTarget)) throw new Error('不支持的外设目标');
+if (process.env.PANEL_DESKTOP_CONTROLLER === '1' && (process.platform === 'darwin' || controllerTarget === 'claude-code')) {
+  const unified = process.env.PANEL_CONTROLLER_UNIFIED === '1';
+  const managed = unified || controllerTarget === 'claude-code' ? new ManagedClaude({stateFile:process.env.PANEL_MANAGED_STATE || ((process.env.PANEL_DEVICE_STORE || path.join(appRoot,'.vibe-panel/controller-devices.json')) + '.managed.json')}) : null;
+  const restoredManaged = managed ? await managed.restoreSaved() : false;
+  if (!restoredManaged && unified && managed && process.env.PANEL_CONTROLLER_RESTORE) {
+    try {
+      const snapshot = JSON.parse(await readFile(process.env.PANEL_CONTROLLER_RESTORE,'utf8'));
+      await managed.restore(snapshot);
+      managed.checkpoint();
+      await rm(process.env.PANEL_CONTROLLER_RESTORE);
+    } catch(error) { if (error.code !== 'ENOENT') throw error; }
+  }
+  const liveSpeech = process.env.PANEL_LIVE_SPEECH === '1' ? new LiveSpeech() : null;
+  liveSpeech?.start();
+  process.once('exit', () => { liveSpeech?.close(); managed?.close(); });
+  process.once('SIGTERM', () => { liveSpeech?.close(); managed?.close(); process.exit(0); });
+  process.once('SIGINT', () => { liveSpeech?.close(); managed?.close(); process.exit(0); });
+  let controller = new DesktopController({ title: process.env.PANEL_DESKTOP_THREAD?.trim() || '',
+    ...(controllerTarget === 'claude-app' ? { provider: 'claude', target: 'claude-app' } : {}),
+    ...(managed ? { driver: request => managed.driver(request), provider: 'claude', target: 'claude-code' } : {}) });
+  if (managed) managed.onClosed = () => { controller.binding = null; };
+  if (unified) {
+    const code = new DesktopController({title:'',provider:'claude',target:'claude-code',driver:r=>managed.driver(r)});
+    const controllers = {'claude-code':code};
+    if (process.platform === 'darwin') {
+      controllers['codex-app'] = new DesktopController({title:'',target:'codex-app'});
+      controllers['claude-app'] = new DesktopController({title:'',target:'claude-app',provider:'claude'});
+    }
+    controller = controllerHub = new ControllerHub(controllers,controllerTarget,(process.env.PANEL_DEVICE_STORE || path.join(appRoot,'.vibe-panel/controller-devices.json')) + '.target.json');
+    managed.onClosed = () => { code.binding = null; };
+  }
+  app.use('/api/desktop-controller', desktopControllerRouter({
+    controller,
+    managed,
+    connectionInfo: async () => {
+      const identity = JSON.parse(await readFile(process.env.PANEL_RELAY_STATE || path.join(appRoot,'.vibe-panel/controller-relay.json'),'utf8'));
+      if (!/^[A-Za-z0-9_-]{43}$/.test(identity.connectorId)) throw new Error('连接信息不可用');
+      const url = new URL(connectorRelayConfig().publicOrigin);
+      if (url.protocol === 'wss:') url.protocol = 'https:';
+      if (url.protocol === 'ws:') url.protocol = 'http:';
+      return {entry:`${url.origin}/app?relay=${identity.connectorId}&next=controller`,controller:`${url.origin}/api/desktop-controller/view?relay=${identity.connectorId}`};
+    },
+    authenticate: authenticatedDevice,
+    correctTranscript,
+    liveSpeech,
+  }));
+}
+
 app.use('/api', async (req, res, next) => {
   if (!pairingRequired || isLoopbackRequest(req)) return next();
   try {
@@ -601,13 +660,19 @@ app.get('/api/diagnostics', async (req, res) => {
   catch { res.status(503).json({ error: '版本诊断暂时不可用，请稍后重试或重启电脑 Connector' }); }
 });
 
+
 app.post('/api/transcriptions', async (req, res) => {
   try {
+    const expectedBinding = req.body?.bindingId;
+    if (controllerHub && (!expectedBinding || expectedBinding !== controllerHub.status().bindingId)) return res.status(409).json({error:'电脑目标已变化，请刷新连接并确认目标后再录音'});
+    const provider = process.env.PANEL_DESKTOP_CONTROLLER === '1' ? (controllerHub?.provider || (controllerTarget === 'codex-app' ? 'codex' : 'claude')) : (req.body?.agentProvider || defaultProvider);
+    if (!['codex', 'claude'].includes(provider)) return res.status(400).json({ error: '不支持的纠错模式' });
     const started = Date.now();
     const original = await transcribeAudio(req.body?.audio, req.body?.language);
     // Leave room to deliver the original text before the Relay's 60s deadline.
-    const text = await correctTranscript(original, { timeoutMs: 50000 - (Date.now() - started) });
-    res.json({ text });
+    let correctionStatus = 'skipped';
+    const text = controllerHub && expectedBinding !== controllerHub.status().bindingId ? original : await correctTranscript(original, { provider, timeoutMs: 50000 - (Date.now() - started), onStatus: status => { correctionStatus = status; } });
+    res.json({ text, correction: { provider, status: correctionStatus } });
   } catch (error) {
     const failure = error.status ? error : speechFailure(error);
     res.status(failure.status).json({ error: failure.message, code: failure.code || 'INVALID_RECORDING' });

@@ -13,6 +13,7 @@ if (process.argv.includes('--setup-voice')) {
 const require = createRequire(import.meta.url);
 const json = process.argv.includes('--json');
 const doctor = process.argv.includes('--doctor');
+const controller = process.argv.includes('--controller');
 let bundle;
 try { bundle = require('../bundle.json'); } catch {}
 const checks = [];
@@ -32,7 +33,7 @@ if (!bundle && !doctor && checks.every(c => c.ok) && !dependencies()) {
 add('dependencies', dependencies(), bundle ? 'Re-download and fully extract the Connector ZIP; runtime files are missing.' : 'Run npm ci in the project directory.');
 let selectedPort;
 const requested = Number(process.env.PANEL_API_PORT || 8787);
-for (const port of [requested, 8800, 8801, 8802, 8810, 8811]) {
+for (const port of controller ? [] : [requested, 8800, 8801, 8802, 8810, 8811]) {
   if (!Number.isInteger(port) || port < 1 || port > 65535) continue;
   const available = await new Promise(resolve => {
     const socket = net.createServer();
@@ -41,8 +42,8 @@ for (const port of [requested, 8800, 8801, 8802, 8810, 8811]) {
   });
   if (available) { selectedPort = port; break; }
 }
-add('local port', Boolean(selectedPort), 'Close another Connector or set PANEL_API_PORT to an unused port.');
-if (dependencies()) {
+if (!controller) add('local port', Boolean(selectedPort), 'Close another Connector or set PANEL_API_PORT to an unused port.');
+if (dependencies() && !controller) {
   const { managedSpeechEnv } = await import('../server/managed-speech.js');
   Object.assign(process.env, managedSpeechEnv());
   const { probeAgentProviders } = await import('../server/agent-providers.js');
@@ -67,7 +68,11 @@ else for (const check of checks) {
   } else console.log(`${check.ok ? 'OK' : 'FAIL'} ${check.name}${check.revision ? ': ' + check.revision.slice(0, 8) : ''}${check.next ? ': ' + check.next : ''}`);
 }
 if (!ok) process.exit(1);
-if (!doctor) {
+if (controller) {
+  process.argv = process.argv.filter(arg => !['--controller', '--doctor', '--json'].includes(arg));
+  if (doctor && !process.argv.includes('--check')) process.argv.push('--check');
+  await import('./controller.mjs');
+} else if (!doctor) {
   process.env.PANEL_API_PORT = String(selectedPort);
   await import('./connect.mjs');
 }

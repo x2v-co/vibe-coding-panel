@@ -6,6 +6,12 @@ Control your computer's Codex or Claude Code from your phone. Speak a request, c
 
 No Vibe Panel account, personal server, Tailscale, or tunnel setup is needed. The Connector runs on your computer and connects to the shared Relay at `https://vibe.toolkit.fun`. Your agent keeps using its existing login and model provider.
 
+## Desktop controller
+
+Use `npm run connect -- --controller` to bind a desktop conversation and send text or voice from your phone. macOS supports Codex App and Claude App; Claude Code uses a managed desktop console. The regular Panel remains available through `npm run connect`.
+
+See the [controller setup, pairing and recovery guide](docs/controller-quickstart.md). Portable ZIP launchers also accept `--controller`; no separate npm installation is needed.
+
 ## Install with your Agent
 
 Paste this into Codex, Claude Code, or another coding agent **running on your computer**:

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — integrated controller and regional Relay
+
+- Add an explicit desktop-controller mode to source and portable launchers, with macOS App binding and a managed Claude Code console.
+- Include controller pages, native drivers and speech worker in portable packages.
+- Share regional Relay settings and transport; preserve one-scan controller routing and never automatically replay controller mutations.
+- Keep pairing, target binding, draft conflict checks and managed-session recovery behind their existing local/remote authorization boundaries.
+- Document installation and support limits independently of machine-specific prototype records.
+
+
 Portable packages use package version 0.1.0 plus an exact Git revision. Each
 `relay-<40-character revision>` GitHub Release identifies its source and ships
 four Connector ZIPs, the Relay image, SHA256SUMS and version-specific notes.

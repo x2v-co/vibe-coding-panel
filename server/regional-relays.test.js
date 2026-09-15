@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import http from 'node:http';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -90,4 +90,22 @@ test('two regions share device revocation and deduplication, isolate disconnects
     await Promise.all([...relays.map(relay => relay.server), api].map(server => new Promise(resolve => server.close(resolve))));
     await rm(folder, { recursive: true, force: true });
   }
+});
+
+
+test('regional controller scan preserves identity and pairing code and serves an offline pairing shell', async t => {
+  const folder = await mkdtemp(path.join(tmpdir(), 'vibe-controller-shell-'));
+  await writeFile(path.join(folder, 'controller.html'), '<title>Controller pairing shell</title>');
+  const relay = createRelayServer({routing:true, distDir:folder});
+  const port = await listen(relay.server);
+  t.after(async () => { await new Promise(resolve => relay.server.close(resolve)); await rm(folder,{recursive:true,force:true}); });
+  const base = `http://127.0.0.1:${port}`;
+  const id = 'a'.repeat(43);
+  const response = await fetch(`${base}/app?relay=${id}&next=controller&pair=ABCD1234`, {redirect:'manual'});
+  assert.equal(response.status, 302);
+  assert.equal(response.headers.get('location'), `/api/desktop-controller/view?relay=${id}&pair=ABCD1234`);
+  const shell = await fetch(base + response.headers.get('location'));
+  assert.equal(shell.status,200);
+  assert.match(await shell.text(), /Controller pairing shell/);
+  assert.equal((await fetch(`${base}/api/desktop-controller/status`)).status, 503);
 });

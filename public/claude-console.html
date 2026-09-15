@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Claude Code · Vibe 电脑控制台</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101820;color:#edf2f4;font:16px system-ui;padding:28px}main{max-width:1100px;margin:auto}h1{font-size:25px}.muted{color:#a9bac5}input,textarea{width:100%;background:#192832;color:white;border:1px solid #537080;border-radius:9px;padding:12px;font:16px system-ui}textarea{min-height:150px}button{background:#d7ff7b;color:#172018;border:0;border-radius:9px;padding:12px 18px;font:600 15px system-ui;margin:10px 10px 10px 0;cursor:pointer}button:disabled{opacity:.4}pre{height:42vh;overflow:auto;background:#192832;padding:18px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere}#error{color:#ffbcae}article{border:1px solid #537080;border-radius:9px;padding:14px;margin:10px 0}article pre{height:auto;max-height:220px}a{color:#d7ff7b}
+body{background:#eeefeb;color:#171917}h1{letter-spacing:-.7px}.muted{color:#71756f}input,textarea{background:#fff;color:#171917;border-color:#a9b1a7}button{background:#242b25;color:#f4f7ef;border-radius:10px}pre{background:#151816;color:#c7ddc7;border:1px solid #353c35}article{background:#f9faf7;border-color:#ccd1c8}#error{color:#a13622}a{color:#395e3f}body.embedded{padding:22px}body.embedded h1{font-size:21px}body.embedded main>p:last-of-type{margin-bottom:0}</style><main>
+<h1>Claude Code 电脑控制台</h1><p class="muted">手机分段录音，完整草稿在这里。发送后由 Claude Code 处理，授权和回复也在电脑查看。</p>
+<label for="cwd">工作目录（绝对路径）</label><input id="cwd" placeholder="/Users/你的用户名/项目目录">
+<button id="start">创建会话并绑定手机</button><button id="stop" disabled>停止会话</button>
+<p id="status" role="status">尚未创建会话</p><pre id="output" aria-label="Claude Code 输出"></pre>
+<section id="permissions" aria-label="待处理授权"></section>
+<section id="recovery" hidden><p>已恢复上次会话和草稿。请核对电脑上的任务结果，确认后继续。</p><pre id="last-submission"></pre><button id="recover">已核对，恢复会话（不重发）</button></section><label for="draft">电脑草稿</label><textarea id="draft" disabled placeholder="手机录音后文字会追加到这里，也可在电脑编辑"></textarea>
+<button id="save" disabled>保存电脑修改</button><button id="send" disabled>发送草稿</button>
+<p class="muted">电脑编辑后先保存；如手机同时更新了草稿，会提示冲突并保留你的编辑。</p>
+<button id="reload">放弃未保存编辑，读取电脑草稿</button>
+<p><a href="/api/desktop-controller/view">手机连接与配对</a></p><p id="error" role="alert"></p>
+</main><script>
+if (new URL(location.href).searchParams.get('embed') === '1') document.body.classList.add('embedded');
+const $ = id => document.getElementById(id), base = '/api/desktop-controller';
+let state, expected, dirty = false, busy = false, polling = null;
+async function api(path, body) {
+  const response = await fetch(base + path, body === undefined ? { cache:'no-store' } : { method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body) });
+  const result = await response.json(); if (!response.ok) throw new Error(result.error || '操作失败'); return result;
+}
+function render() {
+  $('start').disabled = busy || state?.active; $('stop').disabled = busy || !state?.active;
+  $('draft').disabled = busy || !state?.active; $('save').disabled = busy || !state?.active || !dirty;
+  $('recovery').hidden = !state?.active || !state?.recoveryRequired; $('recover').disabled = busy;
+  $('last-submission').textContent = state?.lastSubmission ? '中断前提交的指令（不会重发）：\n' + state.lastSubmission : '上次进程状态需要确认。';
+  $('send').disabled = busy || state?.recoveryRequired || !state?.active || state?.running || !$('draft').value.trim();
+  $('cwd').disabled = !!state?.active; $('reload').disabled = busy;
+}
+async function refresh() {
+  const next = await api('/managed/state'); state = next;
+  if (!dirty) { $('draft').value = next.text || ''; expected = next.controller; }
+  $('status').textContent = next.active ? `${next.title} · ${next.recoveryRequired ? '需要核对恢复' : next.permissions.length ? '等待电脑授权' : next.running ? '处理中，可继续准备下一段草稿' : '准备输入'}` : next.error || '尚未创建会话';
+  if ($('output').textContent !== (next.output || '')) { $('output').textContent = next.output || ''; $('output').scrollTop = $('output').scrollHeight; }
+  $('permissions').replaceChildren();
+  for (const request of next.permissions || []) {
+    const article = document.createElement('article'), title = document.createElement('strong'), detail = document.createElement('pre');
+    title.textContent = 'Claude Code 请求使用：' + request.tool; detail.textContent = JSON.stringify(request.input,null,2);
+    article.append(title,detail);
+    for (const allow of [true,false]) {
+      const button = document.createElement('button'); button.textContent = allow ? '允许本次操作' : '拒绝'; button.disabled = busy;
+      button.onclick = () => task(() => api('/managed/permission',{sessionId:next.id,requestId:request.id,allow})); article.append(button);
+    }
+    $('permissions').append(article);
+  }
+  render();
+}
+async function task(fn) {
+  if (busy) return; busy = true; $('error').textContent = ''; render();
+  try { if (polling) await polling; await fn(); await refresh(); } catch(error) { $('error').textContent = error.message; }
+  finally { busy = false; render(); }
+}
+async function command(action, text) {
+  if (!expected?.bound) throw new Error('请在连接页重新绑定当前控制台');
+  const next = await api('/command',{bindingId:expected.bindingId,revision:expected.revision,eventId:crypto.randomUUID(),action,text});
+  expected = next; return next;
+}
+async function save() { if (dirty) { await command('write',$('draft').value); dirty = false; } }
+$('draft').oninput = () => { dirty = true; render(); };
+$('save').onclick = () => task(save);
+$('send').onclick = () => task(async () => { await save(); await command('send'); });
+$('reload').onclick = () => task(async () => { dirty = false; });
+$('start').onclick = () => task(async () => { if (dirty) throw new Error('请先保存或放弃电脑编辑'); await api('/managed/start',{cwd:$('cwd').value.trim()}); });
+$('recover').onclick = () => task(async()=>{if(dirty)throw new Error('请先保存电脑编辑，再恢复会话');await api('/managed/recover',{sessionId:state.id});});
+$('stop').onclick = () => task(() => api('/managed/stop',{sessionId:state.id}));
+async function poll() {
+  if (busy || polling) return;
+  polling = refresh();
+  try { await polling; } catch(error) { $('error').textContent = error.message; }
+  finally { polling = null; render(); }
+}
+setInterval(poll,1500);
+poll();
+</script></html>
