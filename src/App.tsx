@@ -629,6 +629,12 @@ function PanelApp() {
   }, [showSettings]);
 
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('next') === 'controller' && window.location.pathname === '/app') {
+      const params = new URLSearchParams(window.location.search);
+      params.delete('next');
+      window.location.replace(`/api/desktop-controller/view${params.toString() ? `?${params.toString()}` : ''}`);
+      return;
+    }
     if (sessionInitRef.current) return;
     sessionInitRef.current = true;
     const initialize = async () => {
@@ -1521,8 +1527,10 @@ function PanelApp() {
           const state = providers.find((provider) => provider.id === option.id);
           const ready = state?.available && state.authenticated;
           const stateLabel = !state ? '等待检测' : !state.available ? '未安装' : !state.authenticated ? '未登录' : '可用';
-          return <button type="button" key={option.id} aria-pressed={agentProvider === option.id} onClick={() => selectAgentProvider(option.id)} disabled={busy || Boolean(state && !ready)} title={state?.version || option.description}><Terminal size={16} /><span><strong>{option.label}</strong><small className={ready ? 'ready' : ''}>{stateLabel}</small></span></button>;
+          const help = !state ? '正在检测电脑环境' : !state.available ? `${option.id === 'codex' ? '请安装 Codex CLI' : '请安装 Claude Code'}` : !state.authenticated ? `${option.id === 'codex' ? '请在电脑终端运行 codex login' : '请在电脑终端运行 claude auth login'}` : option.description;
+          return <button type="button" key={option.id} aria-pressed={agentProvider === option.id} onClick={() => selectAgentProvider(option.id)} disabled={busy || Boolean(state && !ready)} title={help}><Terminal size={16} /><span><strong>{option.label}</strong><small className={ready ? 'ready' : ''}>{stateLabel}</small></span></button>;
         })}</div>
+        <p className="agent-help">状态来自电脑 Connector。Codex 未登录时，在电脑终端运行 <code>codex login</code>；Claude Code 未登录时运行 <code>claude auth login</code>，完成后重启 Connector。</p>
       </fieldset>}
 
       {!pairingAdmin && <fieldset className="pairing-fieldset">

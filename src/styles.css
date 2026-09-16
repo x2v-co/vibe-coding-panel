@@ -706,6 +706,8 @@ i.micro-keycap-glyph { background: currentColor; mask-size: contain; mask-positi
 .agent-options strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .agent-options small { color: #858d86; font-size: 8px; }
 .agent-options small.ready { color: var(--green); }
+.agent-help { margin: 10px 0 0; color: #858d86; font-size: 9px; line-height: 1.55; }
+.agent-help code { color: #c6d1c7; font-family: 'DM Mono', monospace; }
 
 .pairing-fieldset { margin: 0 0 20px; padding: 0 0 20px; border: 0; border-bottom: 1px solid #353b36; }
 .pairing-fieldset legend { margin-bottom: 8px; color: #8e968e; font-size: 11px; }
