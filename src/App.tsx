@@ -1023,7 +1023,11 @@ function PanelApp() {
       if (!transcript) throw new Error('没有识别到语音，请靠近麦克风后重试');
       // Preserve edits made while transcription/correction was in flight.
       setPrompt(current => [current.trim(), transcript].filter(Boolean).join(' '));
-      if (payload.correction?.status === 'unavailable') setError('当前模式的文字纠错暂不可用，已保留语音识别原文');
+      if (payload.correction?.status === 'unavailable') {
+        setError(agentProvider === 'codex'
+          ? 'Codex 语音已识别，但当前登录方式不支持自动校对，已保留原文。若要启用校对，请在电脑配置 OPENAI_API_KEY 后重启 Connector。'
+          : 'Claude Code 的文字校对暂不可用，已保留语音识别原文；请检查 Claude 登录状态后重试。');
+      }
     } catch (reason) {
       if (voiceSession === voiceSessionRef.current) {
         setCanImportRecording(true);
