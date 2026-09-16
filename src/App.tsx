@@ -1025,7 +1025,7 @@ function PanelApp() {
       setPrompt(current => [current.trim(), transcript].filter(Boolean).join(' '));
       if (payload.correction?.status === 'unavailable') {
         setError(agentProvider === 'codex'
-          ? 'Codex 语音已识别，但当前登录方式不支持自动校对，已保留原文。若要启用校对，请在电脑配置 OPENAI_API_KEY 后重启 Connector。'
+          ? 'Codex 文字校对暂未完成，已保留语音识别原文。请检查电脑上的 Codex CLI 登录和网络状态后重试。'
           : 'Claude Code 的文字校对暂不可用，已保留语音识别原文；请检查 Claude 登录状态后重试。');
       }
     } catch (reason) {

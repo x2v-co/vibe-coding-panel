@@ -1,7 +1,8 @@
-import { readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
+import { readFile, mkdtemp, rm } from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { CodexRuntime } from './codex-runtime.js';
+import spawn from 'cross-spawn';
 
 // Read resolved Codex settings without starting a task or touching its session.
 export async function readCodexCorrectionConfig(env = process.env, { timeoutMs = 25000 } = {}) {
@@ -41,6 +42,10 @@ export async function codexCorrectionConfig(env = process.env, readConfig = read
 }
 
 export async function runCodexCorrection(text, instructions, { env = process.env, timeoutMs = 25000, fetchImpl = fetch, resolveConfig = codexCorrectionConfig } = {}) {
+  // Normal requests always use Codex's own authentication and provider resolution.
+  if (resolveConfig === codexCorrectionConfig) {
+    return runCodexCliCorrection(text, instructions, { env, timeoutMs });
+  }
   const started = Date.now();
   const config = await resolveConfig(env, undefined, { timeoutMs });
   const remaining = timeoutMs - (Date.now() - started);
@@ -66,4 +71,38 @@ export async function runCodexCorrection(text, instructions, { env = process.env
   const content = payload.output.filter(item => item.type === 'message').flatMap(item => item.content || []);
   if (content.some(item => item.type !== 'output_text')) throw new Error('Codex 纠错未返回文本');
   return JSON.stringify({ result: content.map(item => item.text).join('') });
+}
+
+export async function runCodexCliCorrection(text, instructions, { env = process.env, timeoutMs = 25000, readConfig = readCodexCorrectionConfig } = {}) {
+  const started = Date.now();
+  const config = await readConfig(env, { timeoutMs });
+  const cwd = await mkdtemp(path.join(tmpdir(), 'vibe-codex-correction-'));
+  try {
+  return await new Promise((resolve, reject) => {
+    const command = env.PANEL_CODEX_BIN || 'codex';
+    const overrides = { approval_policy: 'never', web_search: 'disabled', project_doc_max_bytes: 0, developer_instructions: instructions, 'features.shell_tool': false, 'features.unified_exec': false, 'features.js_repl': false, 'features.apps': false, 'features.hooks': false };
+    for (const name of Object.keys(config.mcp_servers || {})) overrides[`mcp_servers.${JSON.stringify(name)}.enabled`] = false;
+    for (const name of Object.keys(config.plugins || {})) overrides[`plugins.${JSON.stringify(name)}.enabled`] = false;
+    const args = ['exec', '--json', '--ephemeral', '--sandbox', 'read-only', '--skip-git-repo-check', ...Object.entries(overrides).flatMap(([key, value]) => ['-c', `${key}=${JSON.stringify(value)}`]), '-'];
+    const child = spawn(command, args, { cwd, env, stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true });
+    let output = '', settled = false;
+    const finish = (error, value) => { if (settled) return; settled = true; clearTimeout(timer); error ? reject(error) : resolve(value); };
+    const timer = setTimeout(() => { child.kill('SIGKILL'); finish(new Error('Codex 纠错超时')); }, Math.max(1, timeoutMs - (Date.now() - started)));
+    child.stdin.on('error', error => finish(error));
+    child.stdout.on('data', chunk => { output += chunk.toString(); if (output.length > 65536) { child.kill('SIGKILL'); finish(new Error('Codex 纠错响应过大')); } });
+    child.once('error', error => finish(error));
+    child.once('close', code => {
+      if (code !== 0) return finish(new Error('Codex CLI 纠错不可用'));
+      try {
+        const events = output.trim().split(/\r?\n/).map(line => JSON.parse(line));
+        if (!events.some(event => event.type === 'turn.completed') || events.some(event => ['turn.failed', 'error'].includes(event.type) || (event.item && !['agent_message', 'reasoning'].includes(event.item.type)))) throw new Error('Codex 纠错结果不完整');
+        const message = [...events].reverse().find(event => event.type === 'item.completed' && event.item?.type === 'agent_message');
+        const result = message?.item?.text || message?.item?.content;
+        if (typeof result !== 'string' || !result.trim()) throw new Error('Codex 纠错结果为空');
+        finish(null, JSON.stringify({ result }));
+      } catch (error) { finish(error); }
+    });
+    child.stdin.end(`${instructions}\n\n${JSON.stringify({ transcript: text })}`);
+  });
+  } finally { await rm(cwd, { recursive: true, force: true }); }
 }

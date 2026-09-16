@@ -104,3 +104,26 @@ test('mode switches route each request and failure never retries a different pro
   assert.ok(!correctionArgs({}).includes('--model'));
   await assert.rejects(correctWithProvider('原文', { provider: 'unknown' }), /Unsupported/);
 });
+
+test('CLI correction inherits authentication, isolates workspace, and rejects failed/tool turns', { skip: process.platform === 'win32' }, async t => {
+  const { runCodexCliCorrection } = await import('./codex-correction.js');
+  const dir = await mkdtemp(path.join(tmpdir(), 'correction-cli-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const bin = path.join(dir, 'codex');
+  await writeFile(bin, `#!${process.execPath}
+const assert = require('node:assert/strict');
+assert.notEqual(process.cwd(), process.env.WORKSPACE);
+assert.equal(process.env.CODEX_HOME, 'existing-login-home');
+assert.ok(process.argv.includes('--ephemeral'));
+assert.ok(process.argv.includes('features.shell_tool=false'));
+assert.ok(process.argv.includes('plugins."example".enabled=false'));
+process.stdin.resume();
+process.stdin.on('end', () => {
+ console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'{"text":"请回复收到"}'}}));
+ if(process.env.SCENARIO==='tool') console.log(JSON.stringify({type:'item.completed',item:{type:'command_execution'}}));
+ console.log(JSON.stringify({type:process.env.SCENARIO==='failed'?'turn.failed':'turn.completed'}));
+});`, { mode: 0o755 });
+  const options = { env: { PANEL_CODEX_BIN: bin, CODEX_HOME: 'existing-login-home', WORKSPACE: process.cwd() }, readConfig: async () => ({plugins:{example:{enabled:true}}}), timeoutMs: 2000 };
+  assert.equal(JSON.parse(await runCodexCliCorrection('请回复收告', '校对', options)).result, '{"text":"请回复收到"}');
+  for (const SCENARIO of ['failed','tool']) await assert.rejects(runCodexCliCorrection('原文','校对',{...options,env:{...options.env,SCENARIO}}), /不完整/);
+});
