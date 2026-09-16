@@ -959,11 +959,12 @@ footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto
 .site-how { width: min(980px, calc(100% - 56px)); margin: 0 auto; padding: 118px 0; display: grid; grid-template-columns: .8fr 1.2fr; gap: 90px; }
 .site-how h2, .site-cta h2 { margin: 0; font-size: 37px; line-height: 1.2; letter-spacing: 0; }
 .site-steps { display: grid; gap: 0; }
-.site-steps > div { min-height: 90px; padding: 0 0 20px; display: grid; grid-template-columns: 32px 1fr; grid-template-rows: auto 1fr; gap: 0 13px; border-bottom: 1px solid #d1d6ce; }
+.site-steps > div { min-height: 90px; padding: 0 0 20px; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; gap: 0; border-bottom: 1px solid #d1d6ce; }
 .site-steps > div + div { padding-top: 20px; }
 .site-steps b { width: 26px; height: 26px; display: grid; place-items: center; color: #eef4ee; background: #bd5c36; font-family: 'DM Mono', monospace; font-size: 10px; }
 .site-steps strong { align-self: center; font-size: 15px; }
-.site-steps p { grid-column: 2; margin: 7px 0 0; color: #737c74; font-size: 11px; line-height: 1.6; }
+.site-steps p { grid-column: 1; margin: 7px 0 0; color: #737c74; font-size: 11px; line-height: 1.6; }
+.site-steps a { grid-column: 1; justify-self: start; margin-top: 12px; }
 .site-cta { padding: 85px 20px 100px; text-align: center; background: #dce5dc; }
 .site-cta .site-kicker { margin-bottom: 14px; }
 .site-cta > p:not(.site-kicker) { margin: 15px 0 25px; color: #667268; font-size: 12px; }
