@@ -3,6 +3,8 @@
 
 /* QR codes are generated locally and keep a full white quiet zone. */
 .managed-console { margin-top:24px; }
+.controller-nav { display:flex; align-items:center; gap:12px; }
+.controller-nav a { color:inherit; font-size:12px; text-decoration:none; border-bottom:1px solid var(--line); padding-bottom:2px; }
 .managed-console > summary { display:flex; align-items:center; justify-content:space-between; gap:16px; cursor:pointer; padding:18px 20px; border:1px solid var(--line); border-radius:14px; background:#f8faf6; list-style:none; }
 .managed-console > summary::-webkit-details-marker { display:none; }
 .managed-console > summary span { color:var(--muted); font-size:13px; }
