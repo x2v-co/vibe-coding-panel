@@ -1664,7 +1664,7 @@ function LandingPage() {
       <section className="site-how" id="how-it-works"><div><p className="site-kicker">THREE STEPS</p><h2>从打开到完成，<br />只需要一条连接。</h2></div><div className="site-steps"><div><b>1</b><strong>在电脑启动 Connector</strong><p>macOS 或 Windows 双击启动文件，自动检测 Agent、Whisper 和 ffmpeg。</p></div><div><b>2</b><strong>手机打开配对链接</strong><p>Connector 会生成一次性链接，不需要注册账号。</p></div><div><b>3</b><strong>选择项目，开始下令</strong><p>选择 Codex 或 Claude Code，然后用语音或文字创建任务。</p></div></div></section>
       <section className="site-cta"><p className="site-kicker">READY WHEN YOU ARE</p><h2>先在浏览器里试一次。</h2><p>演示模式不会读取文件，也不会运行命令。</p><a className="site-primary-action" href="/app">进入 Vibe Panel <ArrowRight size={17} /></a></section>
     </main>
-    <footer className="site-footer"><span>VIBE PANEL / 2026</span><span><a href="/api/desktop-controller/view">遥控器</a><a href="/download">下载</a><a href="https://github.com/x2v-co/vibe-coding-panel">GitHub</a><a href="/privacy/">隐私</a><a href="/terms/">条款</a></span></footer>
+    <footer className="site-footer"><span>VIBE PANEL / 2026 · <a href="https://toolkit.fun" target="_blank" rel="noreferrer">Toolkit</a></span><span><a href="/api/desktop-controller/view">遥控器</a><a href="/download">下载</a><a href="https://github.com/x2v-co/vibe-coding-panel" target="_blank" rel="noreferrer">GitHub</a><a href="https://aiplans.dev" target="_blank" rel="noreferrer">更多产品</a><a href="/privacy/">隐私</a><a href="/terms/">条款</a></span></footer>
   </div>;
 }
 
