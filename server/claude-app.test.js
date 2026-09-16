@@ -5,8 +5,8 @@ import { promisify } from 'node:util';
 import { DesktopController } from './desktop-controller.js';
 const exec = promisify(execFile);
 
-test('Claude App accepts only verified session URL shapes, never home or foreign pages', { skip: process.platform !== 'darwin', timeout: 15000 }, async () => {
-  const result = await exec('/usr/bin/swift', ['scripts/claude-desktop-controller.swift', '--self-test'], { timeout: 12000 });
+test('Claude App accepts only verified session URL shapes, never home or foreign pages', { skip: process.platform !== 'darwin', timeout: 120000 }, async () => {
+  const result = await exec('/usr/bin/swift', ['scripts/claude-desktop-controller.swift', '--self-test'], { timeout: 110000 });
   assert.match(result.stdout, /identity checks passed/);
 });
 

@@ -97,7 +97,8 @@ test('durable unsent drafts restore without launching a CLI or inventing existin
  const restored=new ManagedClaude({stateFile:file,spawnImpl:()=>{launched++;throw new Error('unexpected launch');}});
  assert.equal(await restored.restoreSaved(),true);assert.equal(restored.snapshot().id,original.id);
  assert.equal(restored.snapshot().text,'尚未发送');assert.equal(restored.session.resume,false);assert.equal(launched,0);
- assert.equal((await stat(file)).mode & 0o777,0o600);
+ // Windows uses inherited ACLs; POSIX mode bits do not describe its access control.
+ if (process.platform !== 'win32') assert.equal((await stat(file)).mode & 0o777,0o600);
 });
 test('an interrupted submitted turn restores only the next draft and requires local acknowledgement',async t=>{
  const file=await statePath(t),f=await fixture({stateFile:file});await f.command('append','已发出的任务');await f.command('send');await f.command('append','下一条草稿');
