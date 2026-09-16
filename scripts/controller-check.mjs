@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { sync as spawnSync } from 'cross-spawn';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
