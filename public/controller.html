@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#eeefeb"><title>Vibe · 外设控制中心</title>
+<!-- Older running Connectors serve updated HTML but only expose CSS through dist. -->
+<link rel="stylesheet" href="/api/desktop-controller/controller.css" onerror="this.onerror=null;this.href='/controller.css'">
+<main id="shell" class="shell device">
+<header class="masthead"><a class="brand" href="/app"><span class="brand-mark">v.</span> vibe panel <span class="edition">REMOTE</span></a><nav class="controller-nav"><a href="/app">任务面板</a><span id="connection-badge" class="badge">连接中</span><button id="open-settings" class="app-icon-button" aria-label="外观与设置"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="16" cy="17" r="3"/></svg></button></nav></header>
+<section class="intro"><p class="eyebrow">YOUR VOICE. YOUR WORKSPACE.</p><h1 id="page-title">说出来，继续工作。</h1><p id="page-subtitle" class="muted">手机负责输入，完整草稿和回复留在电脑。</p></section>
+<div class="hardware-rail device-rail" aria-hidden="true"><span id="template-label">VIBEBAR / TEXT + VOICE</span><div class="speaker-grill"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+<div class="display-bezel"><section class="display"><div class="display-top"><span class="live-dot"></span><span id="target-kind">当前目标</span><span class="display-label">CONNECTED WORKSPACE</span></div><p id="target">正在连接电脑…</p><p id="status" role="status" aria-live="polite">连接中</p><p id="error" role="alert"></p></section></div>
+<section id="desktop-workspace" class="desktop-only" hidden>
+<div class="workspace-grid"><section class="surface target-surface"><div class="section-heading"><span class="step">01</span><h2>当前会话</h2></div><p class="muted">绑定一次，手机随时继续输入。已有草稿保留。</p>
+<div id="desktop-controls" hidden><p id="desktop-instructions" class="muted">在电脑 Codex 选中要控制的会话并点击输入框，再点绑定。已有草稿会保留。</p><button id="adopt" class="primary">绑定当前 Codex 会话（保留草稿）</button><button id="bind" hidden>绑定空白会话</button></div>
+<details id="target-settings" class="desktop-setup-help"><summary>高级设置 · 手动选择客户端</summary><div id="target-options" class="target-options" hidden>
+<button id="target-codex-app" class="target-card"><span class="target-symbol">C</span><span><strong>Codex 桌面</strong><small>直接输入当前 App 会话</small></span><span class="selection-dot"></span></button>
+<button id="target-claude-code" class="target-card"><span class="target-symbol">&gt;_</span><span><strong>Claude Code</strong><small>托管控制台 · 草稿、回复与授权</small></span><span class="selection-dot"></span></button>
+<button id="target-claude-app" class="target-card"><span class="target-symbol">✳</span><span><strong>Claude App</strong><small>目前支持 Code 中的现有会话</small></span><span class="selection-dot"></span></button></div>
+</details>
+<p id="console-link" hidden><a href="/api/desktop-controller/managed/view" target="_blank" rel="noopener">单独打开 Claude Code 控制台 ↗</a></p>
+</section><section class="surface pairing-surface"><div class="section-heading"><span class="step">02</span><h2>连接手机</h2></div><p class="muted">一台电脑，一次配对。切换工作目标无需重新连接。</p><div class="connection-card"><span class="device-icon">▯</span><div><strong>你的随身输入设备</strong><p class="muted">手机扫码打开遥控器；首次使用在设置中输入配对码，之后直接使用。</p></div></div>
+<div class="connection-qr-grid">
+<div class="connection-qr"><img id="mobile-controller-qr" width="176" height="176" alt="手机遥控器二维码" hidden><a id="mobile-controller" href="#" hidden target="_blank" rel="noopener">打开遥控器 ↗</a><p class="muted">扫码打开 · 在设置中连接电脑</p></div>
+</div>
+<button id="pair-code-create" class="secondary">为新手机生成配对码</button><p id="new-pair-code" class="pair-code muted" aria-live="polite">已有配对继续有效</p></section></div>
+<details class="desktop-setup-help"><summary>首次使用 · 连接说明</summary><section class="setup-guide" aria-label="首次使用步骤">
+<div><span class="step">电脑 · 1</span><h2>准备目标与权限</h2><p id="setup-target-help">打开要控制的 App；首次绑定若提示权限不足，请查看下方授权说明。</p></div>
+<div><span class="step">电脑 · 2</span><h2>绑定目标会话</h2><p id="setup-binding-help">打开会话后点击“绑定当前会话”。已有草稿保留。</p></div>
+<div><span class="step">手机 · 3</span><h2>配对后开始输入</h2><p>手机扫码打开遥控器，在设置中输入电脑生成的配对码。允许麦克风后录音。</p></div>
+</section></details>
+<details class="desktop-setup-help"><summary>首次授权与常见问题</summary>
+<p><strong>macOS 辅助功能：</strong>系统设置 → 隐私与安全性 → 辅助功能，允许启动外设服务的终端或宿主应用，例如 Terminal、iTerm 或 Codex。重新启动服务后再绑定。</p>
+<p><strong>Claude Code：</strong>先在电脑安装并登录，可运行 <code>claude auth login</code>。在下方控制台填写项目绝对路径，创建会话。</p>
+<p><strong>手机打不开：</strong>手机使用 HTTPS 连接入口，不能使用电脑的 127.0.0.1 地址。先确认电脑服务仍在运行。</p>
+<p><strong>麦克风：</strong>在手机浏览器的站点权限中允许麦克风。添加到主屏幕后也需在对应入口授权。</p>
+<p><strong>安装检查：</strong>运行 <code>npm run controller -- --check</code>；检查通过后仍需实际绑定与录音验证。</p></details>
+<details id="managed-console" class="managed-console" open hidden>
+<summary><strong>Claude Code 控制台</strong><span class="console-expand">展开控制台</span><span class="console-collapse">收起控制台</span></summary>
+<iframe id="managed-frame" title="Claude Code 电脑控制台" hidden></iframe>
+</details>
+</section>
+<section class="phone-panel">
+
+<div class="record-deck">
+<div class="input-keypad control-bank">
+<button id="key-new" class="extra-key console-key dark vibebar-side-one" aria-disabled="true" title="新建任务尚未支持"><b>＋</b><span>NEW</span></button>
+<button id="key-history" class="extra-key console-key dark vibebar-side-two" aria-disabled="true" title="电脑任务记录尚未支持"><b>↶</b><span>HISTORY</span></button>
+<div class="extra-key vibebar-strip"><button id="key-settings" class="console-key dark" aria-label="打开设置">☷</button><button id="key-workspace" class="console-key dark" aria-label="工作目录请在电脑切换" aria-disabled="true">⌂</button><button id="key-view" class="console-key dark" aria-label="全屏显示">⛶</button><button id="key-history-two" class="console-key dark" aria-label="电脑任务记录尚未支持" aria-disabled="true">↶</button></div>
+<div id="input-dial" class="micro-only micro-control-knob" role="group" aria-label="旋钮：输入控件导航"><button id="dial-left" class="knob-left" aria-label="上一个输入控件">‹</button><button id="dial-push" class="knob-push" aria-label="执行选中的输入控件"><span id="dial-face" class="dial-face"></span></button><button id="dial-right" class="knob-right" aria-label="下一个输入控件">›</button></div>
+<div class="micro-only micro-agent-key slot-1 current-slot" role="img" aria-label="当前绑定会话"><i></i><span>01</span><small>当前会话</small></div>
+<div class="micro-only micro-agent-key slot-2 empty" role="img" aria-label="未分配会话"><i></i><span>02</span><small>未分配</small></div>
+<div class="micro-only micro-agent-key slot-3 empty" role="img" aria-label="未分配会话"><i></i><span>03</span><small>未分配</small></div>
+<div class="micro-only micro-agent-key slot-4 empty" role="img" aria-label="未分配会话"><i></i><span>04</span><small>未分配</small></div>
+<div class="micro-only micro-agent-key slot-5 empty" role="img" aria-label="未分配会话"><i></i><span>05</span><small>未分配</small></div>
+<div class="micro-only micro-agent-key slot-6 empty" role="img" aria-label="未分配会话"><i></i><span>06</span><small>未分配</small></div>
+<div class="micro-only micro-joystick" role="group" aria-label="摇杆：电脑导航尚未支持"><button id="joystick-center" class="joystick-cap" aria-label="电脑导航尚未支持" aria-disabled="true"></button></div>
+<button id="micro-quick" class="micro-only micro-command-key micro-quick micro-color-white" aria-label="FAST：尚未支持" aria-disabled="true" title="FAST：手机外设尚未支持"><svg class="default-command-glyph" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m13 2-10 12h9l-1 8L21 10h-9l1-8Z"/></svg><i id="glyph-quick" class="custom-command-glyph" aria-hidden="true" hidden></i><span id="label-quick">FAST</span></button>
+<button id="micro-approve" class="micro-only micro-command-key micro-approve micro-color-white" aria-label="APPROVE：尚未支持" aria-disabled="true" title="APPROVE：手机外设尚未支持"><svg class="default-command-glyph" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg><i id="glyph-approve" class="custom-command-glyph" aria-hidden="true" hidden></i><span id="label-approve">APPROVE</span></button>
+<button id="micro-decline" class="micro-only micro-command-key micro-decline micro-color-white" aria-label="DECLINE：尚未支持" aria-disabled="true" title="DECLINE：手机外设尚未支持"><svg class="default-command-glyph" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12"/></svg><i id="glyph-decline" class="custom-command-glyph" aria-hidden="true" hidden></i><span id="label-decline">DECLINE</span></button>
+<button id="micro-fork" class="micro-only micro-command-key micro-fork micro-color-white" aria-label="FORK：尚未支持" aria-disabled="true" title="FORK：手机外设尚未支持"><svg class="default-command-glyph" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="3" r="2"/><circle cx="6" cy="21" r="2"/><circle cx="18" cy="6" r="2"/><path d="M6 5v14m0-4c0-6 12-3 12-7"/></svg><i id="glyph-fork" class="custom-command-glyph" aria-hidden="true" hidden></i><span id="label-fork">FORK</span></button>
+<div class="micro-only micro-connection" role="img" aria-label="黑色圆形部件与三颗指示灯（装饰）"><span class="micro-connection-leds" aria-hidden="true"><i></i><i></i><i></i></span><span class="micro-black-disc" aria-hidden="true"></span></div>
+<button id="bar-stop" class="bar-only console-key dark stop-key vibebar-main-three" aria-disabled="true" title="停止：手机外设尚未支持"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg><span>PAUSE / REJECT</span><small>停止</small></button>
+<button id="bar-capture" class="bar-only console-key dark capture-key vibebar-main-two" aria-disabled="true" title="图片：手机外设尚未支持"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg><span>IMAGE</span><small>图片</small></button>
+<button id="mic" class="console-key voice-key vibebar-main-one micro-mic micro-color-white" disabled aria-label="开始录音"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/></svg><span id="mic-label">VOICE INPUT</span><small>语音输入</small></button>
+<button id="send" class="console-key dark execute-key vibebar-main-four micro-send micro-color-white" disabled aria-label="发送电脑草稿"><svg class="bar-only" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 3 14 9-14 9V3Z"/></svg><svg class="micro-only" aria-hidden="true" fill="currentColor" fill-rule="evenodd" height="24" style="flex:none;line-height:1" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><title>Codex</title><path clip-rule="evenodd" d="M8.086.457a6.105 6.105 0 013.046-.415c1.333.153 2.521.72 3.564 1.7a.117.117 0 00.107.029c1.408-.346 2.762-.224 4.061.366l.063.03.154.076c1.357.703 2.33 1.77 2.918 3.198.278.679.418 1.388.421 2.126a5.655 5.655 0 01-.18 1.631.167.167 0 00.04.155 5.982 5.982 0 011.578 2.891c.385 1.901-.01 3.615-1.183 5.14l-.182.22a6.063 6.063 0 01-2.934 1.851.162.162 0 00-.108.102c-.255.736-.511 1.364-.987 1.992-1.199 1.582-2.962 2.462-4.948 2.451-1.583-.008-2.986-.587-4.21-1.736a.145.145 0 00-.14-.032c-.518.167-1.04.191-1.604.185a5.924 5.924 0 01-2.595-.622 6.058 6.058 0 01-2.146-1.781c-.203-.269-.404-.522-.551-.821a7.74 7.74 0 01-.495-1.283 6.11 6.11 0 01-.017-3.064.166.166 0 00.008-.074.115.115 0 00-.037-.064 5.958 5.958 0 01-1.38-2.202 5.196 5.196 0 01-.333-1.589 6.915 6.915 0 01.188-2.132c.45-1.484 1.309-2.648 2.577-3.493.282-.188.55-.334.802-.438.286-.12.573-.22.861-.304a.129.129 0 00.087-.087A6.016 6.016 0 015.635 2.31C6.315 1.464 7.132.846 8.086.457zm-.804 7.85a.848.848 0 00-1.473.842l1.694 2.965-1.688 2.848a.849.849 0 001.46.864l1.94-3.272a.849.849 0 00.007-.854l-1.94-3.393zm5.446 6.24a.849.849 0 000 1.695h4.848a.849.849 0 000-1.696h-4.848z"></path></svg><span>EXECUTE</span><small>发送</small></button>
+</div><p id="input-hint" class="muted record-hint">点按录音 · 再按结束 · 按发送提交电脑草稿</p><p class="capability-note">灰色功能键暂未接入；当前只控制电脑绑定的一个会话。</p>
+</div>
+
+
+</section>
+<footer class="footer"><button id="open-text" class="quiet">文字补充</button><p id="phone-binding-help" class="muted">更换目标请在电脑操作。切回原会话后可继续输入。</p><button id="refresh" class="quiet">刷新连接</button></footer>
+<dialog id="text-sheet" class="app-sheet" aria-labelledby="text-sheet-title"><header class="sheet-header"><h2 id="text-sheet-title">文字补充</h2><button id="close-text" aria-label="关闭文字补充">×</button></header><p id="text-sheet-error" class="sheet-error" role="alert"></p><details id="fragment-details" class="surface" open><summary>本段文字</summary><p class="muted">这里只保存尚未追加的片段，完整草稿请在电脑查看。</p><label class="sr-only" for="text">待处理片段</label><button id="retry" class="secondary" hidden>重试识别上一段</button><textarea id="text" placeholder="需要修正或补充的这一段文字"></textarea><button id="write" class="primary" disabled>确认本段并追加到电脑</button><button id="cancel" class="secondary" disabled>清空电脑草稿</button><button id="discard" class="quiet">丢弃手机上的本段</button></details></dialog>
+<dialog id="settings-sheet" class="app-sheet" aria-labelledby="settings-title"><header class="sheet-header"><h2 id="settings-title">外观与设置</h2><button id="close-settings" aria-label="关闭设置">×</button></header><section id="connection-settings"><h3>连接电脑</h3><p id="settings-connection-status" class="sheet-note" role="status">正在检查连接…</p><form id="pairing" class="surface" hidden><h2>连接这台电脑</h2><p class="muted">在电脑控制中心生成配对码，输入后即可开始。</p><label for="pair-code">8 位配对码</label><input id="pair-code" type="text" inputmode="text" autocomplete="one-time-code" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-describedby="pair-code-help" placeholder="XXXXXXXX" required minlength="8" maxlength="32" pattern="[A-Za-z0-9]{8}"><p id="pair-code-help" class="sheet-note">直接输入 8 位字母或数字，无需切换大小写、输入横线。也可粘贴完整配对码。</p><button id="pair-submit" class="primary" type="submit">配对并连接</button></form><button id="settings-pair" class="quiet" type="button">输入配对码</button><p id="settings-connection-error" class="sheet-note" role="alert"></p></section><h3>输入模板</h3><div class="layout-options"><button id="template-console" class="layout-option console" aria-pressed="false"><i aria-hidden="true"><span></span><b><em></em><em></em><em></em><em></em></b></i><strong>Console</strong></button><button id="template-bar" class="layout-option bar" aria-pressed="false"><i aria-hidden="true"><span></span><b><em></em><em></em><em></em><em></em></b></i><strong>VibeBar</strong></button><button id="template-matrix" class="layout-option matrix" aria-pressed="false"><i aria-hidden="true"><span></span><b><em></em><em></em><em></em><em></em></b></i><strong>Macro Pad</strong></button><button id="template-hardware-tri" class="layout-option hardware-tri" aria-pressed="false"><i aria-hidden="true"><span></span><b><em></em><em></em><em></em></b></i><strong>TriKey</strong></button><button id="template-hardware-vibebar" class="layout-option hardware-vibebar" aria-pressed="false"><i aria-hidden="true"><span></span><b><em></em><em></em><em></em><em></em><em></em><em></em></b></i><strong>VibeBar 6</strong></button><button id="template-hardware-five" class="layout-option hardware-five" aria-pressed="false"><i aria-hidden="true"><span></span><b><em></em><em></em><em></em><em></em><em></em></b></i><strong>Voice Five</strong></button><button id="template-hardware-aha" class="layout-option hardware-aha" aria-pressed="false"><i aria-hidden="true"><span></span><b><em></em><em></em><em></em><em></em></b></i><strong>AhaKey 4</strong></button><button id="template-micro" class="layout-option hardware-micro" aria-pressed="false"><i aria-hidden="true"><span></span><b><em></em><em></em><em></em><em></em><em></em><em></em><em></em><em></em><em></em><em></em></b></i><strong>Codex Micro</strong></button></div><h3>配色</h3><div class="theme-options" role="group" aria-label="配色"><button id="theme-signal" class="theme-swatch theme-signal" aria-label="银橙"><i aria-hidden="true"></i><span>银橙</span></button><button id="theme-smoke" class="theme-swatch theme-smoke" aria-label="烟黑"><i aria-hidden="true"></i><span>烟黑</span></button><button id="theme-ice" class="theme-swatch theme-ice" aria-label="冰白"><i aria-hidden="true"></i><span>冰白</span></button><button id="theme-midnight" class="theme-swatch theme-midnight" aria-label="午夜"><i aria-hidden="true"></i><span>午夜</span></button></div><select id="panel-theme" hidden aria-label="配色"><option value="signal">银橙</option><option value="smoke">烟黑</option><option value="ice">冰白</option><option value="midnight">午夜</option></select><details class="experimental"><summary>高级选项</summary><label><input id="live" type="checkbox" autocomplete="off"> 边说边更新电脑草稿（实验）</label><p class="muted">仅用于空白草稿，默认使用完整分段识别。</p></details><section id="command-settings"><h3>Micro 命令键</h3><div class="command-key-picker" role="group" aria-label="选择要设置的命令键"><button id="edit-quick">FAST</button><button id="edit-approve">APPROVE</button><button id="edit-decline">DECLINE</button><button id="edit-fork">FORK</button></div><label for="command-action">按键动作</label><select id="command-action"><option value="default">保留原生动作（尚未支持）</option><option value="prompt">追加快捷指令到电脑草稿</option><option value="text">打开文字补充</option><option value="refresh">刷新连接</option></select><div id="command-prompt-field" hidden><label for="command-prompt">快捷指令</label><textarea id="command-prompt" maxlength="1000" placeholder="例如：检查当前改动，找出潜在问题，先不要修改文件。"></textarea><p class="sheet-note">只追加到电脑草稿，不自动发送。</p></div><p id="command-config-error" class="sheet-error" role="alert"></p><div class="command-editor-actions"><button id="save-command" class="primary">保存按键</button><button id="reset-command" class="quiet">恢复此键默认动作</button></div><p id="command-saved" class="sheet-note" role="status"></p></section><p class="sheet-note">尚未接入的电脑操作会提示说明。完整草稿与回复留在电脑。</p></dialog>
+</main>
+<script src="/api/desktop-controller/live-capture.js"></script>
+<script src="/api/desktop-controller/controller-bootstrap.js"></script>
+<script>
+const $ = id => document.getElementById(id), base = '/api/desktop-controller';
+// Layout names and key semantics follow main:src/App.tsx and main:src/micro.ts.
+let controllerIsDesktop = false;
+const panelThemes = ['signal','smoke','ice','midnight'];
+function selectTheme(value) {
+  const theme = panelThemes.includes(value) ? value : 'signal';
+  $('panel-theme').value = theme;
+  $('shell').setAttribute('data-theme', theme);
+  for (const id of panelThemes) $('theme-'+id).ariaPressed = String(id === theme);
+  try { localStorage.setItem('vibe-panel-theme', theme); } catch {}
+}
+let savedTheme = 'signal';
+try { savedTheme = localStorage.getItem('vibe-panel-theme'); } catch {}
+selectTheme(savedTheme);
+$('panel-theme').onchange = () => selectTheme($('panel-theme').value);
+for (const id of panelThemes) $('theme-'+id).onclick = () => selectTheme(id);
+let connectionRequested = false;
+function openSettings() { if ($('settings-sheet').open) return; $('settings-sheet').showModal(); }
+function openText() { $('fragment-details').open = true; $('settings-sheet').close(); if (!$('text-sheet').open) $('text-sheet').showModal(); }
+function closeText() { $('fragment-details').open = false; $('text-sheet').close(); }
+$('open-settings').onclick = $('key-settings').onclick = openSettings;
+$('close-settings').onclick = () => $('settings-sheet').close();
+$('open-text').onclick = openText;
+$('close-text').onclick = closeText;
+$('key-view').onclick = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); else $('error').textContent = '此浏览器不支持全屏，可添加到主屏幕使用。'; } catch { $('error').textContent = '无法进入全屏，可添加到主屏幕使用。'; } };
+const inputLayouts = {'console':'Console','bar':'VibeBar','matrix':'Macro Pad','hardware-tri':'TriKey','hardware-vibebar':'VibeBar 6','hardware-five':'Voice Five','hardware-aha':'AhaKey 4','micro':'Codex Micro'};
+function applyLayoutClasses() {
+  for (const id of Object.keys(inputLayouts)) $('shell').classList.toggle('layout-'+(id === 'micro' ? 'hardware-micro' : id), !controllerIsDesktop && inputTemplate === id);
+}
+let inputTemplate = 'bar';
+try { const saved = localStorage.getItem('vibe-controller-template'); if (Object.hasOwn(inputLayouts,saved)) inputTemplate = saved; } catch {}
+function selectTemplate(value) {
+  inputTemplate = Object.hasOwn(inputLayouts,value) ? value : 'bar';
+  applyLayoutClasses();
+  $('mic').classList.toggle('micro-command-key', inputTemplate === 'micro');
+  $('mic').classList.toggle('micro-mic', inputTemplate === 'micro');
+  $('send').classList.toggle('micro-send', inputTemplate === 'micro');
+  for (const name of ['console-key','voice-key']) $('mic').classList.toggle(name, inputTemplate !== 'micro');
+  for (const name of ['console-key','dark','execute-key']) $('send').classList.toggle(name, inputTemplate !== 'micro');
+  $('send').classList.toggle('micro-command-key', inputTemplate === 'micro');
+  for (const id of Object.keys(inputLayouts)) $('template-'+id).ariaPressed = String(inputTemplate === id);
+  $('template-label').textContent = inputLayouts[inputTemplate].toUpperCase() + ' / TEXT + VOICE';
+  try { localStorage.setItem('vibe-controller-template', inputTemplate); } catch {}
+}
+for (const id of Object.keys(inputLayouts)) $('template-'+id).onclick = () => { selectTemplate(id); render(); };
+selectTemplate(inputTemplate);
+const unsupportedKeys = {'key-new':'新建电脑任务','key-history':'电脑任务记录','key-history-two':'电脑任务记录','key-workspace':'切换电脑工作目录','micro-quick':'Fast mode','micro-approve':'批准请求','micro-decline':'拒绝请求','micro-fork':'保留上下文分叉','bar-stop':'停止电脑任务','bar-capture':'向电脑附加图片','joystick-center':'电脑会话导航'};
+for (const [id, label] of Object.entries(unsupportedKeys)) $(id).onclick = () => { $('error').textContent = '手机外设尚未支持' + label + '，请在电脑操作。'; };
+// Assignments are local device preferences, separate from the main Panel's task keys.
+const commandKeyIds = ['quick','approve','decline','fork'];
+const commandDefaults = {quick:'FAST',approve:'APPROVE',decline:'DECLINE',fork:'FORK'};
+const commandActions = ['default','prompt','text','refresh'];
+const commandPreferenceKey = 'vibe-controller-command-keys-v1';
+let commandAssignments = {}, editingCommand = 'quick';
+try {
+  const saved = JSON.parse(localStorage.getItem(commandPreferenceKey) || '{}');
+  for (const id of commandKeyIds) {
+    const value = saved?.[id];
+    if (value && commandActions.includes(value.action) && typeof value.prompt === 'string' && value.prompt.length <= 1000 && (value.action !== 'prompt' || value.prompt.trim())) commandAssignments[id] = {action:value.action,prompt:value.prompt};
+  }
+} catch {}
+function commandAssignment(id) { return commandAssignments[id] || {action:'default',prompt:''}; }
+function editCommand(id) {
+  editingCommand = id;
+  const value = commandAssignment(id);
+  for (const key of commandKeyIds) $('edit-'+key).ariaPressed = String(key === id);
+  $('command-action').value = value.action; $('command-prompt').value = value.prompt;
+  $('command-prompt-field').hidden = value.action !== 'prompt';
+  $('command-config-error').textContent = ''; $('command-saved').textContent = '';
+}
+for (const id of commandKeyIds) $('edit-'+id).onclick = () => editCommand(id);
+$('command-action').onchange = () => { $('command-prompt-field').hidden = $('command-action').value !== 'prompt'; $('command-config-error').textContent = ''; };
+function persistCommands(next) {
+  try { localStorage.setItem(commandPreferenceKey, JSON.stringify(next)); }
+  catch { $('command-config-error').textContent = '浏览器无法保存按键设置，请检查存储权限。'; return false; }
+  commandAssignments = next; render(); return true;
+}
+$('save-command').onclick = () => {
+  const action = $('command-action').value, prompt = $('command-prompt').value.trim();
+  if (!commandActions.includes(action) || (action === 'prompt' && (!prompt || prompt.length > 1000))) { $('command-config-error').textContent = '请填写 1–1000 字的快捷指令。'; return; }
+  if (persistCommands({...commandAssignments,[editingCommand]:{action,prompt:action === 'prompt' ? prompt : ''}})) { $('command-config-error').textContent = ''; $('command-saved').textContent = '已保存，立即生效。'; }
+};
+$('reset-command').onclick = () => { const next = {...commandAssignments}; delete next[editingCommand]; if (persistCommands(next)) { editCommand(editingCommand); $('command-saved').textContent = '已恢复默认动作。'; } };
+function renderCommandKeys() {
+  for (const id of commandKeyIds) {
+    const value = commandAssignment(id), key = $('micro-'+id), custom = value.action !== 'default';
+    const label = value.action === 'prompt' ? '快捷指令' : value.action === 'text' ? '文字补充' : value.action === 'refresh' ? '刷新连接' : commandDefaults[id];
+    key.classList.toggle('custom-command', custom);
+    key.setAttribute('aria-disabled', String(!custom));
+    key.ariaLabel = value.action === 'prompt' ? '追加快捷指令：' + value.prompt : label + (!custom ? '：尚未支持' : '');
+    key.title = key.ariaLabel;
+    key.disabled = custom && value.action !== 'text' && (busy || !!recorder || !!liveSession || (value.action === 'prompt' && (!state?.bound || reviewRequired || !!$('text').value.trim())));
+    $('label-'+id).textContent = label;
+    $('glyph-'+id).hidden = !custom;
+    $('glyph-'+id).textContent = value.action === 'prompt' ? '>_' : value.action === 'text' ? 'Aa' : '↻';
+  }
+}
+for (const id of commandKeyIds) $('micro-'+id).onclick = () => {
+  const value = commandAssignment(id);
+  if (value.action === 'default') { $('error').textContent = '手机外设尚未支持' + unsupportedKeys['micro-'+id] + '，请在电脑操作。'; return; }
+  if ($('micro-'+id).disabled) return;
+  if (value.action === 'text') { openText(); return; }
+  if (value.action === 'refresh') return $('refresh').onclick();
+  return task(async () => {
+    if (reviewRequired || $('text').value.trim()) throw new Error('请先处理手机上尚未写入的片段，再使用快捷指令。');
+    await command('append', value.prompt, state);
+    render('快捷指令已追加到电脑，按发送键提交。');
+  });
+};
+editCommand(editingCommand);
+// The dial navigates input controls, as in the main Panel composer mode.
+const dialTargets = ['mic', 'send', 'text', 'write'];
+let dialIndex = -1;
+function turnDial(direction) {
+  for (const id of dialTargets) $(id).classList.toggle('micro-knob-target', false);
+  for (let i = 0; i < dialTargets.length; i++) {
+    dialIndex = (dialIndex + direction + dialTargets.length) % dialTargets.length;
+    const element = $(dialTargets[dialIndex]);
+    if (!element.disabled && !element.readOnly) {
+      if (dialIndex > 1) openText();
+      element.classList.toggle('micro-knob-target', true); element.focus(); break;
+    }
+  }
+}
+$('dial-left').onclick = () => turnDial(-1);
+$('dial-right').onclick = () => turnDial(1);
+$('dial-push').onclick = () => { if (dialIndex < 0) { turnDial(1); return; } const element = $(dialTargets[dialIndex]); if (!element.disabled && !element.readOnly) { if (element.onclick) element.onclick(); else element.focus(); } };
+$('input-dial').onwheel = event => { event.preventDefault(); if (event.deltaY) turnDial(event.deltaY > 0 ? 1 : -1); };
+const draftKey = 'vibe-controller-segment-v2';
+function saveDraft() {
+  try { if ($('text').value.trim()) sessionStorage.setItem(draftKey, JSON.stringify({ text: $('text').value, title: state?.title || '', action: pendingAction, expected: pendingExpected })); else sessionStorage.removeItem(draftKey); } catch {}
+}
+function forgetDraft() { $('text').value = ''; draftPending = false; reviewRequired = false; pendingExpected = null; try { sessionStorage.removeItem(draftKey); } catch {} }
+let state = null, busy = false, recorder = null, stream = null, chunks = [], recordingTimer = null, generation = 0, hasDraft = false;
+$('live').checked = false;
+let liveSession = null, draftPending = false, reviewRequired = false, pendingAction = 'append', pendingExpected = null, lastRecording = null;
+let connectionLoaded = false;
+let manualTarget = false;
+const targetNames = {'codex-app':'Codex 桌面','claude-code':'Claude Code','claude-app':'Claude App'};
+async function api(path, data) {
+  const abort = new AbortController();
+  const timeout = setTimeout(() => abort.abort(), data === undefined ? 8000 : 90000);
+  try {
+  const request = window.controllerTransportReady ? await window.controllerTransportReady : fetch;
+  const response = await request(path, data === undefined ? { signal: abort.signal, cache: 'no-store' } : { signal: abort.signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  const payload = await response.json();
+  if (!response.ok) {
+    if (response.status === 401) {
+      const showConnection = $('pairing').hidden;
+      state = null; hasDraft = false; generation++; $('pairing').hidden = false;
+      if (showConnection) openSettings();
+      throw Object.assign(new Error('手机尚未配对，请在设置的“连接电脑”中输入配对码'), {status:401});
+    }
+    throw new Error(payload.error || '连接失败');
+  }
+  return payload;
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      if (path === '/api/pair') throw new Error('配对请求超时，结果尚未确认。请先刷新连接；若仍提示未配对，再在电脑生成新码。');
+      if (path === base + '/bind') throw new Error('电脑会话绑定超时。请检查目标 App 是否已打开会话，以及辅助功能权限。');
+      throw new Error(data === undefined ? '连接超时，正在重连…' : '请求超时，结果尚未确认。请先检查电脑，操作不会自动重试。');
+    }
+    throw error;
+  } finally { clearTimeout(timeout); }
+}
+function render(message) {
+  $('setup-target-help').textContent = state?.target === 'claude-code' ? '在电脑安装并登录 Claude Code，然后在下方控制台填写项目目录。' : state?.target === 'claude-app' ? '在电脑打开 Claude App 的 Code 现有会话；首次使用需授予辅助功能权限。' : '在电脑打开 Codex App 中要控制的会话；首次使用需授予辅助功能权限。';
+  $('setup-binding-help').textContent = state?.bound ? '已绑定：' + state.title + '。手机可以继续使用；更换目标后需要重新绑定。' : state?.target === 'claude-code' ? '在下方创建会话并绑定；恢复的会话可直接点“绑定 Claude Code 控制台”。' : '在目标 App 打开会话并点击输入框，再回到这里点“绑定”。已有草稿保留。';
+  if (state?.autoBind && !manualTarget) {
+    $('setup-target-help').textContent = '打开要使用的 Codex 或 Claude 会话。首次使用按提示授予辅助功能权限。';
+    if (!state.bound) $('setup-binding-help').textContent = '点击“绑定当前会话”，自动识别可用目标并保留电脑草稿。';
+  }
+  $('text-sheet-error').textContent = $('error').textContent;
+  $('connection-settings').hidden = state?.local === true;
+  $('settings-connection-status').textContent = state ? (state.bound ? '已连接 · ' + state.title : '已连接电脑，等待电脑绑定会话') : '输入电脑生成的配对码，即可在这里完成连接。';
+  $('settings-connection-error').textContent = $('error').textContent;
+  $('settings-pair').hidden = !$('pairing').hidden;
+  $('settings-pair').disabled = busy || !!recorder || !!liveSession;
+  renderCommandKeys();
+  controllerIsDesktop = state?.local === true;
+  $('shell').classList.toggle('device', !controllerIsDesktop);
+  applyLayoutClasses();
+  $('shell').classList.toggle('is-desktop',state?.local === true);
+  $('shell').classList.toggle('is-bound',!!state?.bound);
+  $('desktop-workspace').hidden = state?.local !== true;
+  $('page-title').textContent = state?.local ? '让输入回到工作现场。' : '说出来，继续工作。';
+  $('page-subtitle').textContent = state?.local ? '绑定当前会话，手机一次配对，随时继续。' : '手机负责输入，完整草稿和回复留在电脑。';
+  $('connection-badge').textContent = !state ? '未连接' : state.bound ? '已绑定 · 就绪' : '已连接 · 待绑定';
+  $('target-kind').textContent = targetNames[state?.target] || '当前目标';
+  $('target-settings').hidden = state?.local !== true || !state?.unified;
+  $('target-options').hidden = state?.local !== true || !state?.unified;
+  for (const id of Object.keys(targetNames)) {
+    $('target-'+id).ariaPressed = String(state?.target === id);
+    $('target-'+id).disabled = busy || !!recorder || !!liveSession;
+  }
+  const frame = $('managed-frame');
+  $('managed-console').hidden = state?.local !== true || state?.target !== 'claude-code';
+  frame.hidden = state?.local !== true || state?.target !== 'claude-code';
+  if (!frame.hidden && !(frame.src || '').includes('/managed/view')) frame.src = base + '/managed/view?embed=1';
+  $('target').textContent = state ? '目标：' + (state.title || '请在电脑绑定会话') : '电脑未连接';
+  const recording = !!recorder || !!liveSession;
+  $('mic').disabled = (busy && !liveSession) || !!liveSession?.stopping || !state?.bound;
+  $('send').disabled = reviewRequired || busy || recording || !state?.bound || !(hasDraft || (draftPending && $('text').value.trim()));
+  $('cancel').disabled = busy || recording || !state?.bound || !hasDraft;
+  $('write').disabled = busy || recording || !state?.bound;
+  $('write').textContent = pendingAction === 'append' ? '确认本段并追加到电脑' : '确认文字并写入电脑';
+  $('retry').hidden = !lastRecording; $('retry').disabled = busy || recording || !state?.bound;
+  $('text').readOnly = recording; $('discard').disabled = busy || recording;
+  $('bind').disabled = busy || recording; $('adopt').disabled = busy || recording;
+  $('refresh').disabled = busy || recording;
+  $('live').disabled = busy || recording;
+  $('pair-submit').disabled = busy; $('pair-code-create').disabled = busy;
+  $('desktop-controls').hidden = state?.local !== true; $('phone-binding-help').hidden = state?.local === true;
+  $('console-link').hidden = state?.local !== true || state?.target !== 'claude-code';
+  if (state?.target === 'codex-app') $('desktop-instructions').textContent = '在电脑 Codex 选中要控制的会话并点击输入框，再点绑定。已有草稿保留。';
+  if (state?.target === 'claude-app') $('desktop-instructions').textContent = '在 Claude App 的 Code 中打开现有会话并点击输入框，再点绑定。首页、Cowork 和其他布局暂不支持；切换会话后停止写入，切回原会话可重试。';
+  if (state?.target === 'claude-code') $('desktop-instructions').textContent = '先打开电脑 Claude Code 控制台，填写工作目录并创建会话。完整草稿、回复和授权在电脑控制台查看。';
+  if (state?.autoBind && !manualTarget) $('desktop-instructions').textContent = state.bound ? '已就绪，手机可以直接输入。只有需要更换会话时才重新绑定。' : '打开要使用的会话，点击下方按钮即可。多个会话无法区分时再选择。';
+  $('adopt').textContent = state?.autoBind && !manualTarget ? (state.bound ? '重新绑定当前会话' : '绑定当前会话') : state?.target === 'claude-code' ? '绑定 Claude Code 控制台（保留草稿）' : state?.target === 'claude-app' ? '绑定当前 Claude App 会话（保留草稿）' : '绑定当前 Codex 会话（保留草稿）';
+  const triApprove = inputTemplate === 'hardware-tri' && hasDraft && !recording;
+  if (triApprove) $('mic').disabled = $('send').disabled;
+  $('mic-label').textContent = recording ? 'LISTENING' : busy ? 'PROCESSING' : triApprove ? 'APPROVE' : 'VOICE INPUT';
+  $('mic').ariaLabel = recording ? '结束录音并识别' : triApprove ? '发送电脑草稿' : '开始录音';
+  $('mic').classList.toggle('recording', recording);
+  $('mic').classList.toggle('listening', recording);
+  $('mic').classList.toggle('transcribing', busy && !recording);
+  $('mic').classList.toggle('draft-ready', hasDraft && !recording && !busy);
+  if (message) $('status').textContent = message;
+}
+async function task(fn) {
+  if (busy) return;
+  busy = true; $('error').textContent = ''; render();
+  try { await fn(); } catch (error) {
+    $('error').textContent = error.message;
+    render('操作未完成，请检查电脑后刷新连接');
+    // No mutation is retried automatically, especially Send.
+  } finally { busy = false; render(); }
+}
+async function refresh() {
+  let next;
+  try { next = await api(base + '/status'); } catch (error) { connectionError = error.message; throw error; }
+  if (connectionError && $('error').textContent === connectionError) $('error').textContent = '';
+  connectionError = null;
+  if (next.bindingId !== state?.bindingId || next.target !== state?.target || next.revision !== state?.revision) { generation++; if (draftPending) reviewRequired = true; }
+  hasDraft = next.hasDraft;
+  $('pairing').hidden = !connectionRequested;
+  state = next; render(reviewRequired && $('text').value.trim() ? '文字已保留，请核对目标和内容，再确认写入' : state.bound ? '已绑定，准备输入' : '请先在电脑绑定会话');
+  if (state.local && state.unified && !connectionLoaded) {
+    try { const links = await api(base + '/connection');
+      const singleEntry = links.entry?.includes('next=controller');
+      $('mobile-controller').href = singleEntry ? links.entry : links.controller;
+      $('mobile-controller').hidden = false;
+      const qr = singleEntry ? links.entryQr : links.controllerQr;
+      if (qr) { $('mobile-controller-qr').src = qr; $('mobile-controller-qr').hidden = false; }
+      connectionLoaded = true;
+    } catch { /* Local target management remains available while Relay connects. */ }
+  }
+}
+for (const id of Object.keys(targetNames)) $('target-'+id).onclick = () => task(async () => {
+  state = await api(base+'/target',{target:id}); manualTarget = true; $('target-settings').open = false; hasDraft = state.hasDraft; generation++;
+  if (draftPending) reviewRequired = true;
+  render(state.bound ? '目标已绑定，可继续输入' : '目标已选择，请绑定电脑会话。原输入框中的草稿保留。');
+});
+async function command(action, text, expected = state) {
+  if (!expected?.bound) throw new Error('请在电脑绑定会话，再刷新手机页面');
+  const current = await api(base + '/status');
+  if (!current.bound || current.bindingId !== expected.bindingId || current.revision !== expected.revision) {
+    state = current; hasDraft = current.hasDraft; generation++;
+    if (draftPending) reviewRequired = true;
+    throw new Error('电脑绑定或草稿已更新。本段已保留。请先看电脑是否已有这段文字：已有则丢弃手机本段，未写入则确认绑定后再追加。');
+  }
+  const next = await api(base + '/command', { action, text, bindingId: expected.bindingId, revision: expected.revision, eventId: crypto.randomUUID() });
+  state = { ...next, local: current.local };
+  if (action === 'append') {
+    reviewRequired = false; draftPending = false; pendingExpected = null; hasDraft = next.hasDraft; forgetDraft(); closeText();
+    render('本段已追加到电脑，可继续录下一段，或发送完整草稿');
+  } else if (action === 'write') { reviewRequired = false; draftPending = false; if (text.trim()) saveDraft(); else forgetDraft(); hasDraft = !!text.trim(); render(hasDraft ? '草稿已写入电脑，按发送提交' : '电脑草稿已清空'); }
+  else { hasDraft = false; generation++; if (state.bound) forgetDraft(); render(state.bound ? '发送键已投递，可继续下一次输入。请在电脑查看结果。' : '发送结果未能确认，请在电脑检查并重新绑定。'); }
+}
+$('refresh').onclick = () => task(refresh);
+$('settings-pair').onclick = () => { if (busy || recorder || liveSession) return; connectionRequested = true; $('pairing').hidden = false; render(); $('pair-code').focus(); };
+function normalizePairCode(value) { return value.normalize('NFKC').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+// A scanned link can prefill the one-time code; submission remains explicit.
+try {
+  const url = new URL(window.location.href);
+  const code = normalizePairCode(url.searchParams.get('pair') || '');
+  if (/^[A-Z0-9]{8}$/.test(code)) $('pair-code').value = code;
+  if (url.searchParams.has('pair')) { url.searchParams.delete('pair'); window.history.replaceState(null, '', url); }
+} catch {}
+$('pair-code').oninput = () => {
+  const input = $('pair-code'), before = input.value;
+  const cursor = normalizePairCode(before.slice(0, input.selectionStart ?? before.length)).length;
+  input.value = normalizePairCode(before).slice(0, 8);
+  input.setSelectionRange?.(Math.min(cursor, 8), Math.min(cursor, 8));
+};
+$('pairing').onsubmit = event => {
+  event.preventDefault();
+  task(async () => {
+    await api('/api/pair', { code: normalizePairCode($('pair-code').value), deviceName: 'Mobile desktop controller' });
+    $('pair-code').value = ''; connectionRequested = false;
+    $('pairing').hidden = true;
+    $('settings-sheet').close();
+    try { await refresh(); }
+    catch (error) {
+      if (error.status === 401) throw error;
+      connectionError = '配对已成功，但读取电脑状态超时或失败，正在重连，无需重新输入配对码。';
+      $('error').textContent = connectionError;
+      render('配对已成功，正在连接电脑');
+    }
+  });
+};
+$('bind').onclick = () => task(async () => { state = { ...await api(base + '/bind', { current: true }), local: true }; generation++; hasDraft = false; render('已绑定，准备输入'); });
+$('adopt').onclick = () => task(async () => { try { state = { ...await api(base + '/bind', { adoptDraft: true, current: true, auto: state?.autoBind === true && !manualTarget }), local: true }; generation++; hasDraft = state.hasDraft; render('已就绪，手机可继续输入'); } catch (error) { if (state?.autoBind) $('target-settings').open = true; throw error; } });
+$('pair-code-create').onclick = () => task(async () => { const result = await api('/api/pairing-codes', {}); $('new-pair-code').textContent = '在手机控制页输入：' + result.code + '（10 分钟内有效）'; });
+$('text').oninput = () => { saveDraft(); draftPending = true; render(); };
+$('write').onclick = () => task(() => command(pendingAction, $('text').value, pendingExpected?.bindingId === state?.bindingId ? pendingExpected : state));
+$('discard').onclick = () => { if (busy || recorder || liveSession) return; forgetDraft(); lastRecording = null; closeText(); render('本段已丢弃，电脑草稿未改动'); };
+$('retry').onclick = () => task(() => processRecording(lastRecording));
+$('cancel').onclick = () => task(() => command('write', ''));
+$('send').onclick = () => task(async () => { if (reviewRequired) throw new Error('请先检查并确认备用框中的识别文字'); if (draftPending) await command(pendingAction, $('text').value, pendingExpected || state); await command('send'); });
+$('mic').onclick = async () => {
+  if (inputTemplate === 'hardware-tri' && hasDraft && !recorder && !liveSession) { await $('send').onclick(); return; }
+  if (liveSession) { await stopLive(); return; }
+  if (recorder) { if (recorder.state === 'recording') { $('mic').disabled = true; recorder.stop(); } return; }
+  await task(async () => {
+    // Fetch the current binding before obtaining the microphone. A desktop
+    // rebind must not leave this phone recording against an obsolete ID.
+    await refresh();
+    if (!state?.bound) throw new Error('请先在电脑绑定会话');
+    const recordingBinding = { ...state };
+    const captureEpoch = lifecycleEpoch;
+    if (pageLeft || document.hidden) throw new Error('页面不在前台，请返回后重新录音');
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) throw new Error('录音需要 HTTPS 和支持麦克风的浏览器');
+    if (draftPending && $('text').value.trim()) throw new Error('请先处理手机上尚未写入的这一段文字');
+    if ($('live').checked) {
+      if (hasDraft) throw new Error('实验增量模式需要空白草稿；取消勾选即可继续追加录音');
+      pendingAction = 'write'; pendingExpected = null;
+      const speech = await api(base + '/speech/status');
+      if (!speech.ready) throw new Error(speech.error || '增量语音尚未就绪，请稍候；也可取消勾选使用普通录音');
+      const capture = new window.LiveCapture(), session = { capture, binding: recordingBinding, generation, last: '', pending: null, stopped: false };
+      await capture.start(() => { if (liveSession === session) stopLive(); });
+      liveSession = session;
+      if (pageLeft || document.hidden || captureEpoch !== lifecycleEpoch) { session.stopped = true; session.capture.stop(); liveSession = null; throw new Error('录音启动已中断，请重新录音'); }
+      session.timer = setInterval(() => { if (!session.pending && !session.stopping) updateLive(session); }, 3000);
+      render('正在录音，识别文字会逐步写入电脑…'); return;
+    }
+    pendingAction = 'append'; pendingExpected = recordingBinding; lastRecording = null;
+    stream = await navigator.mediaDevices.getUserMedia({ audio: {
+      autoGainControl: true, channelCount: 1, echoCancellation: true, noiseSuppression: true,
+    } });
+    if (pageLeft || document.hidden || captureEpoch !== lifecycleEpoch) { stream.getTracks().forEach(t => t.stop()); stream = null; throw new Error('录音启动已中断，请重新录音'); }
+    try {
+      const ua = navigator.userAgent || '';
+      const appleMobile = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+      const safari = /Safari/.test(ua) && !/Chrome|Chromium|Edg/.test(ua);
+      const types = appleMobile || safari
+        ? ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus']
+        : ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/ogg;codecs=opus'];
+      const type = types.find(t => MediaRecorder.isTypeSupported(t));
+      const active = new MediaRecorder(stream, type ? { mimeType: type } : undefined), capturedGeneration = generation;
+      chunks = []; recorder = active;
+      active.onerror = () => { clearTimeout(recordingTimer); active.onstop = null; stream?.getTracks().forEach(t => t.stop()); stream = null; recorder = null; $('error').textContent = '录音中断，请重新尝试'; render('录音已停止'); };
+      active.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+      active.onstop = () => {
+        clearTimeout(recordingTimer); stream?.getTracks().forEach(t => t.stop()); stream = null; recorder = null;
+        const blob = new Blob(chunks, { type: active.mimeType || 'audio/webm' }); chunks = [];
+        lastRecording = { blob, binding: recordingBinding, generation: capturedGeneration };
+        task(() => processRecording(lastRecording));
+      };
+      active.start(); recordingTimer = setTimeout(() => { if (active.state === 'recording') active.stop(); }, 60000);
+      render('正在录音，再按一次结束（最多 60 秒）');
+    } catch (error) { stream.getTracks().forEach(t => t.stop()); stream = null; recorder = null; throw error; }
+  });
+};
+async function processRecording(recording) {
+  if (!recording) return;
+  const { blob, binding, generation: capturedGeneration } = recording;
+  if (!blob.size || blob.size > 10 * 1024 * 1024) throw new Error('录音为空或超过 10 MB');
+  render('正在识别并纠错本段录音…');
+  const audio = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(blob); });
+  // Retain this one recording for an explicit ASR retry; never auto-retry Send.
+  const result = await api('/api/transcriptions', { audio, language: 'zh', bindingId: binding.bindingId });
+  if (!result.text?.trim()) throw new Error('没有识别到语音，可重试上一段');
+  lastRecording = null;
+  if (pageLeft) return;
+  pendingAction = 'append'; pendingExpected = binding;
+  $('text').value = result.text; draftPending = true; saveDraft();
+  try {
+    if (capturedGeneration !== generation) throw new Error('绑定已变化，本段文字已保留，请先核对电脑目标');
+    await command('append', result.text, binding);
+    if (result.correction?.status === 'unavailable') render('本段已追加到电脑；当前模式纠错暂不可用，保留了识别原文');
+  } catch (error) { openText(); throw error; }
+}
+let pageLeft = false;
+function updateLive(session, final = false) {
+  const run = async () => {
+    await Promise.resolve(); // Install session.pending before a synchronous early return.
+    busy = true; render(final ? '正在完成识别并纠错…' : '正在增量识别…');
+    try {
+      const audio = session.capture.snapshot();
+      if (audio.samples < 800) {
+        if (final) throw new Error('手机没有采集到足够音频，请重新开启麦克风；也可取消勾选增量模式再试');
+        return;
+      }
+      const result = await api(base + '/speech', { bindingId: session.binding.bindingId, pcm: audio.pcm, final });
+      if (session.stopped) return;
+      if (result.candidateText?.trim()) {
+        $('text').value = result.candidateText; saveDraft(); draftPending = true; reviewRequired = true;
+        openText();
+      } else if (result.text?.trim()) {
+        reviewRequired = false;
+        $('text').value = result.text; saveDraft(); draftPending = true; openText();
+        if (generation !== session.generation) throw new Error('绑定已变化，识别文字已保留');
+        if (result.text !== session.last) { await command('write', result.text, session.binding); session.binding = { ...state }; session.last = result.text; } else draftPending = false;
+      }
+      const reasons = { no_signal: '录音已传到电脑，但音频没有声音。请检查麦克风或取消勾选增量模式再试', no_speech: '录音有声音，但未检测到人声。请靠近麦克风重试', filtered: '检测到人声，但转写可信度不足，未写入草稿。可取消勾选增量模式重试', asr_empty: '检测到人声，但识别器未返回文字。请重试或使用普通录音' };
+      session.emptyMessage = reasons[result.diagnostics?.reason] || '没有识别到语音，请重试';
+      if (result.speechEnded && !final) session.endDetected = true;
+      render(reviewRequired ? '识别文字需要核对：请检查下方文字，结束录音后点“确认文字并写入电脑”' : final ? (session.last ? '草稿已就绪，按发送提交' : session.emptyMessage) : '正在录音，草稿会继续更新…');
+    } catch (error) {
+      session.stopped = true; clearInterval(session.timer); session.capture.stop();
+      $('error').textContent = error.message; render('识别已停止，已有文字保留在备用输入框');
+    } finally { busy = false; session.pending = null; if (session.stopped) liveSession = null; render();
+      if (session.endDetected && !session.stopping && !session.stopped) { session.endDetected = false; stopLive(); }
+    }
+  };
+  session.pending = run(); return session.pending;
+}
+async function stopLive() {
+  const session = liveSession; if (!session || session.stopping) return;
+  session.stopping = true; clearInterval(session.timer); session.capture.stop(); render('正在结束录音…');
+  if (session.pending) await session.pending;
+  if (!session.stopped) await updateLive(session, true);
+  liveSession = null; render();
+}
+let lifecycleEpoch = 0, connectionError = null, interruptedRecording = false;
+function suspendPage() {
+  pageLeft = true; lifecycleEpoch++; generation++;
+  saveDraft();
+  interruptedRecording = interruptedRecording || !!recorder || !!liveSession;
+  if (liveSession) { liveSession.stopped = true; clearInterval(liveSession.timer); liveSession.capture.stop(); liveSession = null; }
+  clearTimeout(recordingTimer);
+  if (recorder) { recorder.onstop = null; recorder.onerror = null; recorder.ondataavailable = null; if (recorder.state === 'recording') recorder.stop(); recorder = null; }
+  stream?.getTracks().forEach(t => t.stop()); stream = null; chunks = [];
+}
+window.addEventListener('pagehide', suspendPage);
+let polling = false;
+async function pollStatus() {
+  if (busy || recorder || liveSession || polling || document.hidden || pageLeft) return;
+  polling = true;
+  const observed = state, epoch = lifecycleEpoch;
+  try {
+    const next = await api(base + '/status');
+    if (busy || recorder || liveSession || state !== observed || epoch !== lifecycleEpoch) return;
+    const recovered = connectionError !== null || !state;
+    const changed = next.bindingId !== state?.bindingId || next.revision !== state?.revision || next.target !== state?.target;
+    if (changed) { generation++; if (draftPending) reviewRequired = true; }
+    state = next; hasDraft = next.hasDraft; $('pairing').hidden = !connectionRequested;
+    if (connectionError && $('error').textContent === connectionError) $('error').textContent = '';
+    connectionError = null;
+    if (changed || recovered || interruptedRecording) {
+      const message = reviewRequired && $('text').value.trim() ? '本段已保留，请核对电脑草稿后确认。' : !next.bound ? '电脑服务已连接，请在电脑重新绑定会话。' : interruptedRecording ? '录音因页面离开前台而中断，已有草稿保留，可重新录音。' : recovered ? '连接已恢复，可以继续输入。' : '电脑绑定已同步，准备输入';
+      interruptedRecording = false; render(message);
+    } else render();
+  } catch (error) {
+    if (!busy && !recorder && (state === observed || error.status === 401) && epoch === lifecycleEpoch) {
+      state = null; hasDraft = false; connectionError = error.message;
+      $('error').textContent = connectionError; render('暂时无法连接电脑，正在自动重连。手机文字已保留。');
+    }
+  } finally { polling = false; }
+}
+async function resumePage() { pageLeft = false; await pollStatus(); }
+window.addEventListener('pageshow', resumePage);
+window.addEventListener('online', resumePage);
+window.addEventListener('visibilitychange', () => { if (document.hidden) suspendPage(); else resumePage(); });
+setInterval(pollStatus, 5000);
+try { const saved = JSON.parse(sessionStorage.getItem(draftKey) || 'null'); if (typeof saved?.text === 'string' && saved.text.length <= 16000) { $('text').value = saved.text; pendingAction = saved.action === 'write' ? 'write' : 'append'; pendingExpected = saved.expected?.bound && typeof saved.expected.bindingId === 'string' && Number.isSafeInteger(saved.expected.revision) ? saved.expected : null; reviewRequired = true; draftPending = true; openText(); } } catch {}
+task(refresh);
+</script>
+</html>

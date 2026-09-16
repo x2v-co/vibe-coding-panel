@@ -67,6 +67,13 @@ Report issues: https://github.com/x2v-co/vibe-coding-panel/issues
 Source and configuration: https://github.com/x2v-co/vibe-coding-panel
 
 Bundled release information: `CHANGELOG.md`, `docs/known-issues.md`, and
-`docs/native-session-handoff.md`. Read [privacy](https://vibe.tooluse.app/privacy/)
-and [terms](https://vibe.tooluse.app/terms/); offline copies are included under
+`docs/native-session-handoff.md`. Read [privacy](https://vibe.toolkit.fun/privacy/)
+and [terms](https://vibe.toolkit.fun/terms/); offline copies are included under
 `dist/privacy/index.html` and `dist/terms/index.html`.
+
+## 电脑控制中心
+
+解压包的同一启动文件支持 `--controller`，例如 `bash "Vibe Panel.sh" --controller`。
+使用 `--controller --check` 检查依赖。原生 App 需要 macOS，Windows / Linux 默认使用 Claude Code。
+所有控制器页面、Swift 驱动与语音 worker 随包分发；语音模型和 Python 依赖仍为可选安装。
+详见 [控制中心指南](controller-quickstart.md)。

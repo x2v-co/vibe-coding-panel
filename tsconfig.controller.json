@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "public"
+  },
+  "include": [
+    "src/relay-transport.ts"
+  ]
+}

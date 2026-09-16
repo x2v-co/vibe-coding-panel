@@ -1,5 +1,7 @@
 # Relay deployment
 
+For the managed Toolkit China/global topology and migration, see [regional Relays](regional-relays.md).
+
 The Relay gives the phone a stable HTTPS address while the agent computer makes the only outbound connection. Users do not need ngrok, cloudflared, Tailscale, a public IP, or router configuration.
 
 ```text

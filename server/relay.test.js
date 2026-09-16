@@ -296,3 +296,18 @@ test('partial uploads consume bounded parser capacity and disconnect releases it
     await new Promise(resolve => relay.server.close(resolve));
   }
 });
+
+test('first remote scan selects connector and redirects only to the allowed remote page',async()=>{
+  const relay=createRelayServer();const port=await listen(relay.server),identity=connectorIdentity('q');
+  const socket=await openConnector(`ws://127.0.0.1:${port}/relay/connect?id=${identity.id}`,identity.credential);
+  try {
+    const base=`http://127.0.0.1:${port}/app?relay=${identity.id}`;
+    const remote=await fetch(base+'&next=controller',{redirect:'manual'});
+    assert.equal(remote.status,302);assert.equal(remote.headers.get('location'),'/api/desktop-controller/view');
+    assert.match(remote.headers.get('set-cookie'),new RegExp(identity.id));
+    for(const suffix of ['', '&next=https://example.com', '&next=//example.com']) {
+      const response=await fetch(base+suffix,{redirect:'manual'});
+      assert.equal(response.headers.get('location'),'/app');
+    }
+  } finally {socket.close();await new Promise(resolve=>socket.once('close',resolve));await new Promise(resolve=>relay.server.close(resolve));}
+});

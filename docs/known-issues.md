@@ -65,8 +65,8 @@ passes were not repeated on the fresh installation.
   ownership uncertainty blocks handoff. See [handoff recovery](native-session-handoff.md).
 - Browser history and project screenshots persist locally. Shared Relay traffic
   is not end-to-end encrypted; model services receive their requested inputs.
-  See [privacy](https://vibe.tooluse.app/privacy/) and
-  [terms](https://vibe.tooluse.app/terms/).
+  See [privacy](https://vibe.toolkit.fun/privacy/) and
+  [terms](https://vibe.toolkit.fun/terms/).
 
 ## Updates and feedback
 

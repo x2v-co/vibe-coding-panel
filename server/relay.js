@@ -4,8 +4,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocket, WebSocketServer } from 'ws';
-import { readCookie } from './pairing.js';
+import { readCookie, deviceToken } from './pairing.js';
 import { createLimiter } from './relay-limits.js';
+import { relayOrigin, DEFAULT_RELAYS, PRODUCT_ORIGIN } from './relay-config.js';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const hopByHopHeaders = new Set([
@@ -23,14 +24,16 @@ function connectorIdForCredential(credential) {
 }
 
 function connectorIdFrom(req) {
-  return readCookie(req.headers.cookie, 'vibe_relay_connector');
+  return String(req.headers['x-vibe-connector-id'] || req.query.connector || readCookie(req.headers.cookie, 'vibe_relay_connector'));
 }
 
 function forwardedHeaders(req) {
   const headers = {};
-  for (const name of ['accept', 'content-type', 'cookie', 'last-event-id', 'user-agent']) {
+  for (const name of ['accept', 'content-type', 'last-event-id', 'user-agent', 'x-vibe-request-id', 'x-vibe-instance-id']) {
     if (req.headers[name]) headers[name] = req.headers[name];
   }
+  const device = deviceToken(req.headers.cookie);
+  if (device) headers.cookie = `vibe_panel_device=${encodeURIComponent(device)}`;
   headers['x-forwarded-for'] = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'relay');
   headers['x-forwarded-proto'] = 'https';
   return headers;
@@ -49,6 +52,10 @@ export function createRelayServer(options = {}) {
   const maxInflight = positiveInteger(options.maxInflight ?? process.env.PANEL_RELAY_MAX_INFLIGHT, 100);
   const requestTimeoutMs = positiveInteger(options.requestTimeoutMs ?? process.env.PANEL_RELAY_REQUEST_TIMEOUT_MS, 60 * 1000);
   const publicUrl = String(options.publicUrl ?? process.env.PANEL_RELAY_PUBLIC_URL ?? '').replace(/\/$/, '');
+  const routing = options.routing ?? process.env.PANEL_RELAY_ROUTING === '1';
+  const regions = (options.regions || (process.env.PANEL_RELAY_REGIONS || DEFAULT_RELAYS.join(',')).split(',')).map(relayOrigin);
+  const productOrigin = relayOrigin(options.productOrigin || process.env.PANEL_PRODUCT_ORIGIN || PRODUCT_ORIGIN);
+  const allowedOrigins = new Set([productOrigin, ...regions, ...(publicUrl ? [relayOrigin(publicUrl)] : [])]);
   const distDir = options.distDir || path.join(appRoot, 'dist');
   const connectors = new Map();
   const pending = new Map();
@@ -78,6 +85,33 @@ export function createRelayServer(options = {}) {
   server.timeout = 30000;
   app.disable('x-powered-by');
 
+  app.use((req, res, next) => {
+    if (!req.path.startsWith('/api/') && !req.path.startsWith('/relay/')) return next();
+    res.set('Cache-Control', 'no-store');
+    const origin = req.headers.origin;
+    if (origin) {
+      // Exact allowlist: another Toolkit subdomain is not an authorized UI.
+      const sameOrigin = origin === publicUrl || (!publicUrl && [ `http://${req.headers.host}`, `https://${req.headers.host}` ].includes(origin));
+      if (!sameOrigin && (!routing || !allowedOrigins.has(origin))) return res.status(403).json({ code: 'ORIGIN_DENIED' });
+      res.set('Access-Control-Allow-Origin', origin);
+      res.set('Access-Control-Allow-Credentials', 'true');
+      res.vary('Origin');
+    }
+    if (req.method === 'OPTIONS') {
+      res.set('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+      res.set('Access-Control-Allow-Headers', 'Content-Type, X-Vibe-Connector-Id, X-Vibe-Request-Id, X-Vibe-Instance-Id, Last-Event-ID');
+      res.set('Access-Control-Max-Age', '600');
+      return res.sendStatus(204);
+    }
+    next();
+  });
+  app.get('/relay/config', (_req, res) => res.json({ enabled: routing, origins: routing ? regions : [], productOrigin }));
+  app.get('/relay/probe', (req, res) => {
+    if (limit(`probe:${clientIp(req)}`, 120)) return res.sendStatus(429);
+    const id = String(req.query.connector || '');
+    res.json({ ok: true, online: connectors.get(id)?.readyState === WebSocket.OPEN });
+  });
+
   app.get('/healthz', (_req, res) => {
     res.json({
       ok: true,
@@ -90,6 +124,11 @@ export function createRelayServer(options = {}) {
   });
 
   const parseBody = express.raw({ type: () => true, limit: maxBodyBytes, inflate: false });
+  if (routing) {
+    for (const [route, file] of Object.entries({view:'controller.html', 'controller.css':'controller.css', 'live-capture.js':'live-capture.js', 'controller-bootstrap.js':'controller-bootstrap.js', 'relay-transport.js':'relay-transport.js'})) {
+      app.get('/api/desktop-controller/' + route, (_req, res) => { res.set('Cache-Control', 'no-store'); res.sendFile(path.join(distDir, file)); });
+    }
+  }
   app.use('/api', (req, res, next) => {
     const ip = clientIp(req);
     const pairing = /^\/pair\/?$/i.test(req.path);
@@ -164,8 +203,15 @@ export function createRelayServer(options = {}) {
   app.get(['/', '/app'], (req, res, next) => {
     const requested = String(req.query.relay || '');
     if (!requested) return next();
+    if (routing && /^[A-Za-z0-9_-]{43}$/.test(requested)) {
+      if (req.query.next === 'controller') return res.redirect(`/api/desktop-controller/view?relay=${encodeURIComponent(requested)}${req.query.pair ? '&pair=' + encodeURIComponent(String(req.query.pair)) : ''}`);
+      return next();
+    }
     if (!connectors.has(requested)) return res.status(503).type('html').send('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>电脑未连接 · Vibe Panel</title><body style="font:16px/1.8 system-ui,sans-serif;background:#f1f3ee;color:#1c211c;margin:0"><main style="max-width:600px;margin:60px auto;padding:0 24px"><h1>电脑 Connector 未连接</h1><p>请唤醒电脑并重新打开 Vibe Panel Connector，保持终端窗口运行。终端显示已连接后，刷新此页面。</p><p>已经配对的设备通常无需重新配对。如果这是首次配对且配对码已过期，请使用电脑上新生成的链接。</p><p><a href="/download">查看安装与启动说明</a></p></main></body></html>');
     res.setHeader('Set-Cookie', `vibe_relay_connector=${encodeURIComponent(requested)}; HttpOnly; SameSite=Lax; Secure; Path=/; Max-Age=31536000`);
+    // A fixed destination lets a new phone pair inside the remote without a
+    // second scan. Never accept arbitrary redirect destinations.
+    if (req.query.next === 'controller') return res.redirect(`/api/desktop-controller/view${req.query.pair ? '?pair=' + encodeURIComponent(String(req.query.pair)) : ''}`);
     const pairingCode = String(req.query.pair || '');
     res.redirect(pairingCode ? `/app?pair=${encodeURIComponent(pairingCode)}` : '/app');
   });

@@ -1,0 +1,35 @@
+# Run a regional Relay beside an existing reverse proxy. No public ports are
+# claimed. Attach the proxy to this network and route the dedicated hostname.
+services:
+  vibe-regional:
+    image: ${PANEL_RELAY_IMAGE:?set an immutable image tag}
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+    environment:
+      PANEL_RELAY_PORT: 8789
+      PANEL_RELAY_ROUTING: '1'
+      PANEL_RELAY_PUBLIC_URL: ${PANEL_RELAY_PUBLIC_URL:?set regional HTTPS origin}
+      PANEL_PRODUCT_ORIGIN: https://vibe.toolkit.fun
+      PANEL_RELAY_REGIONS: https://vibe-relay-cn.toolkit.fun,https://vibe-relay-global.toolkit.fun
+      PANEL_RELAY_TRUST_PROXY: ${PANEL_RELAY_TRUST_PROXY:?set exact proxy container IP}
+      PANEL_RELAY_MAX_CONNECTORS: 50
+      PANEL_RELAY_MAX_INFLIGHT: 50
+      PANEL_RELAY_MAX_UPLOADS: 4
+    networks:
+      proxy:
+        aliases: [vibe-regional]
+    ports:
+      - '127.0.0.1:8791:8789'
+    healthcheck:
+      test: ['CMD', 'node', '-e', 'fetch("http://127.0.0.1:8789/healthz").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))']
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: '10m', max-file: '3' }
+networks:
+  proxy:
+    external: true
+    name: ${PANEL_PROXY_NETWORK:?set existing proxy network}

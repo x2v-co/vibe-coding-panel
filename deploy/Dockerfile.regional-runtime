@@ -1,0 +1,12 @@
+# Build from the output of scripts/package-relay-runtime.mjs. The prebuilt
+# frontend must be generated from the same source revision as server/.
+ARG NODE_IMAGE=node:22-bookworm-slim
+FROM ${NODE_IMAGE}
+ARG VERSION
+ENV NODE_ENV=production PANEL_VERSION=$VERSION
+LABEL org.opencontainers.image.revision=$VERSION
+WORKDIR /app
+COPY . /app
+USER node
+EXPOSE 8789
+CMD ["node", "server/relay.js"]

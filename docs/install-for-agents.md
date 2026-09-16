@@ -69,7 +69,7 @@ Use `codex` in that file to choose Codex. `PANEL_AGENT_PROVIDER` takes precedenc
 npm run connect
 ```
 
-The launcher checks Agent availability, chooses a free local port, checks Whisper/ffmpeg, starts the local API, connects to the default shared Relay at `https://vibe.tooluse.app`, and prints a QR code and one-time pairing URL. Use a persistent terminal that will survive the agent's turn, preferably visible to the user. Keep this process running; do not start a duplicate Connector using the same identity. No account with Vibe Panel, personal Relay, Tailscale, or port forwarding is required.
+The launcher checks Agent availability, chooses a free local port, checks Whisper/ffmpeg, starts the local API, connects to the Toolkit China and global Relays with the mobile entry at `https://vibe.toolkit.fun`, and prints a QR code and one-time pairing URL. Use a persistent terminal that will survive the agent's turn, preferably visible to the user. Keep this process running; do not start a duplicate Connector using the same identity. No account with Vibe Panel, personal Relay, Tailscale, or port forwarding is required.
 
 Verify all of the following before reporting success:
 

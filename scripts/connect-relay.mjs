@@ -1,22 +1,20 @@
 import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import http from 'node:http';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import QRCode from 'qrcode';
-import { WebSocket } from 'ws';
+import { connectorRelayConfig } from '../server/relay-config.js';
+import { RelayConnector } from '../server/relay-connector.js';
 import { probeAgentProviders } from '../server/agent-providers.js';
 
 const apiPort = Number(process.env.PANEL_API_PORT || 8787);
-const relayInput = String(process.env.PANEL_RELAY_URL || '').trim();
+const { origins, publicOrigin } = connectorRelayConfig();
 const stateFile = process.env.PANEL_RELAY_STATE || path.join(homedir(), '.vibe-panel', 'relay.json');
-const inflight = new Map();
+const uplinks = [];
 let stopped = false;
-let reconnectDelay = 1000;
 let serverProcess;
 
-if (!relayInput) throw new Error('Set PANEL_RELAY_URL to your Relay HTTPS or WebSocket URL.');
 
 function verifyLocalAgents() {
   const providers = probeAgentProviders();
@@ -41,47 +39,6 @@ async function loadConnectorId() {
   const identity = { connectorId, connectorCredential };
   await writeFile(stateFile, `${JSON.stringify(identity, null, 2)}\n`, { mode: 0o600 });
   return identity;
-}
-
-function relayUrls(connectorId, connectorCredential) {
-  const url = new URL(relayInput);
-  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-  if (['http:', 'ws:'].includes(url.protocol) && !loopback) {
-    throw new Error('PANEL_RELAY_URL must use HTTPS/WSS outside local development.');
-  }
-  if (url.protocol === 'http:') url.protocol = 'ws:';
-  if (url.protocol === 'https:') url.protocol = 'wss:';
-  if (!['ws:', 'wss:'].includes(url.protocol)) throw new Error('PANEL_RELAY_URL must use HTTPS or WSS.');
-  url.pathname = '/relay/connect';
-  url.search = '';
-  url.searchParams.set('id', connectorId);
-  const publicOrigin = String(process.env.PANEL_RELAY_PUBLIC_URL || `${url.protocol === 'wss:' ? 'https:' : 'http:'}//${url.host}`).replace(/\/$/, '');
-  return { socketUrl: url.toString(), connectorCredential, mobileUrl: `${publicOrigin}/app?relay=${encodeURIComponent(connectorId)}` };
-}
-
-function send(socket, message) {
-  if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
-}
-
-function forwardRequest(socket, message) {
-  const request = http.request({
-    host: '127.0.0.1', port: apiPort, method: message.method, path: message.path,
-    headers: { ...(message.headers || {}), host: `127.0.0.1:${apiPort}` },
-  }, (response) => {
-    send(socket, { type: 'response-start', requestId: message.requestId, status: response.statusCode, headers: response.headers });
-    response.on('data', (chunk) => send(socket, { type: 'response-chunk', requestId: message.requestId, data: chunk.toString('base64') }));
-    response.on('end', () => {
-      inflight.delete(message.requestId);
-      send(socket, { type: 'response-end', requestId: message.requestId });
-    });
-  });
-  inflight.set(message.requestId, request);
-  request.on('error', (error) => {
-    inflight.delete(message.requestId);
-    send(socket, { type: 'response-error', requestId: message.requestId, error: error.message });
-  });
-  if (message.body) request.write(Buffer.from(message.body, 'base64'));
-  request.end();
 }
 
 async function printPairingUrl(mobileUrl) {
@@ -123,58 +80,35 @@ async function printPairingUrl(mobileUrl) {
   process.stderr.write(`Could not create a pairing link automatically. Open http://127.0.0.1:${apiPort} and create one in Settings.\n`);
 }
 
-function connect(socketUrl, connectorCredential, mobileUrl) {
-  if (stopped) return;
-  const socket = new WebSocket(socketUrl, {
-    headers: { Authorization: `Bearer ${connectorCredential}` },
-    maxPayload: 14 * 1024 * 1024,
-  });
-
-  socket.on('open', () => {
-    reconnectDelay = 1000;
-    process.stdout.write(`\n电脑 Connector 已连接。\n备用手机地址：${mobileUrl}\n`);
-  });
-  socket.on('message', (raw) => {
-    let message;
-    try { message = JSON.parse(raw.toString()); } catch { return; }
-    if (message.type === 'request') forwardRequest(socket, message);
-    if (message.type === 'cancel') {
-      inflight.get(message.requestId)?.destroy();
-      inflight.delete(message.requestId);
-    }
-  });
-  socket.on('error', (error) => process.stderr.write(`Relay connection error: ${error.message}\n`));
-  socket.on('close', () => {
-    for (const request of inflight.values()) request.destroy();
-    inflight.clear();
-    if (stopped) return;
-    process.stderr.write(`Relay disconnected. Reconnecting in ${Math.round(reconnectDelay / 1000)}s...\n`);
-    setTimeout(() => connect(socketUrl, connectorCredential, mobileUrl), reconnectDelay).unref();
-    reconnectDelay = Math.min(reconnectDelay * 2, 30_000);
-  });
-}
-
 const { connectorId, connectorCredential } = await loadConnectorId();
-const { socketUrl, mobileUrl } = relayUrls(connectorId, connectorCredential);
-verifyLocalAgents();
+const mobileUrl = `${publicOrigin}/app?relay=${encodeURIComponent(connectorId)}${process.env.PANEL_DESKTOP_CONTROLLER === '1' ? '&next=controller' : ''}`;
+if (process.env.PANEL_DESKTOP_CONTROLLER !== '1') verifyLocalAgents();
 if (!['1', 'true'].includes(String(process.env.PANEL_CONNECTOR_NO_SERVER || '').toLowerCase())) {
   serverProcess = spawn(process.execPath, ['server/index.js'], {
-    env: { ...process.env, PANEL_REQUIRE_PAIRING: '1', PANEL_PUBLIC_URL: mobileUrl },
+    env: { ...process.env, PANEL_REQUIRE_PAIRING: '1', PANEL_PUBLIC_URL: mobileUrl, PANEL_RELAY_URLS: origins.join(','), PANEL_RELAY_PUBLIC_URL: publicOrigin },
     stdio: 'inherit',
   });
   serverProcess.on('exit', (code) => {
     if (!stopped && code) process.stderr.write(`Local panel exited with code ${code}.\n`);
     stopped = true;
+    for (const uplink of uplinks) uplink.stop();
   });
 }
-void printPairingUrl(mobileUrl);
-connect(socketUrl, connectorCredential, mobileUrl);
+let pairingPrinted = false;
+for (const origin of origins) {
+  const uplink = new RelayConnector({ origin, connectorId, credential: connectorCredential, apiPort, log: message => process.stdout.write(`${message}\n`),
+    onReady: () => { if (!pairingPrinted) { pairingPrinted = true; void printPairingUrl(mobileUrl); } },
+  });
+  uplinks.push(uplink);
+  uplink.connect();
+  process.stdout.write(`备用手机地址：${origin}/app?relay=${connectorId}\n`);
+}
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => {
     stopped = true;
     serverProcess?.kill(signal);
-    for (const request of inflight.values()) request.destroy();
+    for (const uplink of uplinks) uplink.stop();
     process.exit(0);
   });
 }

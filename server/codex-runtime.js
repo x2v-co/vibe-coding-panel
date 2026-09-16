@@ -9,6 +9,14 @@ export class CodexRuntime {
   async start() {
     if (this.child) return;
     this.child = spawn(this.env.PANEL_CODEX_BIN || 'codex', ['app-server'], { env: this.env, stdio: ['pipe', 'pipe', 'ignore'] });
+    const child = this.child;
+    const failed = () => {
+      if (this.child !== child) return;
+      this.close(new Error('Codex app-server unavailable'));
+    };
+    child.once('error', failed);
+    child.once('exit', failed);
+    child.stdin.on('error', failed);
     this.lines = createInterface({ input: this.child.stdout });
     this.lines.on('line', (line) => this.receive(line));
     await this.request('initialize', { clientInfo: { name: 'vibe_panel_runtime', version: '0.1.0' } });
@@ -20,7 +28,18 @@ export class CodexRuntime {
     const targets = threadId ? (this.listeners.get(threadId) || []) : [...this.listeners.values()].flatMap((set) => [...set]);
     for (const fn of targets) fn(message);
   }
-  request(method, params) { return new Promise((resolve, reject) => { const id = ++this.seq; const timer = setTimeout(() => { this.pending.delete(id); reject(new Error(`Codex request timeout: ${method}`)); }, 30000); this.pending.set(id, { resolve: (v) => { clearTimeout(timer); resolve(v); }, reject: (e) => { clearTimeout(timer); reject(e); } }); this.child.stdin.write(`${JSON.stringify({ id, method, params })}\n`); }); }
+  request(method, params) {
+    return new Promise((resolve, reject) => {
+      if (!this.child?.stdin.writable) return reject(new Error('Codex app-server unavailable'));
+      const id = ++this.seq;
+      const timer = setTimeout(() => { this.pending.delete(id); reject(new Error(`Codex request timeout: ${method}`)); }, 30000);
+      this.pending.set(id, {
+        resolve: value => { clearTimeout(timer); resolve(value); },
+        reject: error => { clearTimeout(timer); reject(error); },
+      });
+      this.child.stdin.write(`${JSON.stringify({ id, method, params })}\n`);
+    });
+  }
   async turn(threadId, cwd, prompt) {
     await this.start();
     try {
@@ -34,5 +53,10 @@ export class CodexRuntime {
     return this.request('turn/start', { threadId, input: [{ type: 'text', text: prompt }], cwd });
   }
   subscribe(threadId, fn) { const set = this.listeners.get(threadId) || new Set(); set.add(fn); this.listeners.set(threadId, set); return () => { set.delete(fn); if (!set.size) this.listeners.delete(threadId); }; }
-  close() { this.lines?.close(); this.child?.kill('SIGTERM'); this.child = null; }
+  close(error = new Error('Codex app-server closed')) {
+    const child = this.child; this.child = null;
+    this.lines?.close(); child?.kill('SIGTERM');
+    for (const pending of this.pending.values()) pending.reject(error);
+    this.pending.clear();
+  }
 }
