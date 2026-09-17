@@ -147,9 +147,18 @@ export class NativeSessions {
     }
     return false;
   }
+  async codexReleaseCapability(id) {
+    if (process.platform === 'win32') return { canRelease: false, releaseHint: '请在电脑退出 Codex CLI 或 Codex App，释放后自动更新状态' };
+    const lock = path.join(this.env.CODEX_HOME || path.join(homedir(), '.codex'), 'thread-writer-locks', `${id}.lock`);
+    const owners = await inspectProcess('lsof', ['-t', '--', lock]);
+    const pids = owners.output.trim().split(/\s+/).map(Number).filter(pid => pid > 1);
+    const verified = owners.code === 0 && pids.length > 0 && (await Promise.all(pids.map(pid => verifiedAgentPid(pid, 'codex')))).every(Boolean);
+    return { canRelease: verified, releaseHint: verified ? '电脑终端占用中：退出后可继续' : '会话由 Codex App、共享服务或无法确认的进程占用。请在电脑保存草稿并退出 Codex App / 原 CLI，释放后自动更新状态；也可使用手机遥控器操作电脑会话。' };
+  }
   async release(provider, workspace, id, { timeoutMs = 10000, pollMs = 200 } = {}) {
     let session = await this.read(provider, workspace, id); // Validate ID and workspace before signaling.
     if (session.canResume) return { released: true, state: 'released', session };
+    if (session.canRelease === false) throw error(session.releaseHint || '请在电脑退出原 CLI 后重试', 409);
     if (process.platform === 'win32') throw error('请在电脑终端按 Ctrl+C 或退出 CLI，等待会话释放后重试', 409);
     if (!await this.signalRelease(provider, id)) throw error('无法核实终端进程，请在电脑退出原 CLI 后重试', 409);
     const deadline = Date.now() + timeoutMs;
@@ -265,7 +274,7 @@ export class NativeSessions {
       }
       const active = t.status?.type === 'active' || t.turns?.at(-1)?.status === 'inProgress';
       const attached = active || await this.attached(provider, id);
-      return { id, provider, cwd, title: title(t.name || t.preview) || id, updatedAt: time(t.updatedAt), messages: messages.slice(-100), truncated: messages.length > 100, canRelease: process.platform !== 'win32', canResume: !attached, status: attached ? 'attached' : 'saved' };
+      return { id, provider, cwd, title: title(t.name || t.preview) || id, updatedAt: time(t.updatedAt), messages: messages.slice(-100), truncated: messages.length > 100, ...(attached ? await this.codexReleaseCapability(id) : { canRelease: false }), canResume: !attached, status: attached ? 'attached' : 'saved' };
     }
     if (provider !== 'claude') throw error('不支持的 Agent');
     for (const file of await this.claudeFiles()) {
