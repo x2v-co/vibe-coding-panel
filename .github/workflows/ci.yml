@@ -34,6 +34,28 @@ jobs:
       - if: runner.os == 'Linux'
         run: python3 deploy/test-release.py
 
+  browser-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run build
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-failure-evidence
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
   cli-compatibility:
     timeout-minutes: 10
     strategy:
@@ -93,7 +115,7 @@ jobs:
 
   release:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: [test, cli-compatibility, windows-terminal, linux-terminal]
+    needs: [test, browser-acceptance, cli-compatibility, windows-terminal, linux-terminal]
     runs-on: ubuntu-latest
     permissions:
       contents: write

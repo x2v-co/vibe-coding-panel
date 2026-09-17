@@ -12,21 +12,31 @@ or regional deployments have been updated. Record each result separately.
 | Failed correction / tool attempt / provider switching | `server/codex-correction.test.js`, `server/transcript-correction.test.js` | Original text preserved; no cross-provider fallback |
 | Workspace isolation, shared daemon ownership, release timeout | `server/native-sessions.test.js` | No signal to shared process; timeout never means success |
 | Real terminal handoff and same-session continuation | CI `windows-terminal`, `linux-terminal` | Real PTY/ConPTY; Windows manual release |
+| Real phone browser UI | `npm run test:browser`, CI `browser-acceptance` | Chromium/Pixel and WebKit/iPhone: pairing errors and normalization, all eight templates, one-row keys, recording boundary, explicit send, disconnect and unsent draft recovery |
 | First controller scan and pairing identity | `server/regional-relays.test.js`, `server/controller-page.test.js` | Route, code and identity survive; phone pairing works |
 | Network loss / uncertain writes / duplicate sends | `server/connection-monitor.test.js`, Relay and controller tests | Preserve draft; no implicit resubmit |
 | Installed Connector package | CI package test on all four platforms | Launchers and bundled runtime |
 | Actual deployed website | `scripts/verify-production.mjs` | Backend SHA, frontend SHA, JS/CSS HTTP success; healthy old code fails |
 
-Run `npm test`, `npm run test:acceptance`, `npm run build`. The existing CI
+Run `npm test`, `npm run test:acceptance`, `npm run build`, then `npm run test:browser`.
+Install browsers once with `npx playwright install chromium webkit` (Linux CI adds `--with-deps`).
+Browser tests serve the actual production build on isolated port 4189, with per-test API fixtures.
+Service workers are blocked so API fixtures remain deterministic; PWA installation/offline caching is not covered.
+No installed Connector, desktop session or real account is touched. API responses and microphone
+hardware are simulated; this does not test recognition quality or the actual correction backend.
+The real CLI and backend gates cover those protocol boundaries separately.
+Browser failures block Release and upload screenshots, traces and an HTML report for 14 days.
+Open locally with `npx playwright show-report`. The existing CI
 CLI compatibility matrix also runs the real voice correction test automatically.
 Model quality and real OAuth account validity are not simulated by the fixture.
 
-## Required manual acceptance (never infer from CLI tests)
+## Physical-device smoke checks (not a repeated full manual suite)
 
-Record release SHA, device/browser, Connector version, result and evidence:
+Run these focused checks when microphone capture, mobile lifecycle, account authentication or
+desktop integration changes, and before the first public release. Routine layout and logic
+changes use the automated gates above. Record SHA, device/browser and Connector version:
 
-- Fresh phone browser: scan, pair, usable mobile layout; no horizontal page scroll.
-- Existing phone: refresh/reconnect without pairing again; unsent draft survives.
+- Real phone: microphone permission and audio capture (browser layout/pairing/reload are automated).
 - Codex-only with actual OAuth login: record, correct, review and explicitly send.
 - Claude-only: record, correct, review and explicitly send.
 - Codex App holding a session: manual-release guidance, no terminal-exit button;
