@@ -187,3 +187,10 @@ test('incomplete live Claude metadata blocks resume until ownership is readable'
     assert.equal(await sessions.attached('claude', id), false, 'missing directory is an unused Claude installation');
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test('shared Codex owner reports manual handoff without signaling any process', async () => {
+  const sessions = new NativeSessions({codex:{close(){}}});
+  sessions.read = async () => ({canResume:false,canRelease:false,releaseHint:'请在电脑退出 Codex App'});
+  sessions.signalRelease = async () => assert.fail('shared app must not receive a terminal signal');
+  await assert.rejects(sessions.release('codex','workspace','session'), e => e.status === 409 && /Codex App/.test(e.message));
+});

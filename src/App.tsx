@@ -35,7 +35,7 @@ type SavedJob = {
 type WorkspaceDirectory = { name: string; path: string };
 type PairedDevice = { id: string; name: string; userAgent: string; createdAt: number; lastSeenAt: number };
 type PairingInfo = { code: string; expiresAt: number; pairingUrl: string };
-type NativeSession = { id: string; provider: AgentProviderId; cwd: string; title: string; updatedAt: number; status?: string; canResume?: boolean; canRelease?: boolean; truncated?: boolean; messages?: { role: string; text: string; at: number }[] };
+type NativeSession = { id: string; provider: AgentProviderId; cwd: string; title: string; updatedAt: number; status?: string; canResume?: boolean; canRelease?: boolean; releaseHint?: string; truncated?: boolean; messages?: { role: string; text: string; at: number }[] };
 
 const ACTIVE_JOB_KEY = 'vibe-panel-active-job-id';
 const MICRO_KEYS_VERSION = '2';
@@ -432,7 +432,7 @@ function PanelApp() {
       setNativeHandoff({ key, state: 'released', message: '终端已释放，可以继续此会话' });
       setNativeSelection(current => current?.id === session.id && current.provider === session.provider ? payload.session : current);
     } catch (reason) {
-      setNativeHandoff({ key, state: reason instanceof DOMException && reason.name === 'TimeoutError' ? 'timeout' : 'error', message: '交接未确认完成，请检查电脑终端状态后重试' });
+      setNativeHandoff({ key, state: reason instanceof DOMException && reason.name === 'TimeoutError' ? 'timeout' : 'error', message: session.releaseHint || '交接未确认完成。请在电脑检查 Codex App 或原 CLI 是否仍占用此会话；已有草稿已保留，请勿重复发送'  });
     } finally { nativeReleasePendingRef.current = false; }
   }
 
@@ -629,6 +629,12 @@ function PanelApp() {
   }, [showSettings]);
 
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('next') === 'controller' && window.location.pathname === '/app') {
+      const params = new URLSearchParams(window.location.search);
+      params.delete('next');
+      window.location.replace(`/api/desktop-controller/view${params.toString() ? `?${params.toString()}` : ''}`);
+      return;
+    }
     if (sessionInitRef.current) return;
     sessionInitRef.current = true;
     const initialize = async () => {
@@ -1017,7 +1023,11 @@ function PanelApp() {
       if (!transcript) throw new Error('没有识别到语音，请靠近麦克风后重试');
       // Preserve edits made while transcription/correction was in flight.
       setPrompt(current => [current.trim(), transcript].filter(Boolean).join(' '));
-      if (payload.correction?.status === 'unavailable') setError('当前模式的文字纠错暂不可用，已保留语音识别原文');
+      if (payload.correction?.status === 'unavailable') {
+        setError(agentProvider === 'codex'
+          ? 'Codex 文字校对暂未完成，已保留语音识别原文。请检查电脑上的 Codex CLI 登录和网络状态后重试。'
+          : 'Claude Code 的文字校对暂不可用，已保留语音识别原文；请检查 Claude 登录状态后重试。');
+      }
     } catch (reason) {
       if (voiceSession === voiceSessionRef.current) {
         setCanImportRecording(true);
@@ -1521,8 +1531,10 @@ function PanelApp() {
           const state = providers.find((provider) => provider.id === option.id);
           const ready = state?.available && state.authenticated;
           const stateLabel = !state ? '等待检测' : !state.available ? '未安装' : !state.authenticated ? '未登录' : '可用';
-          return <button type="button" key={option.id} aria-pressed={agentProvider === option.id} onClick={() => selectAgentProvider(option.id)} disabled={busy || Boolean(state && !ready)} title={state?.version || option.description}><Terminal size={16} /><span><strong>{option.label}</strong><small className={ready ? 'ready' : ''}>{stateLabel}</small></span></button>;
+          const help = !state ? '正在检测电脑环境' : !state.available ? `${option.id === 'codex' ? '请安装 Codex CLI' : '请安装 Claude Code'}` : !state.authenticated ? `${option.id === 'codex' ? '请在电脑终端运行 codex login' : '请在电脑终端运行 claude auth login'}` : option.description;
+          return <button type="button" key={option.id} aria-pressed={agentProvider === option.id} onClick={() => selectAgentProvider(option.id)} disabled={busy || Boolean(state && !ready)} title={help}><Terminal size={16} /><span><strong>{option.label}</strong><small className={ready ? 'ready' : ''}>{stateLabel}</small></span></button>;
         })}</div>
+        <p className="agent-help">状态来自电脑 Connector。Codex 未登录时，在电脑终端运行 <code>codex login</code>；Claude Code 未登录时运行 <code>claude auth login</code>，完成后重启 Connector。</p>
       </fieldset>}
 
       {!pairingAdmin && <fieldset className="pairing-fieldset">
@@ -1605,7 +1617,7 @@ function PanelApp() {
                   {result && !busy && !capturePreview ? <div className="result-screen"><span className="screen-label">{status === 'stopped' ? '已停止' : status === 'failed' ? '任务异常' : 'TASK COMPLETE'}</span><div className="result-heading"><strong>{taskTitle}</strong><button type="button" className="copy-result" title={copied ? '已复制' : '复制结果'} aria-label={copied ? '已复制' : '复制结果'} onClick={async () => { await navigator.clipboard.writeText(result); setCopied(true); window.setTimeout(() => setCopied(false), 1500); }}>{copied ? <Check size={16} /> : <Copy size={16} />}</button></div><p>{result}</p></div>
                     : busy ? <div className="running-screen"><span className="screen-label">NOW RUNNING</span><strong>{taskTitle || '正在启动 Agent'}</strong><p>{latestProgress}</p><div className="progress-track"><i /></div></div>
                     : isRecoveringJob ? <div className="running-screen recovering-screen"><span className="screen-label">RESTORING SESSION</span><strong>正在恢复上次任务</strong><p>正在连接 Agent 并读取最新进度</p><div className="progress-track"><i /></div></div>
-                    : <div className={`command-screen ${capturePreview ? 'has-capture' : ''}`}>{capturePreview && <div className="capture-preview"><img src={capturePreview} alt="已添加的图片上下文" /><div><span>VISUAL CONTEXT</span><strong>图片已装载</strong></div><button type="button" onClick={() => { setCapturePath(''); setCapturePreview(''); }} aria-label="移除图片"><X size={16} /></button></div>}{isListening && <div className="waveform" aria-hidden="true">{Array.from({ length: 28 }, (_, index) => <i key={index} />)}</div>}<div className="screen-label">{nativeSelection ? 'NATIVE SESSION' : isListening ? 'LISTENING' : isTranscribing ? 'TRANSCRIBING' : 'COMMAND DRAFT'}</div>{nativeSelection && <div className="native-selected-session"><strong>{nativeSelection.title}</strong><small role="status" aria-live="polite">{selectedHandoff?.state === 'releasing' || selectedHandoff?.state === 'timeout' || selectedHandoff?.state === 'error' ? selectedHandoff.message : confirmNativeRelease ? '请求交接：确认后将中断电脑上的当前任务' : nativeSelection.canResume === false ? (nativeSelection.canRelease === false ? '请在电脑退出 CLI，释放后可继续' : '电脑终端占用中：退出后可继续') : selectedHandoff?.state === 'released' ? selectedHandoff.message : '已连接，输入内容将继续此会话'}</small>{nativeSelection.canResume === false && nativeSelection.canRelease !== false && (nativeSelection.provider === 'codex' || nativeSelection.provider === 'claude') && (confirmNativeRelease ? <span className="release-native-confirm"><span>退出当前电脑终端？</span><button type="button" className="release-native-cancel" onClick={() => setConfirmNativeRelease(false)}>取消</button><button type="button" className="release-native-button danger" onClick={() => void releaseNativeTerminal()}>确认退出</button></span> : <button type="button" className="release-native-button" disabled={selectedHandoff?.state === 'releasing'} onClick={() => setConfirmNativeRelease(true)}>请求退出电脑终端</button>)}</div>}<label htmlFor="command">任务指令</label><textarea id="command" ref={promptRef} value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void execute(); } }} rows={3} maxLength={3000} placeholder={isListening ? '正在录音，再按一次结束…' : isTranscribing ? '正在转写与校对…' : nativeSelection ? '继续这个原生会话…' : '按下语音键，或在这里输入…'} /></div>}
+                    : <div className={`command-screen ${capturePreview ? 'has-capture' : ''}`}>{capturePreview && <div className="capture-preview"><img src={capturePreview} alt="已添加的图片上下文" /><div><span>VISUAL CONTEXT</span><strong>图片已装载</strong></div><button type="button" onClick={() => { setCapturePath(''); setCapturePreview(''); }} aria-label="移除图片"><X size={16} /></button></div>}{isListening && <div className="waveform" aria-hidden="true">{Array.from({ length: 28 }, (_, index) => <i key={index} />)}</div>}<div className="screen-label">{nativeSelection ? 'NATIVE SESSION' : isListening ? 'LISTENING' : isTranscribing ? 'TRANSCRIBING' : 'COMMAND DRAFT'}</div>{nativeSelection && <div className="native-selected-session"><strong>{nativeSelection.title}</strong><small role="status" aria-live="polite">{selectedHandoff?.state === 'releasing' || selectedHandoff?.state === 'timeout' || selectedHandoff?.state === 'error' ? selectedHandoff.message : confirmNativeRelease ? '请求交接：确认后将中断电脑上的当前任务' : nativeSelection.canResume === false ? (nativeSelection.releaseHint || (nativeSelection.canRelease === false ? '请在电脑退出 CLI，释放后可继续' : '电脑终端占用中：退出后可继续')) : selectedHandoff?.state === 'released' ? selectedHandoff.message : '已连接，输入内容将继续此会话'}</small>{nativeSelection.canResume === false && nativeSelection.canRelease !== false && (nativeSelection.provider === 'codex' || nativeSelection.provider === 'claude') && (confirmNativeRelease ? <span className="release-native-confirm"><span>退出当前电脑终端？</span><button type="button" className="release-native-cancel" onClick={() => setConfirmNativeRelease(false)}>取消</button><button type="button" className="release-native-button danger" onClick={() => void releaseNativeTerminal()}>确认退出</button></span> : <button type="button" className="release-native-button" disabled={selectedHandoff?.state === 'releasing'} onClick={() => setConfirmNativeRelease(true)}>请求退出电脑终端</button>)}</div>}<label htmlFor="command">任务指令</label><textarea id="command" ref={promptRef} value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void execute(); } }} rows={3} maxLength={3000} placeholder={isListening ? '正在录音，再按一次结束…' : isTranscribing ? '正在转写与校对…' : nativeSelection ? '继续这个原生会话…' : '按下语音键，或在这里输入…'} /></div>}
                 </div>
                 {result && !busy && !capturePreview && <textarea id="command" className="micro-followup" ref={promptRef} aria-label="继续当前任务" rows={2} value={prompt} maxLength={3000} placeholder={isListening ? '正在录音…' : isTranscribing ? '正在转写…' : '继续当前任务…'} onChange={(event) => setPrompt(event.target.value)} />}
                 <div className="activity-strip">{recentActivity.length ? recentActivity.map((item) => <div key={item.id}><span>{item.type === 'tool' ? 'CMD' : item.type === 'status' ? 'SYS' : 'AI'}</span><p>{item.text}</p></div>) : <div><span>SYS</span><p>{capturePath ? '图片上下文已准备' : '等待输入'}</p></div>}</div>
