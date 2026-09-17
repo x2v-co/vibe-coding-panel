@@ -49,19 +49,19 @@ test('fresh phone pairs in settings, normalizes pasted code, and stays paired af
   await page.reload(); await expect(page.locator('#mic')).toBeEnabled(); await fits(page);
   expect(f.commands).toEqual([]); expect(f.errors).toEqual([]);
 });
-test('all templates fit a phone; AhaKey and Voice Five keys stay on one row', async ({ page }) => {
+for (const id of ['console','bar','matrix','hardware-tri','hardware-vibebar','hardware-five','hardware-aha','micro']) {
+test(`phone template ${id} fits and persists; hardware keys stay on one row`, async ({ page }) => {
   const f = await fixture(page); await page.goto(remote); await expect(page.locator('#mic')).toBeEnabled();
-  for (const id of ['console','bar','matrix','hardware-tri','hardware-vibebar','hardware-five','hardware-aha','micro']) {
     await page.locator('#open-settings').click(); await page.locator('#template-'+id).click(); await page.locator('#close-settings').click();
     await fits(page);
     if (['hardware-five', 'hardware-aha'].includes(id)) {
       const tops = await page.locator('.input-keypad > button:visible').evaluateAll(es => es.map(e => e.getBoundingClientRect().top));
       expect(tops.length).toBeGreaterThanOrEqual(4); expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(2);
     }
-  }
-  await page.reload(); await page.locator('#open-settings').click(); await expect(page.locator('#template-micro')).toHaveAttribute('aria-pressed','true');
+  await page.reload(); await page.locator('#open-settings').click(); await expect(page.locator('#template-'+id)).toHaveAttribute('aria-pressed','true');
   expect(f.errors).toEqual([]);
 });
+}
 test('recorded segment becomes a computer draft, and send failure is never replayed on reconnect', async ({ page }) => {
   const f = await fixture(page);
   // Replace only the hardware boundary; exercise real FileReader, fetch and page handlers.
