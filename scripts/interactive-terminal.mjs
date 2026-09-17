@@ -104,7 +104,7 @@ export async function checkInteractiveTerminal({ provider, bin, id, workspace, e
     const occupied = await sessions.read(provider, workspace, id);
     assert.equal(occupied.status, 'attached');
     assert.equal(occupied.canRelease, !windows);
-    if (windows) await assert.rejects(sessions.release(provider, workspace, id), /Ctrl\+C|退出 CLI/);
+    if (windows) await assert.rejects(sessions.release(provider, workspace, id), /Ctrl\+C|退出 (?:Codex )?CLI/);
     assert.equal(exited, false, 'unsupported remote release must leave the terminal running');
     assert.equal((await sessions.read(provider, workspace, id)).canResume, false);
     await waitFor('waiting for resumed transcript in terminal', () => {
