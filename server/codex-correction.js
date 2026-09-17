@@ -100,7 +100,6 @@ export async function runCodexCliCorrection(text, instructions, { env = process.
     // Run official Codex from a minimal home to avoid loading the user's plugin
     // catalog. Custom test wrappers keep their supplied environment contract.
     if (isolateHome) isolatedHome = await mkdtemp(path.join(tmpdir(), 'vibe-codex-home-'));
-    else isolatedHome = env.CODEX_HOME;
     const sourceHome = env.CODEX_HOME || path.join(homedir(), '.codex');
     if (isolateHome) {
       await mkdir(isolatedHome, { recursive: true });
