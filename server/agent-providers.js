@@ -27,14 +27,14 @@ export function providerBinary(provider, env = process.env) {
   return env[definition.envBin] || definition.defaultBin;
 }
 
-export function probeAgentProviders(env = process.env) {
+export function probeAgentProviders(env = process.env, run = spawnSync) {
   return Object.values(agentProviders).map((provider) => {
     const executable = providerBinary(provider.id, env);
-    const result = spawnSync(executable, ['--version'], { encoding: 'utf8', timeout: 5000, env });
+    const result = run(executable, ['--version'], { encoding: 'utf8', timeout: 5000, env });
     let authenticated = false;
     if (!result.error && result.status === 0) {
       const authArgs = provider.id === 'claude' ? ['auth', 'status'] : ['login', 'status'];
-      const auth = spawnSync(executable, authArgs, { encoding: 'utf8', timeout: 10_000, env });
+      const auth = run(executable, authArgs, { encoding: 'utf8', timeout: 10_000, env });
       authenticated = !auth.error && auth.status === 0;
       if (provider.id === 'claude' && authenticated) {
         try { authenticated = JSON.parse(auth.stdout).loggedIn === true; } catch { authenticated = false; }

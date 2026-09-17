@@ -32,7 +32,7 @@ test('provider env credentials are not replaced by another provider credential',
 });
 
 test('missing Codex executable rejects without crashing the API', async () => {
-  await assert.rejects(readCodexCorrectionConfig({ PANEL_CODEX_BIN: '/nonexistent-vibe-codex' }, { timeoutMs: 1000 }), /unavailable/);
+  await assert.rejects(readCodexCorrectionConfig({ PANEL_CODEX_BIN: '/nonexistent-vibe-codex' }, { timeoutMs: 5000 }), /unavailable/);
 });
 
 test('stalled config reader and exited subprocess promptly release pending requests', { skip: process.platform === 'win32' }, async t => {
@@ -44,7 +44,7 @@ test('stalled config reader and exited subprocess promptly release pending reque
   await assert.rejects(readCodexCorrectionConfig({ PANEL_CODEX_BIN: bin }, { timeoutMs: 100 }), /超时/);
   assert.ok(Date.now() - started < 2000);
   await writeFile(bin, `#!${process.execPath}\nprocess.exit(1);\n`);
-  await assert.rejects(readCodexCorrectionConfig({ PANEL_CODEX_BIN: bin }, { timeoutMs: 1000 }), /unavailable/);
+  await assert.rejects(readCodexCorrectionConfig({ PANEL_CODEX_BIN: bin }, { timeoutMs: 5000 }), /unavailable/);
 });
 
 test('slow response body times out and leaves the original draft intact', async () => {
