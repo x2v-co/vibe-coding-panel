@@ -88,7 +88,13 @@ export async function runCodexCliCorrection(text, instructions, { env = process.
       const localName = name.split('@', 1)[0];
       if (/^[A-Za-z0-9._-]+$/.test(localName)) overrides[`plugins.${JSON.stringify(localName)}.enabled`] = false;
     }
-    const args = ['exec', '--json', '--ephemeral', '--sandbox', 'read-only', '--skip-git-repo-check', ...Object.entries(overrides).flatMap(([key, value]) => ['-c', `${key}=${JSON.stringify(value)}`]), '-'];
+    // The user's full config can contain a large plugin/skill catalog. Loading
+    // it for a one-line correction regularly spends the whole request budget
+    // refreshing plugins before the model turn starts. Authentication is still
+    // read from CODEX_HOME/auth.json; only non-essential user config is skipped.
+    const args = ['exec', '--ignore-user-config', '--json', '--ephemeral', '--sandbox', 'read-only', '--skip-git-repo-check',
+      '-c', `model=${JSON.stringify(config.model)}`,
+      ...Object.entries(overrides).flatMap(([key, value]) => ['-c', `${key}=${JSON.stringify(value)}`]), '-'];
     const child = spawn(command, args, { cwd, env, stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true });
     let output = '', settled = false;
     const finish = (error, value) => { if (settled) return; settled = true; clearTimeout(timer); error ? reject(error) : resolve(value); };
