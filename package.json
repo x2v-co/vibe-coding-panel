@@ -22,20 +22,22 @@
     "test": "node --test server/*.test.js",
     "doctor": "node scripts/launch.mjs --doctor",
     "test:acceptance": "node --test scripts/acceptance.test.mjs",
-    "controller": "node scripts/controller.mjs"
+    "controller": "node scripts/controller.mjs",
+    "test:browser": "playwright test"
   },
   "dependencies": {
-    "cross-spawn": "^7.0.6",
     "@vitejs/plugin-react": "latest",
+    "cross-spawn": "^7.0.6",
     "express": "latest",
     "lucide-react": "latest",
     "qrcode": "^1.5.4",
     "react": "latest",
     "react-dom": "latest",
-    "ws": "^8.18.0",
-    "vite": "latest"
+    "vite": "latest",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@types/express": "latest",
     "@types/node": "latest",
     "@types/qrcode": "^1.5.6",

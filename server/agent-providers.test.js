@@ -39,3 +39,28 @@ test('Codex JSONL remains compatible with the common event format', () => {
   assert.equal(job.result, 'done');
   assert.deepEqual(events, [{ type: 'message', text: 'done' }]);
 });
+
+test('Codex-only and Claude-only installations do not require the other agent', async () => {
+  const {probeAgentProviders} = await import('./agent-providers.js');
+  for (const installed of ['codex', 'claude']) {
+    for (const loggedIn of [true, false]) {
+      const results = probeAgentProviders({}, (bin, args) => {
+        if (bin !== installed) return {error:{code:'ENOENT'},status:null};
+        if (args[0] === '--version') return {status:0,stdout:'fixture 1.0'};
+        return {status:loggedIn ? 0 : 1,stdout:JSON.stringify({loggedIn})};
+      });
+      assert.equal(results.find(p=>p.id===installed).available,true);
+      assert.equal(results.find(p=>p.id===installed).authenticated,loggedIn);
+      assert.equal(results.find(p=>p.id!==installed).available,false);
+    }
+  }
+});
+
+test('login timeout and malformed Claude auth responses never report ready', async () => {
+  const {probeAgentProviders} = await import('./agent-providers.js');
+  for (const auth of [{status:null,error:{code:'ETIMEDOUT'}},{status:1,stdout:''}]) {
+    assert(probeAgentProviders({}, (_bin,args)=>args[0]==='--version'?{status:0,stdout:'v1'}:auth).every(p=>p.available&&!p.authenticated));
+  }
+  const results=probeAgentProviders({}, (_bin,args)=>({status:0,stdout:args[0]==='--version'?'v1':'invalid json'}));
+  assert.equal(results.find(p=>p.id==='claude').authenticated,false);
+});

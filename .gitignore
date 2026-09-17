@@ -18,3 +18,5 @@ deploy/deploy.lock
 deploy/failed-release
 
 release/
+
+playwright-report/

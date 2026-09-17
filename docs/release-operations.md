@@ -82,3 +82,11 @@ freeze releases. For a manual restart use `docker compose --env-file .env
 --env-file deploy/image.env -f docker-compose.relay.yml -f deploy/image.yml up -d`.
 A release restarts Relay; paired Connectors automatically reconnect, but inflight
 HTTP streams can be interrupted. Local agent tasks remain on their computers.
+
+## Required regression and deployed-product evidence
+
+Follow [the release regression matrix](release-regression-matrix.md) before
+marking a release complete. The package CI and legacy updater do not deploy
+regional hosts. Run the separate **Verify deployed product** workflow after
+regional deployment; record the website and Connector package revisions and
+manual phone/App acceptance results separately.

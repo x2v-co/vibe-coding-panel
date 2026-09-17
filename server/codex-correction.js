@@ -80,7 +80,7 @@ export async function runCodexCliCorrection(text, instructions, { env = process.
   try {
   return await new Promise((resolve, reject) => {
     const command = env.PANEL_CODEX_BIN || 'codex';
-    const overrides = { approval_policy: 'never', web_search: 'disabled', project_doc_max_bytes: 0, developer_instructions: instructions, 'features.shell_tool': false, 'features.unified_exec': false, 'features.js_repl': false, 'features.apps': false, 'features.hooks': false };
+    const overrides = { approval_policy: 'never', web_search: 'disabled', project_doc_max_bytes: 0, developer_instructions: instructions, 'features.shell_tool': false, 'features.unified_exec': false, 'features.js_repl': false, 'features.apps': false, 'features.hooks': false, 'features.multi_agent': false, 'features.multi_agent_v2': false, 'features.view_image': false, 'features.collaboration_modes': false };
     for (const name of Object.keys(config.mcp_servers || {})) overrides[`mcp_servers.${JSON.stringify(name)}.enabled`] = false;
     for (const name of Object.keys(config.plugins || {})) overrides[`plugins.${JSON.stringify(name)}.enabled`] = false;
     const args = ['exec', '--json', '--ephemeral', '--sandbox', 'read-only', '--skip-git-repo-check', ...Object.entries(overrides).flatMap(([key, value]) => ['-c', `${key}=${JSON.stringify(value)}`]), '-'];
@@ -95,7 +95,7 @@ export async function runCodexCliCorrection(text, instructions, { env = process.
       if (code !== 0) return finish(new Error('Codex CLI 纠错不可用'));
       try {
         const events = output.trim().split(/\r?\n/).map(line => JSON.parse(line));
-        if (!events.some(event => event.type === 'turn.completed') || events.some(event => ['turn.failed', 'error'].includes(event.type) || (event.item && !['agent_message', 'reasoning'].includes(event.item.type)))) throw new Error('Codex 纠错结果不完整');
+        if (!events.some(event => event.type === 'turn.completed') || events.some(event => ['turn.failed', 'error'].includes(event.type) || (event.item && !['agent_message', 'reasoning', 'error'].includes(event.item.type)))) throw new Error('Codex 纠错结果不完整');
         const message = [...events].reverse().find(event => event.type === 'item.completed' && event.item?.type === 'agent_message');
         const result = message?.item?.text || message?.item?.content;
         if (typeof result !== 'string' || !result.trim()) throw new Error('Codex 纠错结果为空');

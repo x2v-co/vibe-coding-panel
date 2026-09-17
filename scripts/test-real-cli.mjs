@@ -7,6 +7,7 @@ import { mkdtemp, mkdir, writeFile, appendFile, rm, readdir, readFile } from 'no
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import spawn from 'cross-spawn';
+import { runCodexCliCorrection } from '../server/codex-correction.js';
 import { NativeSessions } from '../server/native-sessions.js';
 import { checkInteractiveTerminal } from './interactive-terminal.mjs';
 
@@ -37,7 +38,7 @@ const server = createServer(async (req, res) => {
     const provider = req.url.includes('messages') ? 'claude' : 'codex';
     requests.push({ provider, input });
     await observeRequest(provider, input);
-    const reply = 'COMPATIBILITY_READY';
+    const reply = JSON.stringify(input).includes('VOICE_CORRECTION_FIXTURE') ? '{"text":"请回复收到"}' : 'COMPATIBILITY_READY';
     res.setHeader('Content-Type', 'text/event-stream');
     const event = (type, data) => res.write(`event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`);
     if (provider === 'claude') {
@@ -81,6 +82,14 @@ function run(bin, args) {
 }
 const sessions = new NativeSessions({ env });
 try {
+  const beforeCorrection = requests.length;
+  const corrected = await runCodexCliCorrection('请回复收告', 'VOICE_CORRECTION_FIXTURE: 只校对并返回 JSON', {env, timeoutMs: 25000});
+  assert.equal(JSON.parse(JSON.parse(corrected).result).text, '请回复收到');
+  const correctionRequests = requests.slice(beforeCorrection);
+  assert(correctionRequests.length > 0);
+  assert(correctionRequests.every(r => r.provider === 'codex'), 'Codex correction must never use Claude');
+  assert(correctionRequests.every(r => (r.input.tools || []).every(tool => tool.name === 'request_user_input')), 'correction must not expose execution, file or delegation tools');
+  console.log('Codex correction: real CLI, no API key, no Claude, no execution/file/delegation tools passed');
   for (const provider of ['codex', 'claude']) {
     const bin = env[provider === 'codex' ? 'PANEL_CODEX_BIN' : 'PANEL_CLAUDE_BIN'];
     console.log((await run(bin, ['--version'])).trim());
