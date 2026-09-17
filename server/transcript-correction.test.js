@@ -98,6 +98,7 @@ test('slow transcription leaves a bounded correction budget or skips it', async 
   let budget;
   const correct=createTranscriptCorrector({env:{},run:async(text,options)=>{budget=options.timeoutMs;return result(text);}});
   assert.equal(await correct('原文',{timeoutMs:50}),'原文');assert.equal(budget,50);
-  assert.equal(await correct('原文',{timeoutMs:60000}),'原文');assert.equal(budget,25000);
+  assert.equal(await correct('原文',{timeoutMs:60000}),'原文');assert.equal(budget,45000);
+  await correct('原文',{timeoutMs:60000,provider:'claude'});assert.equal(budget,25000);
   budget=null;assert.equal(await correct('原文',{timeoutMs:0}),'原文');assert.equal(budget,null);
 });

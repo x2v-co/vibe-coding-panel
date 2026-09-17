@@ -115,7 +115,7 @@ export function createTranscriptCorrector({ run = correctWithProvider, env = pro
     if (timeoutMs <= 0 || !original.trim() || original.length > 3000 || env.PANEL_TRANSCRIPT_CORRECTION === 'off' || active) return original;
     active = true;
     try {
-      const text = parseCorrection(await run(original, { env, provider, timeoutMs: Math.min(timeoutMs, 25000) }), original);
+      const text = parseCorrection(await run(original, { env, provider, timeoutMs: Math.min(timeoutMs, provider === 'codex' ? 45000 : 25000) }), original);
       onStatus('completed'); return text;
     }
     catch { onStatus('unavailable'); return original; }

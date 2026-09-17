@@ -115,6 +115,7 @@ const assert = require('node:assert/strict');
 assert.notEqual(process.cwd(), process.env.WORKSPACE);
 assert.equal(process.env.CODEX_HOME, 'existing-login-home');
 assert.ok(process.argv.includes('--ephemeral'));
+assert.ok(process.argv.includes('model_reasoning_effort=\"low\"'));
 assert.ok(process.argv.includes('features.shell_tool=false'));
 assert.ok(process.argv.includes('plugins."example".enabled=false'));
 process.stdin.resume();

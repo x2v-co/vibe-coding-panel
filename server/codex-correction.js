@@ -5,7 +5,7 @@ import { CodexRuntime } from './codex-runtime.js';
 import spawn from 'cross-spawn';
 
 // Read resolved Codex settings without starting a task or touching its session.
-export async function readCodexCorrectionConfig(env = process.env, { timeoutMs = 25000 } = {}) {
+export async function readCodexCorrectionConfig(env = process.env, { timeoutMs = 45000 } = {}) {
   const runtime = new CodexRuntime(env);
   const timer = setTimeout(() => runtime.close(new Error('Codex 纠错配置读取超时')), timeoutMs);
   try {
@@ -41,7 +41,7 @@ export async function codexCorrectionConfig(env = process.env, readConfig = read
   return { url: base.href, headers, model };
 }
 
-export async function runCodexCorrection(text, instructions, { env = process.env, timeoutMs = 25000, fetchImpl = fetch, resolveConfig = codexCorrectionConfig } = {}) {
+export async function runCodexCorrection(text, instructions, { env = process.env, timeoutMs = 45000, fetchImpl = fetch, resolveConfig = codexCorrectionConfig } = {}) {
   // Normal requests always use Codex's own authentication and provider resolution.
   if (resolveConfig === codexCorrectionConfig) {
     return runCodexCliCorrection(text, instructions, { env, timeoutMs });
@@ -73,14 +73,14 @@ export async function runCodexCorrection(text, instructions, { env = process.env
   return JSON.stringify({ result: content.map(item => item.text).join('') });
 }
 
-export async function runCodexCliCorrection(text, instructions, { env = process.env, timeoutMs = 25000, readConfig = readCodexCorrectionConfig } = {}) {
+export async function runCodexCliCorrection(text, instructions, { env = process.env, timeoutMs = 45000, readConfig = readCodexCorrectionConfig } = {}) {
   const started = Date.now();
   const config = await readConfig(env, { timeoutMs });
   const cwd = await mkdtemp(path.join(tmpdir(), 'vibe-codex-correction-'));
   try {
   return await new Promise((resolve, reject) => {
     const command = env.PANEL_CODEX_BIN || 'codex';
-    const overrides = { approval_policy: 'never', web_search: 'disabled', project_doc_max_bytes: 0, developer_instructions: instructions, 'features.shell_tool': false, 'features.unified_exec': false, 'features.js_repl': false, 'features.apps': false, 'features.hooks': false, 'features.multi_agent': false, 'features.multi_agent_v2': false, 'features.view_image': false, 'features.collaboration_modes': false };
+    const overrides = { model_reasoning_effort: 'low', approval_policy: 'never', web_search: 'disabled', project_doc_max_bytes: 0, developer_instructions: instructions, 'features.shell_tool': false, 'features.unified_exec': false, 'features.js_repl': false, 'features.apps': false, 'features.hooks': false, 'features.multi_agent': false, 'features.multi_agent_v2': false, 'features.view_image': false, 'features.collaboration_modes': false };
     for (const name of Object.keys(config.mcp_servers || {})) overrides[`mcp_servers.${JSON.stringify(name)}.enabled`] = false;
     for (const name of Object.keys(config.plugins || {})) overrides[`plugins.${JSON.stringify(name)}.enabled`] = false;
     const args = ['exec', '--json', '--ephemeral', '--sandbox', 'read-only', '--skip-git-repo-check', ...Object.entries(overrides).flatMap(([key, value]) => ['-c', `${key}=${JSON.stringify(value)}`]), '-'];
