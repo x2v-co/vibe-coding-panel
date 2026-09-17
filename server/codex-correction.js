@@ -82,7 +82,7 @@ export async function runCodexCliCorrection(text, instructions, { env = process.
   try {
   return await new Promise(async (resolve, reject) => {
     const command = env.PANEL_CODEX_BIN || 'codex';
-    const isolateHome = !env.PANEL_CODEX_BIN;
+    const isolateHome = /(?:^|[\\/])codex(?:\.exe)?$/i.test(command);
     const overrides = { model_reasoning_effort: 'low', approval_policy: 'never', web_search: 'disabled', project_doc_max_bytes: 0, developer_instructions: instructions, 'features.shell_tool': false, 'features.unified_exec': false, 'features.js_repl': false, 'features.apps': false, 'features.hooks': false, 'features.multi_agent': false, 'features.multi_agent_v2': false, 'features.view_image': false, 'features.collaboration_modes': false };
     if (!isolateHome) for (const name of Object.keys(config.mcp_servers || {})) overrides[`mcp_servers.${JSON.stringify(name)}.enabled`] = false;
     // Codex config may return marketplace-qualified keys; CLI overrides accept

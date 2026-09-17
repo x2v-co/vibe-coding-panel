@@ -113,11 +113,12 @@ test('CLI correction inherits authentication, isolates workspace, and rejects fa
   await writeFile(bin, `#!${process.execPath}
 const assert = require('node:assert/strict');
 assert.notEqual(process.cwd(), process.env.WORKSPACE);
-assert.equal(process.env.CODEX_HOME, 'existing-login-home');
+assert.notEqual(process.env.CODEX_HOME, 'existing-login-home');
+assert.equal(process.env.HOME, process.env.CODEX_HOME);
 assert.ok(process.argv.includes('--ephemeral'));
 assert.ok(process.argv.includes('model_reasoning_effort=\"low\"'));
 assert.ok(process.argv.includes('features.shell_tool=false'));
-assert.ok(process.argv.includes('plugins."example".enabled=false'));
+assert.ok(!process.argv.some(arg => arg.includes('plugins.')));
 process.stdin.resume();
 process.stdin.on('end', () => {
  console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'{"text":"请回复收到"}'}}));
