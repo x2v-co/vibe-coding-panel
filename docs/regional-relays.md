@@ -52,7 +52,7 @@ There is no cross-process deduplication: one Connector/local API owns a computer
 
 `PANEL_RELAY_URLS` is a comma-separated list of 1–4 HTTPS origins. Without an
 override it defaults to the two Toolkit regional endpoints. `PANEL_RELAY_URL`
-still selects a single private/legacy endpoint. `PANEL_RELAY_PUBLIC_URL` overrides
+still selects a single private endpoint. `PANEL_RELAY_PUBLIC_URL` overrides
 the QR entry; it defaults to the product origin for managed nodes, or the first
 explicit endpoint for custom configurations. Endpoints are validated origins,
 without credentials, paths or query strings. HTTP is only allowed on loopback.
@@ -83,17 +83,15 @@ Configure renewal and reload without replacing Toolkit's certificate files.
 
 On `ubuntu@vibe-panel-relay`, use network `vibe-coding-panel_default` and append
 `deploy/Caddyfile.vibe-global` to the existing Caddy configuration after DNS is
-ready. Caddy obtains/renews the public certificate. Keep the old domain, service
-and updater unchanged during migration; a web redirect cannot migrate old
-Connector WebSockets. New regional services are explicitly deployed, not
-managed by the legacy single-service update script.
+ready. Caddy obtains/renews the public certificate. The global Relay is deployed
+as its own service and is updated independently from the regional release script.
 
 Order: build/test immutable artifact → start regional services privately → DNS
 and public certificates → test HTTPS, WS, pairing and failover → distribute new
 Connectors. Do not advertise a new default installer before both endpoints are
-ready. Roll back by restoring the previous regional image; retain old service
-and domain for existing installations. Do not route the legacy hostname to a
-separate new Relay unless its Connectors also connect there.
+ready. Roll back by restoring the previous regional image. The supported public
+topology is the product entry plus the China and global Relay endpoints listed
+above.
 
 Acceptance includes three mainland carriers without VPN, Wi-Fi/cellular switching,
 computer VPN on/off, microphone upload, standby authorization, in-flight command
@@ -104,7 +102,7 @@ mainland reachability or real iOS/Android behavior.
 
 Both hosts run `vibe-regional-vibe-regional-1` from `/opt/vibe-regional`, with
 application revision `4a7865c220be7c51aad2a048606968706748c89a` and loopback port
-8791. Existing Toolkit and legacy Vibe proxy routes have not been replaced.
+8791. Existing Toolkit proxy routes have not been replaced.
 Public activation is pending the three DNS records above and public certificates.
 At verification time none of the three new names had an A answer.
 
@@ -138,7 +136,7 @@ Staged proxy configurations are in `/opt/vibe-regional` on the respective hosts.
 After DNS: install the China HTTP ACME route, issue a public certificate for
 `vibe.toolkit.fun` and `vibe-relay-cn.toolkit.fun`, install the prepared HTTPS
 template, configure renewal, validate and reload Nginx. On global, validate and
-reload the prepared `Caddyfile.ready` (which retains the legacy block). Then
+reload the prepared global Caddy configuration. Then
 verify public HTTPS, WebSockets and pairing before distributing new Connectors.
 New regional services are not yet attached to an automatic release updater.
 
@@ -155,7 +153,7 @@ directory, switches the `certs/vibe` symlink and validates/reloads Nginx. The ho
 source is `deploy/renew-vibe-cn-certificate.sh`; the bootstrap HTTP-only template
 is retained as `deploy/nginx.vibe-cn.http.conf`.
 Certbot's staging renewal dry run passed for both names, the renewal timer is
-active, and the original Toolkit CN and legacy Vibe endpoints still return 200.
+active, and the original Toolkit CN endpoint still returns 200.
 
 Cloudflare warns because these DNS-only records expose an IP also used by the
 proxied `cn.toolkit.fun`. This is expected for the direct China endpoint: its

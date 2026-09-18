@@ -37,7 +37,7 @@ done
 [[ "$healthy" == true ]]
 # Container replacement can change its IP; refresh Caddy's upstream resolution.
 docker exec vibe-coding-panel-caddy-1 caddy reload --config /etc/caddy/Caddyfile
-public=$(curl --fail --silent --show-error --retry 5 --retry-delay 2 "https://vibe.tooluse.app/healthz?release=$version")
+public=$(curl --fail --silent --show-error --retry 5 --retry-delay 2 "https://vibe-relay-global.toolkit.fun/healthz?release=$version")
 node_version=$(printf '%s' "$public" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"]; print(d["version"])')
 [[ "$node_version" == "$version" ]]
 trap - ERR

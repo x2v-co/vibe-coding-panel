@@ -151,7 +151,7 @@ jobs:
       - name: Verify production applied this version
         run: |
           for attempt in $(seq 1 60); do
-            version=$(curl -fsS --max-time 15 "https://vibe.tooluse.app/healthz?release=$GITHUB_SHA" | jq -r '.version' || true)
+            version=$(curl -fsS --max-time 15 "https://vibe-relay-global.toolkit.fun/healthz?release=$GITHUB_SHA" | jq -r '.version' || true)
             if [ "$version" = "$GITHUB_SHA" ]; then exit 0; fi
             sleep 10
           done

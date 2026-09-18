@@ -50,7 +50,7 @@ physical-device or desktop-App verification.
 
 1. All required CI checks and package assets must pass.
 2. Deploy the explicit immutable revision to the intended website/region hosts.
-3. Run `node scripts/verify-production.mjs FULL_SHA https://vibe.toolkit.fun https://vibe.tooluse.app`
+3. Run `node scripts/verify-production.mjs FULL_SHA https://vibe.toolkit.fun https://vibe-relay-global.toolkit.fun`
    or dispatch **Verify deployed product** with the full SHA. This is a mandatory
    separate post-deployment gate, not an automatic regional deployment.
 4. Verify Release contains all four Connector ZIPs and SHA256SUMS. Users need to

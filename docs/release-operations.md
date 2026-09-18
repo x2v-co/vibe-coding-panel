@@ -96,7 +96,7 @@ HTTP streams can be interrupted. Local agent tasks remain on their computers.
 ## Required regression and deployed-product evidence
 
 Follow [the release regression matrix](release-regression-matrix.md) before
-marking a release complete. The package CI and legacy updater do not deploy
+marking a release complete. The package CI and regional updater do not deploy
 regional hosts. Run the separate **Verify deployed product** workflow after
 regional deployment; record the website and Connector package revisions and
 manual phone/App acceptance results separately.

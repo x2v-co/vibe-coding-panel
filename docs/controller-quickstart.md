@@ -53,7 +53,6 @@ Windows 在命令提示符运行 `"Vibe Panel.bat" --controller`。
 默认使用 [Toolkit 产品入口](https://vibe.toolkit.fun) 与两个区域 Relay。
 `PANEL_RELAY_URL` 可指定原有单节点或私有 Relay；`PANEL_RELAY_URLS` 与
 `PANEL_RELAY_PUBLIC_URL` 配置多节点及产品入口，见 [区域 Relay](regional-relays.md)。
-旧域名用户需显式设置 `PANEL_RELAY_URL=https://vibe.tooluse.app`，浏览器授权不跨域自动迁移。
 当前配对和连接身份存于 `.vibe-panel/controller-devices.json` 与 `controller-relay.json`。
 不要分享这些文件；移动旧安装时保留其私有状态，并使用原浏览器。
 

@@ -16,11 +16,11 @@ import { connectorRelayConfig } from './relay-config.js';
 const listen = server => new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server.address().port)));
 async function until(check) { for (let i = 0; i < 100; i++) { if (check()) return; await new Promise(resolve => setTimeout(resolve, 10)); } assert.ok(check()); }
 
-test('regional defaults and explicit private/legacy endpoints stay separate', () => {
+test('regional defaults and explicit private endpoints stay separate', () => {
   const defaults = connectorRelayConfig({});
   assert.equal(defaults.publicOrigin, 'https://vibe.toolkit.fun');
   assert.equal(defaults.origins.length, 2);
-  assert.deepEqual(connectorRelayConfig({ PANEL_RELAY_URL: 'https://vibe.tooluse.app' }), { origins: ['https://vibe.tooluse.app'], publicOrigin: 'https://vibe.tooluse.app' });
+  assert.deepEqual(connectorRelayConfig({ PANEL_RELAY_URL: 'https://relay.example.com' }), { origins: ['https://relay.example.com'], publicOrigin: 'https://relay.example.com' });
   assert.throws(() => connectorRelayConfig({ PANEL_RELAY_URL: 'http://example.com' }));
   assert.throws(() => connectorRelayConfig({ PANEL_RELAY_URL: 'https://user:password@example.com' }));
 });

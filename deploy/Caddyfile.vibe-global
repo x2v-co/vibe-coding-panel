@@ -1,5 +1,4 @@
-# Append this site block to the existing Caddyfile. Keep the legacy
-# vibe.tooluse.app block and its original Relay service during migration.
+# Append this site block to the existing Caddyfile for the global Relay.
 vibe-relay-global.toolkit.fun {
     encode zstd gzip
     reverse_proxy vibe-regional:8789 {

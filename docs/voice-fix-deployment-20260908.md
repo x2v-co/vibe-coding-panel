@@ -1,6 +1,6 @@
 # Voice recording fix deployment — 2026-09-08
 
-- Public app: https://vibe.tooluse.app/app
+- Public app: https://vibe.toolkit.fun/app
 - Production source is `/opt/vibe-coding-panel` on the Relay host, without Git metadata. It contains newer UI features than this test checkout. Do not replace its frontend with this checkout's `dist`.
 - Only `src/App.tsx` recording lifecycle and new `src/recording.ts` were changed in production. Micro controls, agent selection, landing/download pages and other assets were preserved.
 - Staged source/build: `/tmp/vibe-prod.vtuD` on the development Mac.

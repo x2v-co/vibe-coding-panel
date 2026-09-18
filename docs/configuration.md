@@ -4,7 +4,7 @@ Most users should use the default shared Relay and the launcher. These settings 
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `PANEL_RELAY_URL` | unset | Single private/legacy Relay override |
+| `PANEL_RELAY_URL` | unset | Single private Relay override |
 | `PANEL_RELAY_URLS` | Toolkit CN + global | Comma-separated Relay origins; takes precedence over singular override |
 | `PANEL_RELAY_PUBLIC_URL` | `https://vibe.toolkit.fun` for managed defaults | Stable mobile pairing entry |
 | `PANEL_AGENT_PROVIDER` | `.vibe-panel/connector.json`, otherwise `codex` | `codex` or `claude`; environment overrides the file |

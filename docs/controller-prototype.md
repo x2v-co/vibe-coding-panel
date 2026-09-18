@@ -21,7 +21,8 @@ PANEL_LIVE_PYTHON=/Users/kl/miniconda3/bin/python \
 PANEL_DESKTOP_THREAD='确认任务已就绪' \
 PANEL_DEVICE_STORE=.vibe-panel/controller-devices.json \
 PANEL_RELAY_STATE=.vibe-panel/controller-relay.json \
-PANEL_RELAY_URL=https://vibe.tooluse.app \
+PANEL_RELAY_URLS=https://vibe-relay-cn.toolkit.fun,https://vibe-relay-global.toolkit.fun \
+PANEL_RELAY_PUBLIC_URL=https://vibe.toolkit.fun \
 node scripts/connect-relay.mjs
 ```
 
@@ -47,7 +48,7 @@ python -m pip install --no-deps silero-vad==6.2.1
    「电脑绑定与连接」，点击「在这台电脑绑定」。已有草稿时可点「绑定此会话并保留电脑草稿」，
    将现有文字纳入精确草稿检查，不会清空输入框。使用外部浏览器避免抢走 Codex 的应用内输入焦点。
 3. 手机先打开 Connector 的 `/app?relay=...` 链接选择这台测试电脑；然后在同一浏览器打开
-   `https://vibe.tooluse.app/api/desktop-controller/view`。未配对时页面直接显示配对码输入框，
+   `https://vibe.toolkit.fun/api/desktop-controller/view`。未配对时页面直接显示配对码输入框，
    输入电脑生成的新码并点「在这部手机完成配对」。成功后表单消失并显示绑定状态。
    已经在主面板配对的手机无需重复输入。不要用另一个浏览器或无痕窗口打开第二个地址。
 4. 手机点「刷新连接」，默认勾选「边说边更新电脑草稿（实验）」，开始录音后每约 3 秒提交累计音频，
