@@ -12,6 +12,12 @@ Use `npm run connect -- --controller` to bind a desktop conversation and send te
 
 See the [controller setup, pairing and recovery guide](docs/controller-quickstart.md). Portable ZIP launchers also accept `--controller`; no separate npm installation is needed.
 
+**First use:** install and start one Connector on the computer, open Vibe Panel
+and verify the Agent login, then open the Connector control center and scan its
+QR code with the phone. Panel and Remote are two product entries backed by the
+same Connector; the phone follows the computer's bound Agent and does not ask
+you to choose a client again.
+
 ## Install with your Agent
 
 Paste this into Codex, Claude Code, or another coding agent **running on your computer**:
@@ -31,7 +37,7 @@ permission to me. Do not report success until you have checked the service.
 
 ## Portable download
 
-[Download a portable Connector](https://vibe.toolkit.fun/download) for macOS Apple Silicon/Intel, Windows x64 or Linux x64. Node.js 24 and locked application dependencies are included: extract the ZIP and run the platform launcher without installing Node or npm. An installed, authenticated Codex/Claude CLI is still required; Whisper/ffmpeg are optional for voice. Packages are unsigned internal-beta builds. [Package instructions and limitations](docs/portable-connector.md) · [Releases and checksums](https://github.com/x2v-co/vibe-coding-panel/releases/latest).
+[Download a portable Connector](https://vibe.toolkit.fun/download) for macOS Apple Silicon/Intel, Windows x64 or Linux x64. Node.js 24 and locked application dependencies are included: extract the ZIP and run the platform launcher without installing Node or npm. An installed, authenticated Codex/Claude CLI is still required; Whisper/ffmpeg are optional for voice. Packages are unsigned public-preview builds. [Package instructions and limitations](docs/portable-connector.md) · [Releases and checksums](https://github.com/x2v-co/vibe-coding-panel/releases/latest).
 
 ## Install from source
 
@@ -77,14 +83,17 @@ settings take priority. See [package instructions](docs/portable-connector.md)
 and [advanced configuration](docs/configuration.md).
 
 Allow the site's microphone on your phone, tap **VOICE INPUT**, speak, and tap
-again to finish. Automatic correction calls the configured Claude model service
-before SEND and fills the existing editable draft. Edit it directly if needed;
-failed correction keeps the raw text. Press **SEND** to execute the task. If
+again to finish. Automatic correction follows the currently bound target and uses its configured
+Codex or Claude correction path before SEND, filling the existing editable draft.
+Edit it directly if needed; failed correction keeps the raw text. Press **SEND**
+to execute the task. If
 browser recording fails, use the system audio upload option.
 
 ## Choose an Agent
 
-Select Codex or Claude Code in the phone panel. To remember a default for double-click launches, create `.vibe-panel/connector.json` in the project:
+Select Codex, Claude App, or Claude Code in Vibe Panel. Vibe Remote follows the
+computer’s bound target and does not ask the phone user to choose a client. To
+remember a default for double-click launches, create `.vibe-panel/connector.json` in the project:
 
 ```json
 {"agentProvider":"claude"}
@@ -112,6 +121,8 @@ This synchronizes saved conversation history and supports handoff; it does not m
 - Large controls, mobile focus mode, text/voice input, image uploads, and workspace directory selection.
 - Codex and Claude Code tasks with live output, stop, follow-up, and browser history.
 - Eight key layouts, four color themes, and custom Micro key actions, labels, colors, and SVG icons.
+- Vibe Remote is a phone input companion, not a complete hardware replacement;
+  unavailable Micro-native actions remain visibly disabled and are documented.
 - [Micro controls and official-documentation mapping](docs/micro-controls.md): task-light meanings, assignment modes, configurable joystick and dial, and supported action candidates.
 - Micro voice key: hold to talk and release to transcribe; double-tap within 350 ms to latch recording, then press again to stop.
 - Demo mode and installable HTTPS PWA. Demo mode does not execute real tasks.
@@ -168,6 +179,7 @@ Android PWA core acceptance, both agents' handoff to the tested Mac, and an
 independent clean reinstall/pairing/home-icon launch/Codex submission check passed.
 iPhone Safari core flows passed; remaining iPhone checks are paused. See
 [physical-device results and remaining limits](docs/known-issues.md) for exact
-devices and coverage. Distribution remains internal beta.
+devices and coverage. Distribution is a public preview; unsigned packages,
+provider authentication, and the remaining platform limits are documented below.
 
 Release information: [Changelog](CHANGELOG.md) · [Known limitations](docs/known-issues.md) · [Privacy notice (Chinese)](https://vibe.toolkit.fun/privacy/) · [Terms (Chinese)](https://vibe.toolkit.fun/terms/).

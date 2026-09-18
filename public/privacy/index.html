@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>隐私说明 · Vibe Panel</title><link rel="stylesheet" href="/legal.css"></head><body>
 <header><a class="brand" href="/">VIBE PANEL</a><nav aria-label="网站导航"><a href="/download">下载</a><a href="/app">打开面板</a></nav></header>
-<main><h1>隐私说明</h1><p class="meta">更新日期：2026 年 9 月 10 日 · 当前内测服务</p><p class="summary">默认共享 Relay 会转发手机与电脑之间的内容；语音在电脑转写，转写文字会在填入输入框前交给你配置的 Claude 模型服务自动校对。发送任务前，你可以直接修改文字。</p>
+<main><h1>隐私说明</h1><p class="meta">更新日期：2026 年 9 月 18 日 · 公开预览服务</p><p class="summary">默认共享 Relay 会转发手机与电脑之间的内容；语音在电脑转写，转写文字会在填入输入框前交给当前绑定目标的校对服务处理。发送任务前，你可以直接修改文字。</p>
 <h2>适用范围与联系</h2>
 <p>本说明由 Vibe Panel 项目维护者发布，描述项目默认共享服务 vibe.toolkit.fun 及其区域 Relay、官方 Connector 和 Vibe Remote 的数据处理。自建 Relay、远程 Bridge、Agent 及模型服务商可能采用不同配置与政策。项目源码由 <a href="https://github.com/x2v-co/vibe-coding-panel">x2v-co/vibe-coding-panel</a> 托管。</p>
 <p>对本说明有疑问，可通过 <a href="https://github.com/x2v-co/vibe-coding-panel/issues">项目反馈入口</a> 联系维护者。该入口是公开的，请勿提交录音、代码、令牌、配对链接或其他敏感内容；如需提供敏感信息，先询问适合的私下联系方式。</p>
@@ -9,7 +9,7 @@
 <p>手机的指令、录音、图片、任务结果、目录信息以及你查看的原生会话内容，会通过共享 Relay 在手机和 Connector 之间转发。网络服务还会接触 IP 地址、浏览器信息、访问时间、请求路径及连接标识。HTTPS/WSS 保护传输链路，但这不是端到端加密：Relay 及终止 HTTPS 的网络服务可以处理明文内容。请仅使用你信任的 Relay。</p>
 <p>当前 Relay 实现将请求与转发内容保留在进程内存中，不将业务请求体和响应内容持久写入数据库或文件。连接结束、超时和进程退出会释放相关状态。内存转发不等于“数据从未离开电脑”，也不代表操作系统或上游网络服务不保留任何记录。</p>
 <h2>语音与模型服务</h2>
-<p>Whisper 或 MLX 在电脑上转写录音。Connector 为转写建立临时音频文件，在正常完成或捕获到错误后删除；断电或进程崩溃可能留下临时文件。自动纠错只向电脑配置的 Claude 兼容服务发送转写文字和校对提示，不把录音作为校对输入，也不主动读取项目代码作为校对上下文。</p>
+<p>Whisper 或 MLX 在电脑上转写录音。Connector 为转写建立临时音频文件，在正常完成或捕获到错误后删除；断电或进程崩溃可能留下临时文件。自动纠错只向当前绑定目标的 Codex 或 Claude 校对路径发送转写文字和校对提示，不把录音作为校对输入，也不主动读取项目代码作为校对上下文。</p>
 <p>自动纠错发生在按 SEND 之前，可能产生模型服务费用。校对结果填入原输入框，可手动修改；失败或超时保留原文，不自动执行。可在电脑设置 <code>PANEL_TRANSCRIPT_CORRECTION=off</code> 后重启来停用。按 SEND 后，Codex 或 Claude Code 可能按任务需要读取项目并将上下文发送给你配置的模型服务商。其保留、训练用途和账户设置以实际服务商政策为准；自定义 API 地址不一定属于 OpenAI 或 Anthropic。</p>
 <h2>浏览器保存什么</h2>
 <p>浏览器本地存储保存最近最多 20 个任务记录（可能包含指令、结果和事件）、工作目录、主题、布局、连接地址和最近任务标识，直到被后续记录替换或你清除站点数据。远程 Bridge 令牌使用会话存储，可能随浏览器会话恢复而保留。PWA 会缓存网页资源；浏览器历史可能保留访问过的连接或配对 URL。</p>

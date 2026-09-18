@@ -1,4 +1,4 @@
-# Known limitations — internal beta
+# Known limitations — public preview
 
 Updated 2026-09-10. Passing CI is not evidence that every phone, CLI version or
 native-session format is supported.
@@ -39,18 +39,18 @@ passes were not repeated on the fresh installation.
   provider or GPU drivers. Slow computers and long audio can exceed Relay timeouts.
 - Mandarin homophone errors can remain after recognition and automatic correction.
   Corrected text is an editable draft, never an automatically executed command.
-  Correction can call the configured Claude service before SEND, costs may apply,
-  and failure preserves the original. Tested phone samples passed; this does not
-  establish accuracy for every speaker, accent or recording environment.
+  Correction follows the currently bound target and may call its configured Codex
+  or Claude service before SEND, so provider costs may apply. Failure preserves
+  the original. Tested phone samples passed; this does not establish accuracy
+  for every speaker, accent or recording environment.
 - Relay requests have a 10 MiB encoded-body limit; base64 adds overhead, so keep
   recordings and images below roughly 7 MiB per request. Long recordings should
   be split. Requests may be limited or time out; keep the computer awake and
   Connector terminal open.
-- iPhone acceptance was stopped at the tester's request. Remaining checks include
-  stop/subsequent execution, Claude task execution, native-session handoff,
-  workspace roundtrip, and voice-to-draft/image/background/network behavior in
-  the installed iPhone web app. Mobile viewport checks and synthetic audio do
-  not replace these physical tests.
+- The iPhone checks recorded above cover the tested Safari and home-screen flows,
+  but this release did not repeat every stop/subsequent execution, Claude task,
+  native-session handoff and recovery case on a physical iPhone. Mobile viewport
+  checks and synthetic audio do not replace those physical tests.
 - Real interactive native handoff was verified on macOS with Codex 0.153.4 and
   Claude Code 2.1.266, including Android PWA handoff. CI also verifies actual
   Codex 0.152.0/0.153.4 and Claude 2.1.265/2.1.266 executables against a local model

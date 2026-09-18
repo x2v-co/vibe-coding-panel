@@ -13,7 +13,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Verify actual website and global Relay deployment
+      - name: Verify actual website and regional Relay deployments
         env:
           EXPECTED_REVISION: ${{ inputs.revision }}
-        run: node scripts/verify-production.mjs "$EXPECTED_REVISION" https://vibe.toolkit.fun https://vibe-relay-global.toolkit.fun
+        run: node scripts/verify-production.mjs "$EXPECTED_REVISION" https://vibe.toolkit.fun https://vibe-relay-cn.toolkit.fun https://vibe-relay-global.toolkit.fun

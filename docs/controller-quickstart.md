@@ -2,6 +2,14 @@
 
 Vibe Panel 是一个产品，提供两个入口：任务面板用于发起和查看任务，手机遥控器用于控制电脑当前会话。两者共用品牌，用户可从任一页面切换。当前两种启动方式仍使用独立配对身份，切换页面不会自动迁移授权；首次进入另一种方式仍需连接对应的电脑服务。
 
+## 推荐的首次使用路径
+
+1. 在电脑下载并启动 Connector，先打开 Vibe Panel，确认 Codex、Claude App 或 Claude Code 能正常回复。
+2. 需要手机输入时，在同一个 Connector 中打开“遥控器”或启动控制中心模式；电脑会显示二维码和一次性配对码。
+3. 手机扫描二维码，在 Remote 设置中完成一次配对。之后手机直接打开 Remote，电脑仍负责完整草稿、回复和执行确认。
+
+Panel 和 Remote 是两个入口、一个 Connector。它们共用 Relay，但首次进入另一种入口时需要完成对应的本地配对；手机不需要重复选择 Agent。
+
 同一个 Connector 产品包含两种使用方式：
 
 | 模式 | 启动 | 手机功能 |
@@ -70,9 +78,9 @@ Windows 在命令提示符运行 `"Vibe Panel.bat" --controller`。
 锁屏或切后台会停止录音并释放麦克风。待处理文字保存在当前标签页，原始音频不持久化。
 手机不展示完整电脑草稿或回复。支持八种布局、四种主题与 Micro 快捷指令；
 快捷指令只追加草稿，尚未实现的原生 Fast、批准、拒绝、Fork、停止等操作会显示说明。
+Remote 是手机输入外设，不承诺替代完整的 Codex Micro 硬件；灰色按键表示当前未接入的能力。
 
-普通分段语音使用现有 Whisper 配置；见 [配置说明](configuration.md)。纠错跟随绑定目标的 provider，
-失败保留识别原文。Codex 纠错当前需要 API key 配置，OAuth-only 与 App 内临时模型覆盖未接入。
+普通分段语音使用现有 Whisper 配置；见 [配置说明](configuration.md)。纠错跟随绑定目标的 provider：Codex 目标通过 Codex CLI 的本地校对流程，Claude 目标通过 Claude Code 的本地校对流程。失败保留识别原文。Codex 的 ChatGPT OAuth 登录、临时 App 模型覆盖和自定义 provider 组合是否可用，取决于当前 Codex CLI 配置；如果校对不可用，仍可编辑并发送识别原文。
 实验增量识别默认关闭，需要单独设置 `PANEL_LIVE_SPEECH=1`，并指定装有
 Whisper、numpy、torch、onnxruntime 和 silero-vad 的 `PANEL_LIVE_PYTHON`。
 `--text-only` 关闭增量识别，不卸载或禁用已有普通分段识别。

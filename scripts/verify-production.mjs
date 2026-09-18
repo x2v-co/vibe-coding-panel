@@ -21,6 +21,12 @@ export async function verifyProduction(origin, revision, fetchImpl = fetch) {
     if (asset.endsWith('.js') && body.includes(revision)) versionFound = true;
   }
   assert(versionFound, `${origin}: frontend is stale despite healthy backend`);
+  const remoteHtml = await (await get(`/remote?verify=${revision}`)).text();
+  assert(remoteHtml.includes('/screenshots/runtime/remote-mobile.png'), `${origin}: Remote artwork is missing or stale`);
+  assert(!remoteHtml.includes('/screenshots/runtime/panel-mobile.png'), `${origin}: Remote page references Panel artwork`);
+  const artwork = await get('/screenshots/runtime/remote-mobile.png');
+  assert((artwork.headers.get('content-type') || '').startsWith('image/'), `${origin}: Remote artwork is not an image`);
+  assert(Number(artwork.headers.get('content-length') || 0) > 0, `${origin}: Remote artwork is empty`);
   return {origin,revision,assets};
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

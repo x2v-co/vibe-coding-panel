@@ -30,7 +30,7 @@ if not changes:
     raise SystemExit('No commits found for this release range')
 notes = f'''# Vibe Panel 0.1.0 · {args.revision[:8]}
 
-Source: [{args.revision}]({repo}/commit/{args.revision}). This is an internal beta.
+Source: [{args.revision}]({repo}/commit/{args.revision}). This is a public preview release.
 
 ## Changes in this release
 

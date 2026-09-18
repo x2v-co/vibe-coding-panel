@@ -12,6 +12,10 @@ Vibe Panel 是电脑端 Agent 工作台：连接本机的 Codex、Claude App 或
 
 [控制中心安装、配对与恢复指南](docs/controller-quickstart.md)。便携包启动文件同样支持 `--controller`，无需另装 npm。
 
+**首次使用：**在电脑安装并启动一个 Connector，先打开 Vibe Panel 并确认 Agent
+已登录，再从 Connector 打开电脑控制中心，用手机扫描二维码。Panel 和 Remote
+是同一个 Connector 支持的两个产品入口；手机沿用电脑绑定的 Agent，不需要再次选择客户端。
+
 ## 让 Agent 帮你安装
 
 将下面这段话发给**运行在自己电脑上的** Codex、Claude Code 或其他编程 Agent：
@@ -30,7 +34,7 @@ Vibe Panel 是电脑端 Agent 工作台：连接本机的 Codex、Claude App 或
 
 ## 下载便携运行包
 
-[下载 Connector](https://vibe.toolkit.fun/download)：提供 macOS Apple Silicon／Intel、Windows x64 和 Linux x64 版本。内含 Node.js 24 和锁定依赖，完整解压后运行对应启动文件，无需另装 Node 或 npm。仍需安装并登录 Codex／Claude；语音所需 Whisper／ffmpeg 可选安装。当前为未签名的内测包。[运行包说明与限制](docs/portable-connector.md) · [版本与校验文件](https://github.com/x2v-co/vibe-coding-panel/releases/latest)。
+[下载 Connector](https://vibe.toolkit.fun/download)：提供 macOS Apple Silicon／Intel、Windows x64 和 Linux x64 版本。内含 Node.js 24 和锁定依赖，完整解压后运行对应启动文件，无需另装 Node 或 npm。仍需安装并登录 Codex／Claude；语音所需 Whisper／ffmpeg 可选安装。当前为未签名的公开预览包。[运行包说明与限制](docs/portable-connector.md) · [版本与校验文件](https://github.com/x2v-co/vibe-coding-panel/releases/latest)。
 
 ## 从源码安装：先用 Panel，再启用 Remote
 
@@ -101,6 +105,7 @@ Vibe Panel 中可选择 Codex、Claude App 或 Claude Code；Vibe Remote 沿用�
 - Panel 的文字与语音输入、图片上传、工作区目录选择，以及 Remote 的手机按键和语音追加。
 - Codex 与 Claude Code 实时输出、停止、追问和浏览器历史记录。
 - 八种键位布局、四种配色；Micro 支持自定义动作、文案、颜色和 SVG 键帽。
+- Vibe Remote 是手机输入配套，不承诺替代完整硬件；尚未接入的 Micro 原生能力会保持灰色并显示说明。
 - Micro 语音键：按住说话，松开转写；350 ms 内双击锁定录音，再按一次结束。
 - 演示模式和可添加到主屏幕的 HTTPS PWA；演示不会执行真实任务。
 - 一次性配对，可在电脑的本地设置中撤销设备授权。
@@ -149,6 +154,6 @@ npm run build
 
 Android PWA 核心流程、两种 Agent 与测试 Mac 的会话接管均已通过；独立卸载并清理站点数据后的重新配对、安装、桌面启动及 Codex 发送也已通过。此前语音、图片、停止及恢复结果来自早先验收，本次重装未重复测试。
 
-iPhone Safari 核心流程及部分主屏幕应用检查通过，剩余 iPhone 项目按测试者要求暂停。具体设备、覆盖范围和限制见[已知限制](docs/known-issues.md)。当前仍为内测版本。
+iPhone Safari 核心流程及部分主屏幕应用检查通过，剩余 iPhone 项目尚未在本次版本重复验收。具体设备、覆盖范围和限制见[已知限制](docs/known-issues.md)。当前为公开预览版本。
 
 发布资料：[变更记录](CHANGELOG.md) · [已知限制](docs/known-issues.md) · [隐私说明](https://vibe.toolkit.fun/privacy/) · [使用条款](https://vibe.toolkit.fun/terms/)。

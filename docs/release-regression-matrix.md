@@ -8,7 +8,7 @@ or regional deployments have been updated. Record each result separately.
 | User path | Executable gate | Scope |
 | --- | --- | --- |
 | Codex-only / Claude-only, logged in / logged out, probe failures | `server/agent-providers.test.js` | No dependency on the other CLI |
-| Codex voice correction without API key or Claude | `scripts/test-real-cli.mjs` | Official pinned CLIs on all four CI platforms, local provider fixture; asserts no execution, file or delegation tools |
+| Codex-only and Claude-only voice correction | `scripts/test-real-cli.mjs` | Official pinned CLIs on all four CI platforms, local provider fixture; asserts no execution, file or delegation tools |
 | Failed correction / tool attempt / provider switching | `server/codex-correction.test.js`, `server/transcript-correction.test.js` | Original text preserved; no cross-provider fallback |
 | Workspace isolation, shared daemon ownership, release timeout | `server/native-sessions.test.js` | No signal to shared process; timeout never means success |
 | Real terminal handoff and same-session continuation | CI `windows-terminal`, `linux-terminal` | Real PTY/ConPTY; Windows manual release |

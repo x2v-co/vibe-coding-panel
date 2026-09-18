@@ -21,6 +21,7 @@
     "check": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
     "test": "node --test server/*.test.js",
     "doctor": "node scripts/launch.mjs --doctor",
+    "check:regional": "node scripts/check-regional-capacity.mjs",
     "test:acceptance": "node --test scripts/acceptance.test.mjs",
     "controller": "node scripts/controller.mjs",
     "test:browser": "playwright test"

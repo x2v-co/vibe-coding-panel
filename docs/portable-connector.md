@@ -61,7 +61,8 @@ Ubuntu 24.04 PTY handoff and remote release are also CI-tested. Physical Windows
 11/Linux desktop UI and real-account authentication on those systems remain
 unverified.
 See [device results and known limitations](known-issues.md) for exact scope.
-This remains an internal beta package.
+This is a public preview package. It is suitable for invited testers and early
+public users; review the platform and provider limits before wider distribution.
 
 Report issues: https://github.com/x2v-co/vibe-coding-panel/issues
 Source and configuration: https://github.com/x2v-co/vibe-coding-panel
@@ -77,3 +78,7 @@ and [terms](https://vibe.toolkit.fun/terms/); offline copies are included under
 使用 `--controller --check` 检查依赖。原生 App 需要 macOS，Windows / Linux 默认使用 Claude Code。
 所有控制器页面、Swift 驱动与语音 worker 随包分发；语音模型和 Python 依赖仍为可选安装。
 详见 [控制中心指南](controller-quickstart.md)。
+
+首次使用建议先运行普通 Panel，确认 Agent 登录和项目目录可用，再从同一
+Connector 打开控制中心并扫描二维码。Remote 依赖电脑 Connector 持续运行；
+手机页面本身不保存完整草稿，也不能在没有电脑连接时执行任务。
