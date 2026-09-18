@@ -239,6 +239,7 @@ function PanelApp() {
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [diagnosticsCopied, setDiagnosticsCopied] = useState(false);
   const [isPanelMode, setIsPanelMode] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [pairCode, setPairCode] = useState('');
@@ -322,6 +323,22 @@ function PanelApp() {
     localStorage.setItem('vibe-panel-onboarding-dismissed', '1');
     setShowOnboarding(false);
     if (openSettings) setShowSettings(true);
+  }
+
+  async function copyDiagnostics() {
+    const payload = {
+      panelRevision: __PANEL_REVISION__,
+      connectorRevision: runtimeDiagnostics?.connector.revision || connectorRevision || null,
+      platform: runtimeDiagnostics ? `${runtimeDiagnostics.platform}/${runtimeDiagnostics.arch}` : null,
+      node: runtimeDiagnostics?.node || null,
+      providers: runtimeDiagnostics?.providers.map(({ id, available, authenticated, version }) => ({ id, available, authenticated, version: version || null })) || [],
+      speech: runtimeDiagnostics ? { backend: runtimeDiagnostics.speech.backend, model: runtimeDiagnostics.speech.model, whisper: runtimeDiagnostics.speech.whisper.status, ffmpeg: runtimeDiagnostics.speech.ffmpeg.status, correction: runtimeDiagnostics.speech.correction } : null,
+    };
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      setDiagnosticsCopied(true);
+      window.setTimeout(() => setDiagnosticsCopied(false), 1800);
+    } catch { setDiagnosticsCopied(false); }
   }
 
   function selectAgentProvider(provider: AgentProviderId) {
@@ -1507,7 +1524,8 @@ function PanelApp() {
 
   function renderSettingsPopover() {
     return <div className="settings-popover">
-      <div className="settings-heading"><span>CONTROL SETTINGS</span><button onClick={() => setShowSettings(false)} aria-label="关闭"><X size={16} /></button></div>
+      <div className="settings-heading"><div><span>CONTROL SETTINGS</span><small className="preview-label">PUBLIC PREVIEW · 公开预览版</small></div><button onClick={() => setShowSettings(false)} aria-label="关闭"><X size={16} /></button></div>
+      <p className="preview-note">Agent、项目和录音都在你的电脑上处理；Relay 只负责连接转发。遇到问题可复制脱敏诊断并提交反馈。</p>
       <fieldset className="connection-fieldset">
         <legend>Agent 连接</legend>
         <div className="connection-modes">
@@ -1590,6 +1608,7 @@ function PanelApp() {
         </dl>
         {connectorRevision && __PANEL_REVISION__ !== 'unknown' && connectorRevision !== __PANEL_REVISION__ && <p role="status">网页与电脑版本不同。先刷新页面；若仍提示不同，再更新并重启电脑 Connector。配对状态会保留。</p>}
         {diagnosticsError && <p role="status">{diagnosticsError}</p>}
+        <div className="diagnostics-actions"><button type="button" onClick={() => void copyDiagnostics()}><Copy size={13} />{diagnosticsCopied ? '已复制' : '复制脱敏诊断'}</button><a href="https://github.com/x2v-co/vibe-coding-panel/issues/new" target="_blank" rel="noreferrer">反馈问题</a></div>
         {runtimeDiagnostics && (runtimeDiagnostics.speech.whisper.status !== 'ok' || runtimeDiagnostics.speech.ffmpeg.status !== 'ok') && <p>{runtimeDiagnostics.speech.guidance || <>语音组件未就绪，可继续输入文字。请在电脑安装包中运行 Setup Voice，再重启 Connector；详情见<a href="https://github.com/x2v-co/vibe-coding-panel/blob/main/docs/configuration.md" target="_blank" rel="noreferrer">安装说明</a>。</>}</p>}
       </fieldset>}
       <p className="privacy-note"><ShieldCheck size={14} /><span>录音在电脑上转写，转写文字会通过电脑配置的 Claude 服务自动校对。发送前可直接修改输入框；共享 Relay 会转发内容，详见<a href="/privacy/" target="_blank" rel="noreferrer">隐私说明</a>与<a href="/terms/" target="_blank" rel="noreferrer">使用条款</a>。</span></p>
@@ -1645,7 +1664,7 @@ function PanelApp() {
 
       {showOnboarding && <div className="onboarding-backdrop" role="presentation"><section className="onboarding-card" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
         <div className="onboarding-heading"><div><span>FIRST RUN</span><h2 id="onboarding-title">先把电脑连上</h2></div><button type="button" onClick={() => dismissOnboarding()} aria-label="稍后设置"><X size={18} /></button></div>
-        <p className="onboarding-copy">Agent 和项目始终运行在你的电脑上。完成下面的检查后，就可以在 Panel 中输入任务；需要离开电脑时，再从控制中心启用 Vibe Remote。</p>
+        <p className="onboarding-copy">这是公开预览版：Agent 和项目始终运行在你的电脑上，Relay 只负责连接转发。完成下面的检查后，就可以在 Panel 中输入任务；需要离开电脑时，再从控制中心启用 Vibe Remote。</p>
         <div className="onboarding-checks">
           <div className={connectionState === 'online' ? 'ready' : connectionState === 'checking' ? 'checking' : ''}><i>{connectionState === 'online' ? <Check size={15} /> : <Wifi size={15} />}</i><span><strong>连接状态</strong><small>{connectionState === 'online' ? '面板已连接' : connectionState === 'checking' ? '正在检测' : '等待连接'}</small></span></div>
           <div className={connection.mode === 'demo' || readyProviderCount > 0 ? 'ready' : ''}><i>{connection.mode === 'demo' || readyProviderCount > 0 ? <Check size={15} /> : <Terminal size={15} />}</i><span><strong>{connection.mode === 'demo' ? '演示模式' : '执行 Agent'}</strong><small>{connection.mode === 'demo' ? '不会修改电脑文件' : readyProviderCount ? `${readyProviderCount} 个 Agent 可用` : '尚未检测到已登录 Agent'}</small></span></div>
@@ -1670,6 +1689,7 @@ type SiteLanguage = 'zh' | 'en';
 
 const siteCopy = {
   zh: {
+    preview: '公开预览版', feedback: '反馈问题',
     panelNav: '怎么工作', remote: 'Vibe Remote', download: '下载 Connector', openPanel: '打开面板',
     panelHero: '在电脑上，|把 Agent 做成工作流。', panelDescription: '连接本机的 Codex 或 Claude Code，在项目里创建任务、查看过程并继续原生会话。手机遥控由配套的 Vibe Remote 提供。', openPanelCta: '打开 Vibe Panel', downloadCta: '下载 Connector', runsOnComputer: 'Agent 和项目运行在你的电脑上',
     connect: '连接', connectDescription: '发现本机已登录的 Agent 和原生会话', organize: '组织', organizeDescription: '选择项目目录，创建并继续任务', deliver: '交付', deliverDescription: '查看过程、结果和下一步行动',
@@ -1681,6 +1701,7 @@ const siteCopy = {
     oneConnector: 'ONE CONNECTOR / TWO ENTRIES', downloadTitle: '下载 Connector。', downloadDescription: '一个 Connector 同时支持 Vibe Panel 和 Vibe Remote。Agent、项目和配对服务都运行在你的电脑上。', beta: '内测版 · 自带 Node.js 24 和运行依赖 · 解压即可启动', releaseChecks: '版本记录与 SHA256 校验', twoEntries: '两种入口，一次安装', panelWorkspace: 'Vibe Panel · 电脑工作台', remoteCompanion: 'Vibe Remote · 手机配套遥控器', launchControl: '在 Connector 启用控制中心', launchControlDescription: '运行控制中心模式并绑定电脑当前会话，电脑会显示一次性配对二维码。', scanPhone: '手机扫描二维码', scanPhoneDescription: '首次配对后直接打开 Remote；语音和按键追加到电脑草稿，完整过程和回复仍在 Panel 中查看。', packageNote: '便携包尚未签名或公证，不是系统安装器。macOS 可能要求在“隐私与安全性”中允许打开；请遵循电脑的安全策略。Linux 需兼容 Node 24 的 glibc 系统（已测试 Ubuntu）。', fullInstall: '完整安装说明', installForAgent: '让 Agent 安装', noAgent: '还没安装 Agent？', demo: '先用演示模式体验', projectIntro: '项目介绍', openRemoteNav: '打开遥控器', privacy: '隐私', terms: '条款', moreProducts: '更多产品', language: 'EN', languageLabel: '切换到英文',
   },
   en: {
+    preview: 'PUBLIC PREVIEW', feedback: 'Report an issue',
     panelNav: 'How it works', remote: 'Vibe Remote', download: 'Download Connector', openPanel: 'Open Panel',
     panelHero: 'On your computer,|turn your Agent into a workflow.', panelDescription: 'Connect your local Codex or Claude Code, create tasks in a project, follow the work, and continue native sessions. Vibe Remote adds phone input when you step away.', openPanelCta: 'Open Vibe Panel', downloadCta: 'Download Connector', runsOnComputer: 'Your Agent and projects stay on your computer',
     connect: 'Connect', connectDescription: 'Find signed-in Agents and native sessions', organize: 'Organize', organizeDescription: 'Choose a project folder and continue tasks', deliver: 'Deliver', deliverDescription: 'Review progress, results, and next actions',
@@ -1715,7 +1736,7 @@ function SiteHeader({ remote = false, language, toggleLanguage }: { remote?: boo
 
 function SiteFooter({ language, remote = false }: { language: SiteLanguage; remote?: boolean }) {
   const copy = siteCopy[language];
-  return <footer className="site-footer"><span>VIBE PANEL / 2026 · <a href="https://x2v.co" target="_blank" rel="noreferrer">X2V</a> · <a href="https://toolkit.fun" target="_blank" rel="noreferrer">Toolkit</a></span><span><a href={remote ? '/remote' : '/remote'}>Vibe Remote</a><a href="/download">{copy.download.replace(' Connector', '')}</a><a href="https://github.com/x2v-co/vibe-coding-panel" target="_blank" rel="noreferrer">GitHub</a><a href="https://aiplans.dev" target="_blank" rel="noreferrer">{copy.moreProducts}</a><a href="/privacy/">{copy.privacy}</a><a href="/terms/">{copy.terms}</a></span></footer>;
+  return <footer className="site-footer"><span>VIBE PANEL / 2026 · <a href="https://x2v.co" target="_blank" rel="noreferrer">X2V</a> · <a href="https://toolkit.fun" target="_blank" rel="noreferrer">Toolkit</a></span><span><a href={remote ? '/remote' : '/remote'}>Vibe Remote</a><a href="/download">{copy.download.replace(' Connector', '')}</a><a href="https://github.com/x2v-co/vibe-coding-panel/issues/new" target="_blank" rel="noreferrer">{copy.feedback}</a><a href="https://github.com/x2v-co/vibe-coding-panel" target="_blank" rel="noreferrer">GitHub</a><a href="https://aiplans.dev" target="_blank" rel="noreferrer">{copy.moreProducts}</a><a href="/privacy/">{copy.privacy}</a><a href="/terms/">{copy.terms}</a></span></footer>;
 }
 
 function SiteHeading({ text }: { text: string }) { const [first, second] = text.split('|'); return <><>{first}<br /><em>{second}</em></></>; }
@@ -1723,7 +1744,7 @@ function SiteHeading({ text }: { text: string }) { const [first, second] = text.
 function LandingPage() {
   const [language, toggleLanguage] = useSiteLanguage(); const c = siteCopy[language];
   return <div className="site-shell"><SiteHeader language={language} toggleLanguage={toggleLanguage} /><main>
-    <section className="site-hero"><div className="site-hero-copy"><p className="site-kicker">VIBE PANEL / AGENT WORKSPACE</p><h1><SiteHeading text={c.panelHero} /></h1><p>{c.panelDescription}</p><div className="site-hero-actions"><a className="site-primary-action" href="/app">{c.openPanelCta} <ArrowRight size={17} /></a><a className="site-secondary-action" href="/download">{c.downloadCta}</a></div><span className="site-note"><ShieldCheck size={14} />{c.runsOnComputer}</span></div><div className="site-hero-device"><div className="site-device-label">VIBE PANEL / WORKSPACE</div><img src="/screenshots/runtime/panel-desktop.png" alt="Vibe Panel workspace" /></div></section>
+    <section className="site-hero"><div className="site-hero-copy"><p className="site-kicker">VIBE PANEL / AGENT WORKSPACE <span className="site-preview-badge">{c.preview}</span></p><h1><SiteHeading text={c.panelHero} /></h1><p>{c.panelDescription}</p><div className="site-hero-actions"><a className="site-primary-action" href="/app">{c.openPanelCta} <ArrowRight size={17} /></a><a className="site-secondary-action" href="/download">{c.downloadCta}</a></div><span className="site-note"><ShieldCheck size={14} />{c.runsOnComputer}</span></div><div className="site-hero-device"><div className="site-device-label">VIBE PANEL / WORKSPACE</div><img src="/screenshots/runtime/panel-desktop.png" alt="Vibe Panel workspace" /></div></section>
     <section className="site-proof"><div><strong>01</strong><span>{c.connect}</span><p>{c.connectDescription}</p></div><div><strong>02</strong><span>{c.organize}</span><p>{c.organizeDescription}</p></div><div><strong>03</strong><span>{c.deliver}</span><p>{c.deliverDescription}</p></div></section>
     <section className="site-how" id="how-it-works"><div><p className="site-kicker">{c.threeSteps}</p><h2><SiteHeading text={c.panelHow} /></h2></div><div className="site-steps"><div><b>1</b><strong>{c.startConnector}</strong><p>{c.startConnectorDescription}</p></div><div><b>2</b><strong>{c.connectAgent}</strong><p>{c.connectAgentDescription}</p></div><div><b>3</b><strong>{c.startWork}</strong><p>{c.startWorkDescription}</p></div></div></section>
     <section className="site-cta"><p className="site-kicker">{c.remoteKicker}</p><h2>{c.remoteQuestion}</h2><p>{c.remoteDescription}</p><a className="site-secondary-action" href="/remote">{c.learnRemote} <ArrowRight size={17} /></a></section>
@@ -1733,7 +1754,7 @@ function LandingPage() {
 function RemoteLandingPage() {
   const [language, toggleLanguage] = useSiteLanguage(); const c = siteCopy[language];
   return <div className="site-shell remote-shell"><SiteHeader remote language={language} toggleLanguage={toggleLanguage} /><main>
-    <section className="site-hero"><div className="site-hero-copy"><p className="site-kicker">VIBE REMOTE / PHONE INPUT</p><h1><SiteHeading text={c.remoteHero} /></h1><p>{c.remoteDescriptionLong}</p><div className="site-hero-actions"><a className="site-primary-action" href="/api/desktop-controller/view">{c.openRemote} <ArrowRight size={17} /></a><a className="site-secondary-action" href="/download#controller-setup">{c.setup}</a></div><span className="site-note"><ShieldCheck size={14} />{c.noAccount}</span></div><div className="site-hero-device remote-hero-device"><div className="site-device-label">VIBE REMOTE / INPUT SURFACE</div><img src="/screenshots/runtime/panel-mobile.png" alt="Vibe Remote phone input" /></div></section>
+    <section className="site-hero"><div className="site-hero-copy"><p className="site-kicker">VIBE REMOTE / PHONE INPUT <span className="site-preview-badge">{c.preview}</span></p><h1><SiteHeading text={c.remoteHero} /></h1><p>{c.remoteDescriptionLong}</p><div className="site-hero-actions"><a className="site-primary-action" href="/api/desktop-controller/view">{c.openRemote} <ArrowRight size={17} /></a><a className="site-secondary-action" href="/download#controller-setup">{c.setup}</a></div><span className="site-note"><ShieldCheck size={14} />{c.noAccount}</span></div><div className="site-hero-device remote-hero-device"><div className="site-device-label">VIBE REMOTE / INPUT SURFACE</div><img src="/screenshots/runtime/panel-mobile.png" alt="Vibe Remote phone input" /></div></section>
     <section className="site-proof"><div><strong>01</strong><span>{c.say}</span><p>{c.sayDescription}</p></div><div><strong>02</strong><span>{c.press}</span><p>{c.pressDescription}</p></div><div><strong>03</strong><span>{c.send}</span><p>{c.sendDescription}</p></div></section>
     <section className="site-how" id="how-it-works"><div><p className="site-kicker">{c.threeSteps}</p><h2><SiteHeading text={c.remoteHow} /></h2></div><div className="site-steps"><div><b>1</b><strong>{c.startControl}</strong><p>{c.startControlDescription}</p></div><div><b>2</b><strong>{c.scanQr}</strong><p>{c.scanQrDescription}</p></div><div><b>3</b><strong>{c.remoteAppend}</strong><p>{c.remoteAppendDescription}</p></div></div></section>
     <section className="site-cta"><p className="site-kicker">{c.partOfPanel}</p><h2>{c.noComputer}</h2><p>{c.noComputerDescription}</p><a className="site-secondary-action" href="/">{c.learnPanel} <ArrowRight size={17} /></a></section>
@@ -1743,7 +1764,7 @@ function RemoteLandingPage() {
 function DownloadPage() {
   const [language, toggleLanguage] = useSiteLanguage(); const c = siteCopy[language];
   const packages = [['darwin-arm64', 'macOS · Apple Silicon'], ['darwin-x64', 'macOS · Intel'], ['win32-x64', 'Windows · x64'], ['linux-x64', 'Linux · x64']];
-  return <div className="site-shell download-shell"><SiteHeader language={language} toggleLanguage={toggleLanguage} /><main className="download-main"><div className="download-heading"><p className="site-kicker">{c.oneConnector}</p><h1>{c.downloadTitle}</h1><p>{c.downloadDescription}</p></div><div className="download-card"><div className="download-card-icon"><Laptop size={24} /></div><div><h2>Vibe Panel Connector</h2><p>{c.beta}</p><div className="download-packages">{packages.map(([target, label]) => <a key={target} className="site-primary-action" href={`https://github.com/x2v-co/vibe-coding-panel/releases/latest/download/vibe-connector-${target}.zip`}>{label}<ArrowRight size={17} /></a>)}</div><p><a href="https://github.com/x2v-co/vibe-coding-panel/releases/latest">{c.releaseChecks}</a></p></div></div>
+  return <div className="site-shell download-shell"><SiteHeader language={language} toggleLanguage={toggleLanguage} /><main className="download-main"><div className="download-heading"><p className="site-kicker">{c.oneConnector} <span className="site-preview-badge">{c.preview}</span></p><h1>{c.downloadTitle}</h1><p>{c.downloadDescription}</p></div><div className="download-card"><div className="download-card-icon"><Laptop size={24} /></div><div><h2>Vibe Panel Connector</h2><p>{c.beta}</p><div className="download-packages">{packages.map(([target, label]) => <a key={target} className="site-primary-action" href={`https://github.com/x2v-co/vibe-coding-panel/releases/latest/download/vibe-connector-${target}.zip`}>{label}<ArrowRight size={17} /></a>)}</div><p><a href="https://github.com/x2v-co/vibe-coding-panel/releases/latest">{c.releaseChecks}</a></p></div></div>
     <div className="download-guide" id="controller-setup"><h2>{c.twoEntries}</h2><div className="download-guide-section"><h3>{c.panelWorkspace}</h3><ol><li><b>{c.startConnector}</b><span>{language === 'zh' ? <>macOS 双击 <code>Vibe Panel.command</code>；Windows 双击 <code>Vibe Panel.bat</code>；Linux 运行 <code>bash "Vibe Panel.sh"</code>。</> : <>On macOS double-click <code>Vibe Panel.command</code>; on Windows double-click <code>Vibe Panel.bat</code>; on Linux run <code>bash "Vibe Panel.sh"</code>.</>}</span></li><li><b>{c.openPanel}</b><span>{language === 'zh' ? '选择已登录的 Codex、Claude App 或 Claude Code，再选择 Workspace，开始创建和继续任务。' : 'Choose a signed-in Codex, Claude App, or Claude Code, then choose a Workspace to create and continue tasks.'}</span></li></ol></div><div className="download-guide-section"><h3>{c.remoteCompanion}</h3><ol><li><b>{c.launchControl}</b><span>{c.launchControlDescription}</span></li><li><b>{c.scanPhone}</b><span>{c.scanPhoneDescription}</span></li></ol></div></div><p className="download-package-note">{c.packageNote}</p><div className="download-help"><ShieldCheck size={17} /><span><a href="https://github.com/x2v-co/vibe-coding-panel/blob/main/README.zh-CN.md">{c.fullInstall}</a> · <a href="https://github.com/x2v-co/vibe-coding-panel/blob/main/docs/install-for-agents.md">{c.installForAgent}</a> · {c.noAgent} <a href="/app">{c.demo}</a>.</span></div></main><SiteFooter language={language} /></div>;
 }
 

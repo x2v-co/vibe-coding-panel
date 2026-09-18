@@ -66,8 +66,14 @@ export function createRelayServer(options = {}) {
   const pairLimit = positiveInteger(options.pairLimit ?? process.env.PANEL_RELAY_PAIR_LIMIT, 10);
   const streamTimeoutMs = positiveInteger(options.streamTimeoutMs ?? process.env.PANEL_RELAY_STREAM_TIMEOUT_MS, 10 * 60 * 1000);
   const perConnectorLimit = positiveInteger(options.perConnectorLimit ?? process.env.PANEL_RELAY_PER_CONNECTOR_INFLIGHT, 20);
+  const admissionMode = ['open', 'limited', 'paused'].includes(String(options.admissionMode ?? process.env.PANEL_RELAY_ADMISSION_MODE ?? 'open').toLowerCase())
+    ? String(options.admissionMode ?? process.env.PANEL_RELAY_ADMISSION_MODE ?? 'open').toLowerCase() : 'open';
+  const perConnectorRate = positiveInteger(options.perConnectorRate ?? process.env.PANEL_RELAY_PER_CONNECTOR_RATE_LIMIT, 180);
+  const perConnectorUploadRate = positiveInteger(options.perConnectorUploadRate ?? process.env.PANEL_RELAY_PER_CONNECTOR_UPLOAD_LIMIT, 30);
   const limit = createLimiter({ windowMs: options.rateWindowMs || 60000 });
   const pairLimiter = createLimiter({ windowMs: 10 * 60000 });
+  const connectorLimiter = createLimiter({ windowMs: options.rateWindowMs || 60000 });
+  const connectorUploadLimiter = createLimiter({ windowMs: 60000 });
   const trustProxy = options.trustProxy ?? process.env.PANEL_RELAY_TRUST_PROXY;
   const audit = options.audit || ((event) => console.log(JSON.stringify({ at: new Date().toISOString(), ...event })));
   const clientIp = req => {
@@ -120,6 +126,7 @@ export function createRelayServer(options = {}) {
       connectors: connectors.size,
       inflight: pending.size,
       capacity: { connectors: maxConnectors, inflight: maxInflight },
+      admission: admissionMode,
     });
   });
 
@@ -131,12 +138,16 @@ export function createRelayServer(options = {}) {
   }
   app.use('/api', (req, res, next) => {
     const ip = clientIp(req);
+    const connectorId = connectorIdFrom(req);
+    const isUpload = req.path === '/transcriptions' || req.path === '/screenshots';
     const pairing = /^\/pair\/?$/i.test(req.path);
     const retry = limit(`api:${ip}`, rateLimit)
       || (pairing && (pairLimiter(`pair:${ip}`, pairLimit) || pairLimiter(`target:${connectorIdFrom(req)}`, pairLimit * 3)));
-    if (retry) {
+    const connectorRetry = connectorId && connectorLimiter(`connector:${connectorId}`, perConnectorRate);
+    const uploadRetry = isUpload && connectorId && connectorUploadLimiter(`upload:${connectorId}`, perConnectorUploadRate);
+    if (retry || connectorRetry || uploadRetry) {
       audit({ event: 'rate_limit', pairing });
-      return res.set('Retry-After', String(retry)).status(429).json({ code: 'RATE_LIMITED', error: 'Too many requests. Please retry later.' });
+      return res.set('Retry-After', String(Math.max(retry || 0, connectorRetry || 0, uploadRetry || 0))).status(429).json({ code: 'RATE_LIMITED', error: 'Too many requests. Please retry later.' });
     }
     next();
   }, (req, res, next) => {
@@ -247,8 +258,20 @@ export function createRelayServer(options = {}) {
       socket.destroy();
       return;
     }
+    if (admissionMode === 'paused') {
+      socket.write('HTTP/1.1 503 Service Unavailable\r\nRetry-After: 60\r\nConnection: close\r\n\r\nRELAY_ADMISSION_PAUSED');
+      socket.destroy();
+      audit({ event: 'connector_admission_rejected', mode: admissionMode });
+      return;
+    }
+    if (admissionMode === 'limited') {
+      socket.write('HTTP/1.1 503 Service Unavailable\r\nRetry-After: 60\r\nConnection: close\r\n\r\nRELAY_ADMISSION_CLOSED');
+      socket.destroy();
+      audit({ event: 'connector_admission_rejected', mode: admissionMode });
+      return;
+    }
     if (!connectors.has(connectorId) && connectors.size >= maxConnectors) {
-      socket.write('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n');
+      socket.write('HTTP/1.1 503 Service Unavailable\r\nRetry-After: 60\r\nConnection: close\r\n\r\nRELAY_CAPACITY_REACHED');
       socket.destroy();
       return;
     }
@@ -301,7 +324,7 @@ export function createRelayServer(options = {}) {
         } else if (message.type === 'response-error') {
           clearTimeout(active.timer);
           pending.delete(message.requestId);
-          if (!res.headersSent) res.status(502).json({ error: message.error || '电脑 Connector 请求失败' });
+          if (!res.headersSent) res.status(502).json({ error: message.error || '电脑 Connector 请求失败', code: message.code || 'CONNECTOR_ERROR' });
           else res.end();
         }
       } catch {
@@ -321,7 +344,7 @@ export function createRelayServer(options = {}) {
         if (active.connectorId !== connectorId) continue;
         clearTimeout(active.timer);
         pending.delete(requestId);
-        if (!active.res.headersSent) active.res.status(503).json({ error: '电脑 Connector 已断开' });
+        if (!active.res.headersSent) active.res.status(503).json({ error: '电脑 Connector 已断开', code: 'CONNECTOR_OFFLINE' });
         else active.res.end();
       }
     });

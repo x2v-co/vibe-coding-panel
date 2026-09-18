@@ -679,6 +679,9 @@ i.micro-keycap-glyph { background: currentColor; mask-size: contain; mask-positi
 }
 .settings-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
 .settings-heading span { color: var(--green); font-family: 'DM Mono', monospace; font-size: 9px; }
+.settings-heading > div { display: flex; flex-direction: column; gap: 6px; }
+.preview-label { color: #d6e3d8; font-family: 'DM Mono', monospace; font-size: 8px; letter-spacing: .04em; }
+.preview-note { margin: -8px 0 18px; padding: 9px 10px; border: 1px solid #3f5945; color: #a9b9ac; background: #17221a; font-size: 10px; line-height: 1.55; }
 .settings-heading button { width: 44px; height: 44px; border: 1px solid #3f453f; border-radius: 3px; display: grid; place-items: center; background: transparent; color: #c6cbc6; cursor: pointer; }
 .settings-popover label { display: block; margin-bottom: 7px; color: #8e968e; font-size: 11px; }
 .settings-popover input { width: 100%; min-height: 44px; border: 1px solid #3d443e; border-radius: 3px; padding: 0 11px; outline: 0; background: #121512; color: white; font-family: 'DM Mono', monospace; font-size: 11px; }
@@ -941,6 +944,7 @@ footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto
 .site-nav .site-nav-action { min-height: 38px; padding: 0 13px; gap: 6px; border: 1px solid #9da69d; color: #1c211c; background: transparent; }
 .site-hero { width: min(1180px, calc(100% - 56px)); margin: 0 auto; padding: 88px 0 82px; display: grid; grid-template-columns: minmax(0, .9fr) minmax(420px, 1.1fr); align-items: center; gap: 72px; }
 .site-kicker { margin: 0 0 18px; color: #bd5c36; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .08em; }
+.site-preview-badge { display: inline-block; margin-left: 8px; padding: 4px 7px; border: 1px solid currentColor; border-radius: 999px; font-size: 8px; letter-spacing: .04em; vertical-align: middle; }
 .site-hero h1 { margin: 0; font-size: clamp(48px, 6vw, 82px); line-height: 1.02; letter-spacing: 0; font-weight: 700; }
 .site-hero h1 em { color: #bd5c36; font-style: normal; }
 .site-hero-copy > p:not(.site-kicker) { max-width: 430px; margin: 25px 0 0; color: #69736a; font-size: 16px; line-height: 1.75; }
@@ -1218,6 +1222,9 @@ footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto
 .runtime-diagnostics dd { margin: 0; overflow-wrap: anywhere; }
 .runtime-diagnostics p { font-size: 12px; line-height: 1.6; }
 .runtime-diagnostics a { color: inherit; text-decoration: underline; }
+.diagnostics-actions { display: flex; align-items: center; gap: 12px; margin-top: 11px; }
+.diagnostics-actions button, .diagnostics-actions a { min-height: 34px; padding: 0 10px; border: 1px solid #465448; border-radius: 3px; display: inline-flex; align-items: center; gap: 6px; color: #c8d7ca; background: #182119; font-size: 10px; cursor: pointer; text-decoration: none; }
+.diagnostics-actions a { color: var(--green); }
 
 .footer-links { display: flex; gap: 16px; flex-wrap: wrap; }
 .footer-links a { color: inherit; text-underline-offset: 3px; }

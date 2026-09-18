@@ -112,6 +112,40 @@ test('relay rejects a connector that does not own the requested id', async () =>
   }
 });
 
+test('relay admission mode blocks new connectors while exposing safe health state', async () => {
+  const relay = createRelayServer({ admissionMode: 'limited', audit() {} });
+  const port = await listen(relay.server);
+  const identity = connectorIdentity('l');
+  try {
+    await assert.rejects(
+      openConnector(`ws://127.0.0.1:${port}/relay/connect?id=${identity.id}`, identity.credential),
+      /Unexpected server response: 503/,
+    );
+    const health = await fetch(`http://127.0.0.1:${port}/healthz`).then(response => response.json());
+    assert.equal(health.admission, 'limited');
+    assert.equal(health.connectors, 0);
+    assert.equal(JSON.stringify(health).includes(identity.credential), false);
+  } finally { await new Promise(resolve => relay.server.close(resolve)); }
+});
+
+test('relay per-connector request budget returns RATE_LIMITED', async () => {
+  const relay = createRelayServer({ perConnectorRate: 1, requestTimeoutMs: 20, audit() {} });
+  const port = await listen(relay.server);
+  const identity = connectorIdentity('m');
+  const socket = await openConnector(`ws://127.0.0.1:${port}/relay/connect?id=${identity.id}`, identity.credential);
+  try {
+    const headers = { Cookie: `vibe_relay_connector=${identity.id}` };
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/health`, { headers })).status, 504);
+    const limited = await fetch(`http://127.0.0.1:${port}/api/health`, { headers });
+    assert.equal(limited.status, 429);
+    assert.equal((await limited.json()).code, 'RATE_LIMITED');
+  } finally {
+    socket.close();
+    await new Promise(resolve => socket.once('close', resolve));
+    await new Promise(resolve => relay.server.close(resolve));
+  }
+});
+
 test('relay does not let a second socket replace an online Mac', async () => {
   const relay = createRelayServer();
   const port = await listen(relay.server);

@@ -22,6 +22,9 @@ Point a DNS A record such as `relay.example.com` at the server. Install Docker a
 PANEL_RELAY_DOMAIN=relay.example.com
 PANEL_RELAY_MAX_CONNECTORS=100
 PANEL_RELAY_MAX_INFLIGHT=100
+PANEL_RELAY_ADMISSION_MODE=open
+PANEL_RELAY_PER_CONNECTOR_RATE_LIMIT=180
+PANEL_RELAY_PER_CONNECTOR_UPLOAD_LIMIT=30
 ```
 
 Start the service:

@@ -20,8 +20,12 @@ export async function readApiResponse(response: Response) {
       CONNECTOR_TIMEOUT: response.url.includes('/transcriptions')
         ? '语音处理超时。请缩短录音，并在电脑确认语音模型已安装；仍可直接输入文字。'
         : '电脑响应超时。请检查 Connector，并先查看任务记录，确认任务是否已启动，避免重复发送。',
+      CONNECTOR_ERROR: '电脑 Connector 返回错误。请查看电脑终端提示，确认 Agent 仍在运行后重试。',
       PAIRING_REQUIRED: '设备尚未配对或授权已撤销。请在电脑生成新的配对码，再连接这台设备。',
       RELAY_BUSY: '连接服务暂时繁忙，请稍后重试；已发送的任务请先查看任务记录。',
+      RELAY_ADMISSION_CLOSED: '连接服务暂时停止新的电脑连接。请稍后重试；已连接的电脑不受影响。',
+      RELAY_ADMISSION_PAUSED: '连接服务正在维护，暂时无法建立新的电脑连接。请稍后重试。',
+      RELAY_CAPACITY_REACHED: '连接服务当前已达到容量上限，请稍后重试。',
       BODY_TOO_LARGE: '上传内容过大。请缩短录音或压缩图片，单次文件尽量小于 7 MB。',
     };
     if (code === 'RATE_LIMITED' || response.status === 429) {

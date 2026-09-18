@@ -24,6 +24,16 @@ upstream CLI versions, real phone microphone access, or platform installers.
 
 ## Relay protection
 
+The public Relay stays open by default during the preview. Operators can pause
+new Connector registrations without changing self-hosted Relays or existing
+connections:
+
+| Environment variable | Default | Meaning |
+| --- | --- | --- |
+| `PANEL_RELAY_ADMISSION_MODE` | `open` | `open` accepts new Connectors; `limited` or `paused` rejects new registrations with a retryable 503. |
+| `PANEL_RELAY_PER_CONNECTOR_RATE_LIMIT` | `180` | API requests per Connector per minute, in addition to the client limit. |
+| `PANEL_RELAY_PER_CONNECTOR_UPLOAD_LIMIT` | `30` | Audio/screenshot uploads per Connector per minute. |
+
 | Environment variable | Default | Meaning |
 | --- | --- | --- |
 | PANEL_RELAY_MAX_UPLOADS | 8 | Concurrent bodies being parsed, before forwarding |
