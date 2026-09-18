@@ -38,6 +38,19 @@ async function fits(page) {
   expect(await page.locator('#shell').evaluate(e => getComputedStyle(e).display)).not.toBe('block');
 }
 async function online(page) { await page.evaluate(() => window.dispatchEvent(new Event('online'))); }
+test('public site switches language, persists it, and fits mobile pages', async ({ page }) => {
+  for (const path of ['/', '/remote', '/download']) {
+    await page.goto(path + '?lang=en');
+    await expect(page.locator('.site-language')).toHaveText('中文');
+    expect(await page.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: innerWidth, lang: document.documentElement.lang }))).toMatchObject({ lang: 'en' });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.locator('.site-language').click();
+    await expect(page.locator('.site-language')).toHaveText('EN');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
+    await page.goto(path);
+    await expect(page.locator('.site-language')).toHaveText('EN');
+  }
+});
 test('fresh phone pairs in settings, normalizes pasted code, and stays paired after reload', async ({ page }) => {
   const f = await fixture(page, { paired: false }); await page.goto(remote);
   await expect(page.locator('#settings-sheet')).toBeVisible();

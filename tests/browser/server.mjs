@@ -5,5 +5,5 @@ const app = express(), root = process.cwd();
 app.get('/api/desktop-controller/view', (_req, res) => res.sendFile(path.join(root, 'dist/controller.html')));
 app.use('/api/desktop-controller', express.static(path.join(root, 'dist')));
 app.use(express.static(path.join(root, 'dist')));
-app.get('/app', (_req, res) => res.sendFile(path.join(root, 'dist/index.html')));
+app.get(['/app', '/remote', '/download'], (_req, res) => res.sendFile(path.join(root, 'dist/index.html')));
 app.listen(4189, '127.0.0.1');
