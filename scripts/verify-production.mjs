@@ -15,15 +15,20 @@ export async function verifyProduction(origin, revision, fetchImpl = fetch) {
   const assets = [...html.matchAll(/(?:src|href)="(\/assets\/[^"?#]+\.(?:js|css))"/g)].map(m=>m[1]);
   assert(assets.some(a=>a.endsWith('.js')) && assets.some(a=>a.endsWith('.css')), 'Missing frontend assets');
   let versionFound = false;
+  const frontendBodies = [];
   for (const asset of assets) {
     const body = await (await get(asset)).text();
     assert(body.length > 0 && !body.trimStart().startsWith('<'), `${asset}: invalid asset response`);
+    frontendBodies.push(body);
     if (asset.endsWith('.js') && body.includes(revision)) versionFound = true;
   }
   assert(versionFound, `${origin}: frontend is stale despite healthy backend`);
-  const remoteHtml = await (await get(`/remote?verify=${revision}`)).text();
-  assert(remoteHtml.includes('/screenshots/runtime/remote-mobile.png'), `${origin}: Remote artwork is missing or stale`);
-  assert(!remoteHtml.includes('/screenshots/runtime/panel-mobile.png'), `${origin}: Remote page references Panel artwork`);
+  // `/remote` is a client-side route and returns the SPA shell. Verify the
+  // route and the artwork reference in the deployed frontend bundle instead
+  // of expecting route-specific server-rendered HTML.
+  await get(`/remote?verify=${revision}`);
+  assert(frontendBodies.some(body => body.includes('/screenshots/runtime/remote-mobile.png')), `${origin}: Remote artwork is missing or stale`);
+  assert(!frontendBodies.some(body => body.includes('/screenshots/runtime/panel-mobile.png')), `${origin}: Remote page references Panel artwork`);
   const artwork = await get('/screenshots/runtime/remote-mobile.png');
   assert((artwork.headers.get('content-type') || '').startsWith('image/'), `${origin}: Remote artwork is not an image`);
   assert(Number(artwork.headers.get('content-length') || 0) > 0, `${origin}: Remote artwork is empty`);
