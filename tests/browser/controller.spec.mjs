@@ -50,6 +50,8 @@ test('public site switches language, persists it, and fits mobile pages', async 
     await page.goto(path);
     await expect(page.locator('.site-language')).toHaveText('EN');
   }
+  await page.goto('/remote');
+  await expect(page.locator('.remote-hero-device img')).toHaveAttribute('src', '/screenshots/runtime/remote-mobile.png');
 });
 test('fresh phone pairs in settings, normalizes pasted code, and stays paired after reload', async ({ page }) => {
   const f = await fixture(page, { paired: false }); await page.goto(remote);
