@@ -2,6 +2,8 @@
 
 ## Unreleased — integrated controller and regional Relay
 
+- Clarify the product boundary: Vibe Panel is the computer Agent workspace and Vibe Remote is its companion phone input surface, with separate website entry points and one Connector.
+- Update the homepage, download guide, onboarding copy and metadata so users start with Panel and enable Remote only when they need phone control.
 - Add an explicit desktop-controller mode to source and portable launchers, with macOS App binding and a managed Claude Code console.
 - Include controller pages, native drivers and speech worker in portable packages.
 - Share regional Relay settings and transport; preserve one-scan controller routing and never automatically replay controller mutations.

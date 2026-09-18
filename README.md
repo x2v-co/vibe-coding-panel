@@ -1,8 +1,8 @@
-# Vibe Coding Panel
+# Vibe Panel
 
-[简体中文](README.zh-CN.md) · [Website](https://vibe.toolkit.fun/) · [Try the panel](https://vibe.toolkit.fun/app)
+[简体中文](README.zh-CN.md) · [Website](https://vibe.toolkit.fun/) · [Try Vibe Panel](https://vibe.toolkit.fun/app) · [Vibe Remote](https://vibe.toolkit.fun/remote)
 
-Control your computer's Codex or Claude Code from your phone. Speak a request, choose a workspace, press a large key, and watch the result. No hardware required.
+Vibe Panel is the computer workspace for local Codex and Claude Code. Vibe Remote is its companion phone input surface: speak or press a key on your phone, then review and send the draft from the computer session. No hardware required.
 
 No Vibe Panel account, personal server, Tailscale, or tunnel setup is needed. The Connector runs on your computer and connects to the shared Relay at `https://vibe.toolkit.fun`. Your agent keeps using its existing login and model provider.
 
@@ -17,7 +17,7 @@ See the [controller setup, pairing and recovery guide](docs/controller-quickstar
 Paste this into Codex, Claude Code, or another coding agent **running on your computer**:
 
 ```text
-Install and start Vibe Coding Panel on this computer.
+Install and start the Vibe Panel Connector on this computer.
 Repository: https://github.com/x2v-co/vibe-coding-panel
 Read docs/install-for-agents.md in the downloaded checkout and follow it.
 Reuse my existing agent login and model/provider settings. Set up local

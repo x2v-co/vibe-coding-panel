@@ -1,4 +1,4 @@
-# Install Vibe Coding Panel for a user
+# Install Vibe Panel for a user
 
 This guide is for Codex, Claude Code, or another coding agent that is asked to install Vibe Panel on the user's computer.
 

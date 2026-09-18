@@ -1,8 +1,8 @@
-# Vibe Coding Panel
+# Vibe Panel
 
-[English](README.md) · [项目官网](https://vibe.toolkit.fun/) · [体验面板](https://vibe.toolkit.fun/app)
+[English](README.md) · [项目官网](https://vibe.toolkit.fun/) · [打开 Vibe Panel](https://vibe.toolkit.fun/app) · [Vibe Remote](https://vibe.toolkit.fun/remote)
 
-用手机控制电脑上的 Codex 或 Claude Code。说出需求、选择工作区、按下大按键，即可查看执行进度和结果，无需购买外设。
+Vibe Panel 是电脑端 Agent 工作台：连接本机的 Codex、Claude App 或 Claude Code，选择 Workspace，创建和继续任务。Vibe Remote 是配套的手机遥控器，用语音和按键向电脑当前会话追加输入；完整草稿、过程和回复留在 Panel。
 
 无需注册 Vibe Panel 账号、租服务器或安装 Tailscale。电脑上的 Connector 默认连接项目共享 Relay：`https://vibe.toolkit.fun`，继续使用你现有的 Agent 登录和模型服务商配置。
 
@@ -17,7 +17,7 @@
 将下面这段话发给**运行在自己电脑上的** Codex、Claude Code 或其他编程 Agent：
 
 ```text
-请在这台电脑上安装并启动 Vibe Coding Panel。
+请在这台电脑上安装并启动 Vibe Panel Connector。
 仓库：https://github.com/x2v-co/vibe-coding-panel
 读取下载目录中的 docs/install-for-agents.md，并按指南完成安装。
 复用我现有的 Agent 登录、模型和 provider 配置，尽量安装本机 Whisper
@@ -32,13 +32,13 @@
 
 [下载 Connector](https://vibe.toolkit.fun/download)：提供 macOS Apple Silicon／Intel、Windows x64 和 Linux x64 版本。内含 Node.js 24 和锁定依赖，完整解压后运行对应启动文件，无需另装 Node 或 npm。仍需安装并登录 Codex／Claude；语音所需 Whisper／ffmpeg 可选安装。当前为未签名的内测包。[运行包说明与限制](docs/portable-connector.md) · [版本与校验文件](https://github.com/x2v-co/vibe-coding-panel/releases/latest)。
 
-## 从源码安装：三步开始
+## 从源码安装：先用 Panel，再启用 Remote
 
-**准备好：**macOS、Windows 10/11 或 Linux 电脑，安装 [Node.js 24 LTS](https://nodejs.org/zh-cn/download)。安装并登录 [Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://code.claude.com/docs/zh-CN/setup)，先在其终端发送一句话，确认能正常回复。
+**准备好：**macOS、Windows 10/11 或 Linux 电脑，安装 [Node.js 24 LTS](https://nodejs.org/zh-cn/download)。准备好并登录 Codex、Claude App 或 [Claude Code](https://code.claude.com/docs/zh-CN/setup)，先在对应客户端发送一句话，确认能正常回复。
 
 1. **下载并解压**[项目 ZIP](https://github.com/x2v-co/vibe-coding-panel/archive/refs/heads/main.zip)。打开解压后的文件夹，不要直接在压缩包里运行。
 2. **在电脑上启动**下表对应文件。第一次启动会自动安装 Node 依赖。
-3. **手机扫描终端二维码**，用 Safari、Chrome 或 Edge 打开。选择 Agent 和工作区，先发一条文字指令。
+3. **打开 Vibe Panel**，选择 Agent 和 Workspace，先发一条文字指令。需要手机输入时，在电脑控制中心启用 Vibe Remote，再扫描二维码配对手机。
 
 | 电脑系统 | 启动方式 |
 | --- | --- |
@@ -69,11 +69,11 @@ node scripts/launch.mjs --setup-voice
 
 安装器自动下载托管 Python 3.11、Whisper、ffmpeg 和 small 模型，验证通过后启用，不修改系统 Python。预留约 3 GB 空间与数分钟下载时间，完成后重启 Connector。已有手动 MLX / Whisper 配置优先。详见[运行包说明](docs/portable-connector.md)和[高级配置](docs/configuration.md)。
 
-手机允许当前网站使用麦克风后，点击 **VOICE INPUT** 开始，说完再点一下结束。识别文字经自动校对后填入原输入框，可手动修改；按 **SEND** 才会执行。校对会在发送前调用电脑配置的 Claude 模型服务，失败时保留原文。浏览器录音失败时，可上传系统录音文件。
+手机允许当前网站使用麦克风后，点击 **VOICE INPUT** 开始，说完再点一下结束。识别文字经当前绑定 Agent 的校对服务处理后追加到电脑草稿，可在电脑修改；按 **SEND** 才会执行。校对失败时保留原文。浏览器录音失败时，可上传系统录音文件。
 
 ## 选择 Agent
 
-手机面板中可选择 Codex 或 Claude Code。如需双击启动时记住默认选择，在项目内创建 `.vibe-panel/connector.json`：
+Vibe Panel 中可选择 Codex、Claude App 或 Claude Code；Vibe Remote 沿用电脑已绑定的目标，不需要在手机重复选择。如需双击启动时记住默认选择，在项目内创建 `.vibe-panel/connector.json`：
 
 ```json
 {"agentProvider":"claude"}
@@ -98,7 +98,7 @@ node scripts/launch.mjs --setup-voice
 
 这是原生历史同步和会话交接，不是镜像或控制已经打开的终端。检测到会话占用时会阻止接续；不同 CLI 版本、操作系统可用的进程信息不同，所以仍需确认退出原会话，避免两端同时写入。Codex 需要支持 `app-server` 的 `thread/list`、`thread/read`；Claude 读取本地项目记录，支持 `CLAUDE_CONFIG_DIR`。Relay 和本机/直连使用电脑 Connector，旧版 Remote Bridge 模式暂仅展示 Panel 任务。更新后请重启 Connector。
 
-- 大按键、手机专注模式、文字与语音输入、图片上传、工作区目录选择。
+- Panel 的文字与语音输入、图片上传、工作区目录选择，以及 Remote 的手机按键和语音追加。
 - Codex 与 Claude Code 实时输出、停止、追问和浏览器历史记录。
 - 八种键位布局、四种配色；Micro 支持自定义动作、文案、颜色和 SVG 键帽。
 - Micro 语音键：按住说话，松开转写；350 ms 内双击锁定录音，再按一次结束。

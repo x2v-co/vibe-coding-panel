@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve Vibe Coding Panel.
+Thanks for helping improve Vibe Panel and its Vibe Remote companion.
 
 ## Local setup
 
