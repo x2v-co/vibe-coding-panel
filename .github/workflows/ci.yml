@@ -120,7 +120,7 @@ jobs:
     permissions:
       contents: write
     concurrency:
-      group: relay-production
+      group: relay-release
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
@@ -148,12 +148,5 @@ jobs:
           previous=$(gh release view --json tagName --jq .tagName)
           python3 scripts/release-notes.py --revision "$GITHUB_SHA" --previous "$previous" --output release-notes.md
           gh release create "relay-$GITHUB_SHA" relay-image.tar.gz vibe-connector-*.zip SHA256SUMS --target "$GITHUB_SHA" --title "Vibe Panel 0.1.0 · ${GITHUB_SHA:0:8}" --notes-file release-notes.md --latest
-      - name: Verify production applied this version
-        run: |
-          for attempt in $(seq 1 60); do
-            version=$(curl -fsS --max-time 15 "https://vibe-relay-global.toolkit.fun/healthz?release=$GITHUB_SHA" | jq -r '.version' || true)
-            if [ "$version" = "$GITHUB_SHA" ]; then exit 0; fi
-            sleep 10
-          done
-          echo 'Production did not reach the expected version; inspect updater logs and rollback state.'
-          exit 1
+      - name: Regional deployment handoff
+        run: echo 'Release published. Deploy the immutable revision to the regional hosts, then run Verify deployed product.'
