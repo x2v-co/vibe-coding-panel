@@ -51,7 +51,10 @@ test('public site switches language, persists it, and fits mobile pages', async 
     await expect(page.locator('.site-language')).toHaveText('EN');
   }
   await page.goto('/remote');
-  await expect(page.locator('.remote-hero-device img')).toHaveAttribute('src', '/screenshots/runtime/remote-mobile.png');
+  const remoteArtwork = page.locator('.remote-hero-device img');
+  await expect(remoteArtwork).toHaveAttribute('src', '/screenshots/runtime/remote-mobile.png');
+  await expect.poll(() => remoteArtwork.evaluate(image => ({ complete: image.complete, width: image.naturalWidth, height: image.naturalHeight }))).toMatchObject({ complete: true });
+  expect(await remoteArtwork.evaluate(image => image.naturalWidth)).toBeGreaterThan(0);
 });
 test('fresh phone pairs in settings, normalizes pasted code, and stays paired after reload', async ({ page }) => {
   const f = await fixture(page, { paired: false }); await page.goto(remote);
