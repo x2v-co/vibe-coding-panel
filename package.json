@@ -1,7 +1,7 @@
 {
   "name": "vibe-coding-panel",
   "version": "0.1.0",
-  "description": "A voice-first, mobile-ready control panel for local coding agents.",
+  "description": "A computer workspace for local coding agents with a companion phone remote.",
   "license": "MIT",
   "repository": {
     "type": "git",

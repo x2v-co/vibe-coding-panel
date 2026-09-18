@@ -1,7 +1,7 @@
 {
-  "name": "Vibe Coding Panel",
+  "name": "Vibe Panel",
   "short_name": "Vibe Panel",
-  "description": "A compact voice-first control panel for coding agents.",
+  "description": "A computer workspace for coding agents with a companion phone remote.",
   "id": "/",
   "start_url": "/app",
   "scope": "/",
