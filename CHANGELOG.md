@@ -2,6 +2,14 @@
 
 ## Unreleased — integrated controller and regional Relay
 
+- Add an in-app update mechanism: each build emits `version.json` and pins the
+  service worker cache to the Git revision, so installed desktop PWAs detect a
+  new release, show a "reload to update" banner and activate the waiting worker
+  without an uninstall/reinstall.
+- Send `no-cache` for the service worker and SPA shell and `no-store` for
+  `version.json` from both Connector and Relay; hashed `/assets` stay cache
+  first in the worker.
+
 - Clarify the product boundary: Vibe Panel is the computer Agent workspace and Vibe Remote is its companion phone input surface, with separate website entry points and one Connector.
 - Update the homepage, download guide, onboarding copy and metadata so users start with Panel and enable Remote only when they need phone control.
 - Add an explicit desktop-controller mode to source and portable launchers, with macOS App binding and a managed Claude Code console.
