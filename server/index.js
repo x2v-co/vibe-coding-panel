@@ -521,8 +521,6 @@ async function localFollowUpHandler(req, res) {
       return res.status(409).json({ error: '该会话正在执行，请稍后再试' });
     }
   }
-  job.events = [];
-  job.sequence = 0;
   launch(job, prompt, true);
   res.json({ ok: true });
 }
@@ -853,8 +851,6 @@ app.post('/api/jobs/:id/follow-up', async (req, res) => {
     await remoteJson(job.remote, `/bridge/jobs/${job.remote.id}/follow-up`, {
       method: 'POST', body: JSON.stringify({ prompt }),
     }, 30000);
-    job.events = [];
-    job.sequence = 0;
     job.status = 'queued';
     job.result = '';
     job.startedAt = null;

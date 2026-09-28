@@ -441,7 +441,14 @@ main { padding: 28px 0 76px; }
 
 .running-screen strong, .result-screen strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 22px; }
 .running-screen p { margin: 20px 0 14px; color: #a8afa8; font-family: 'DM Mono', monospace; font-size: 12px; }
-.result-screen p { margin: 12px 0; max-height: 78px; overflow: auto; color: #bbc1bb; font-size: 13px; line-height: 1.65; white-space: pre-wrap; }
+.session-transcript { max-height: 126px; margin: 10px 0 12px; padding: 7px 10px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid #303830; background: rgba(9, 12, 10, 0.42); scrollbar-color: #5f9c68 #1c211d; scrollbar-width: thin; }
+.transcript-entry { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 8px; align-items: start; padding: 5px 0; color: #aeb8ae; font-family: 'DM Mono', monospace; font-size: 10px; line-height: 1.5; }
+.transcript-entry + .transcript-entry { border-top: 1px solid rgba(82, 103, 84, 0.2); }
+.transcript-entry > span { color: var(--green); font-size: 8px; }
+.transcript-entry p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.transcript-entry.status { color: #849284; }
+.transcript-entry.message { color: #d5ddd5; }
+.result-entry { display: block; }
 .result-screen button { min-height: 38px; padding: 0 12px; border: 1px solid #424942; border-radius: 3px; background: #242924; color: #dde3dd; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; font-size: 11px; }
 .result-heading { display: flex; align-items: center; gap: 10px; }
 .result-heading strong { flex: 1; min-width: 0; }

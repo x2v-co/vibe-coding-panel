@@ -953,7 +953,7 @@ function PanelApp() {
       });
       const payload = await readApiResponse(response);
       if (!response.ok) throw new Error(payload.error || '无法继续任务');
-      setPrompt(''); setCapturePath(''); setCapturePreview(''); setActivity([]); setResult('');
+      setPrompt(''); setCapturePath(''); setCapturePreview(''); setResult('');
       setStreamVersion((version) => version + 1);
     } catch (reason) {
       setStatus('failed');
@@ -984,7 +984,7 @@ function PanelApp() {
 
   function reset() {
     pendingMicroSlot.current=null;
-    if (busy || voiceBusy || isAddingContext || isRecoveringJob) return;
+    if (voiceBusy || isAddingContext || isRecoveringJob) return;
     setNativeSelection(null); setTerminalReleased(false);
     demoRunRef.current += 1;
     voiceSessionRef.current += 1;
@@ -1296,7 +1296,7 @@ function PanelApp() {
 
   function loadJob(job: SavedJob) {
     pendingMicroSlot.current=null;
-    if (busy || voiceBusy || isRecoveringJob || isAddingContext) return;
+    if (voiceBusy || isRecoveringJob || isAddingContext) return;
     setNativeSelection(null);
     if (jobId !== job.id) {
       const previous = microNavigation.length ? microNavigation.slice(0, microNavigationIndex + 1) : jobId ? [jobId] : [];
@@ -1308,6 +1308,14 @@ function PanelApp() {
     restoreJob(job);
     setShowHistory(false);
     if (!job.id.startsWith('demo-')) void refreshJob(job.id);
+  }
+
+  function renderSessionTranscript() {
+    const entries = activity.filter((item) => item.text);
+    if (!entries.length && result) return <div className="session-transcript"><p className="transcript-entry result-entry">{result}</p></div>;
+    return <div className="session-transcript" aria-label="会话上下文">
+      {entries.map((item) => <div className={`transcript-entry ${item.type}`} key={`${item.id}-${item.at}-${item.type}`}><span>{item.type === 'tool' ? 'CMD' : item.type === 'status' ? 'SYS' : item.type === 'message' ? 'AGENT' : 'LOG'}</span><p>{item.text}</p></div>)}
+    </div>;
   }
 
   function triggerMicroAction(key: MicroBinding) {
@@ -1457,7 +1465,7 @@ function PanelApp() {
   }
 
   function renderNewTaskKey(className = '') {
-    return <button type="button" className={`console-key dark utility-key new-key ${className}`} onClick={reset} disabled={busy || voiceBusy || isAddingContext}><Plus size={24} /><span>NEW</span><small>新任务</small></button>;
+    return <button type="button" className={`console-key dark utility-key new-key ${className}`} onClick={reset} disabled={voiceBusy || isAddingContext}><Plus size={24} /><span>NEW</span><small>新任务</small></button>;
   }
 
   function renderHistoryKey(className = '') {
@@ -1631,9 +1639,9 @@ function PanelApp() {
 
             <div className="display-bezel"><div className="display">
               <div className="display-main">
-              <div className="display-status"><span className={`status-light ${status}`} /><span className="task-status-label" role="status" aria-live="polite"><span className="task-status-text">{isRecoveringJob ? '恢复中' : statusLabels[status]}</span><span className="task-agent-label"> / {nativeSelection ? `SESSION · ${nativeSelection.provider === 'claude' ? 'CLAUDE' : 'CODEX'}` : activeAgent.label.toUpperCase()}</span></span><div className="display-quick-actions"><button type="button" className="new-task-action" onClick={reset} disabled={busy || voiceBusy || isAddingContext || isRecoveringJob} title="新建任务" aria-label="新建任务"><Plus size={16} /></button><button type="button" className="context-action" onClick={() => imageInputRef.current?.click()} disabled={busy || voiceBusy || isAddingContext || isRecoveringJob} title="添加图片上下文" aria-label="添加图片上下文">{isAddingContext ? <RotateCw className="spin" size={16} /> : <ImagePlus size={16} />}</button><button type="button" className="history-action" onClick={() => setShowHistory(true)} title="任务记录" aria-label="任务记录"><History size={16} /></button><button type="button" className="micro-toolbar-action" onClick={() => setShowSettings(open => !open)} title="设置主题与工作目录" aria-label="设置主题与工作目录"><Palette size={16} /></button></div><span className="display-time"><Clock3 size={13} /> {busy ? duration : 'READY'}</span></div>
+              <div className="display-status"><span className={`status-light ${status}`} /><span className="task-status-label" role="status" aria-live="polite"><span className="task-status-text">{isRecoveringJob ? '恢复中' : statusLabels[status]}</span><span className="task-agent-label"> / {nativeSelection ? `SESSION · ${nativeSelection.provider === 'claude' ? 'CLAUDE' : 'CODEX'}` : activeAgent.label.toUpperCase()}</span></span><div className="display-quick-actions"><button type="button" className="new-task-action" onClick={reset} disabled={voiceBusy || isAddingContext || isRecoveringJob} title="新建任务（当前 session 将继续运行）" aria-label="新建任务"><Plus size={16} /></button><button type="button" className="context-action" onClick={() => imageInputRef.current?.click()} disabled={busy || voiceBusy || isAddingContext || isRecoveringJob} title="添加图片上下文" aria-label="添加图片上下文">{isAddingContext ? <RotateCw className="spin" size={16} /> : <ImagePlus size={16} />}</button><button type="button" className="history-action" onClick={() => setShowHistory(true)} title="任务记录" aria-label="任务记录"><History size={16} /></button><button type="button" className="micro-toolbar-action" onClick={() => setShowSettings(open => !open)} title="设置主题与工作目录" aria-label="设置主题与工作目录"><Palette size={16} /></button></div><span className="display-time"><Clock3 size={13} /> {busy ? duration : 'READY'}</span></div>
                 <div className={`display-content ${isListening ? 'listening' : ''}`}>
-                  {result && !busy && !capturePreview ? <div className="result-screen"><span className="screen-label">{status === 'stopped' ? '已停止' : status === 'failed' ? '任务异常' : 'TASK COMPLETE'}</span><div className="result-heading"><strong>{taskTitle}</strong><button type="button" className="copy-result" title={copied ? '已复制' : '复制结果'} aria-label={copied ? '已复制' : '复制结果'} onClick={async () => { await navigator.clipboard.writeText(result); setCopied(true); window.setTimeout(() => setCopied(false), 1500); }}>{copied ? <Check size={16} /> : <Copy size={16} />}</button></div><p>{result}</p></div>
+                  {(result || activity.length) && !busy && !capturePreview ? <div className="result-screen"><span className="screen-label">{status === 'stopped' ? '已停止' : status === 'failed' ? '任务异常' : 'SESSION TRANSCRIPT'}</span><div className="result-heading"><strong>{taskTitle}</strong>{result && <button type="button" className="copy-result" title={copied ? '已复制' : '复制结果'} aria-label={copied ? '已复制' : '复制结果'} onClick={async () => { await navigator.clipboard.writeText(result); setCopied(true); window.setTimeout(() => setCopied(false), 1500); }}>{copied ? <Check size={16} /> : <Copy size={16} />}</button>}</div>{renderSessionTranscript()}</div>
                     : busy ? <div className="running-screen"><span className="screen-label">NOW RUNNING</span><strong>{taskTitle || '正在启动 Agent'}</strong><p>{latestProgress}</p><div className="progress-track"><i /></div></div>
                     : isRecoveringJob ? <div className="running-screen recovering-screen"><span className="screen-label">RESTORING SESSION</span><strong>正在恢复上次任务</strong><p>正在连接 Agent 并读取最新进度</p><div className="progress-track"><i /></div></div>
                     : <div className={`command-screen ${capturePreview ? 'has-capture' : ''}`}>{capturePreview && <div className="capture-preview"><img src={capturePreview} alt="已添加的图片上下文" /><div><span>VISUAL CONTEXT</span><strong>图片已装载</strong></div><button type="button" onClick={() => { setCapturePath(''); setCapturePreview(''); }} aria-label="移除图片"><X size={16} /></button></div>}{isListening && <div className="waveform" aria-hidden="true">{Array.from({ length: 28 }, (_, index) => <i key={index} />)}</div>}<div className="screen-label">{nativeSelection ? 'NATIVE SESSION' : isListening ? 'LISTENING' : isTranscribing ? 'TRANSCRIBING' : 'COMMAND DRAFT'}</div>{nativeSelection && <div className="native-selected-session"><strong>{nativeSelection.title}</strong><small role="status" aria-live="polite">{selectedHandoff?.state === 'releasing' || selectedHandoff?.state === 'timeout' || selectedHandoff?.state === 'error' ? selectedHandoff.message : confirmNativeRelease ? '请求交接：确认后将中断电脑上的当前任务' : nativeSelection.canResume === false ? (nativeSelection.releaseHint || (nativeSelection.canRelease === false ? '请在电脑退出 CLI，释放后可继续' : '电脑终端占用中：退出后可继续')) : selectedHandoff?.state === 'released' ? selectedHandoff.message : '已连接，输入内容将继续此会话'}</small>{nativeSelection.canResume === false && nativeSelection.canRelease !== false && (nativeSelection.provider === 'codex' || nativeSelection.provider === 'claude') && (confirmNativeRelease ? <span className="release-native-confirm"><span>退出当前电脑终端？</span><button type="button" className="release-native-cancel" onClick={() => setConfirmNativeRelease(false)}>取消</button><button type="button" className="release-native-button danger" onClick={() => void releaseNativeTerminal()}>确认退出</button></span> : <button type="button" className="release-native-button" disabled={selectedHandoff?.state === 'releasing'} onClick={() => setConfirmNativeRelease(true)}>请求退出电脑终端</button>)}</div>}<label htmlFor="command">任务指令</label><textarea id="command" ref={promptRef} value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void execute(); } }} rows={3} maxLength={3000} placeholder={isListening ? '正在录音，再按一次结束…' : isTranscribing ? '正在转写与校对…' : nativeSelection ? '继续这个原生会话…' : '按下语音键，或在这里输入…'} /></div>}
