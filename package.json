@@ -19,7 +19,7 @@
     "relay": "node server/relay.js",
     "share": "node scripts/share.mjs",
     "check": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
-    "test": "node --test server/*.test.js",
+    "test": "node --test server/*.test.js scripts/release-plugin.test.mjs",
     "doctor": "node scripts/launch.mjs --doctor",
     "check:regional": "node scripts/check-regional-capacity.mjs",
     "test:acceptance": "node --test scripts/acceptance.test.mjs",

@@ -23,6 +23,8 @@ export async function verifyProduction(origin, revision, fetchImpl = fetch) {
     if (asset.endsWith('.js') && body.includes(revision)) versionFound = true;
   }
   assert(versionFound, `${origin}: frontend is stale despite healthy backend`);
+  const releaseManifest = await (await get('/version.json')).json();
+  assert.equal(releaseManifest.revision, revision, `${origin}: version.json is stale`);
   // `/remote` is a client-side route and returns the SPA shell. Verify the
   // route and the artwork reference in the deployed frontend bundle instead
   // of expecting route-specific server-rendered HTML.

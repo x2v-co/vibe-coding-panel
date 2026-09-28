@@ -10,9 +10,10 @@ import { readMicroPreferences, microDirections, microDragDirection, microSlots, 
 import type { MicroPreferences, MicroBinding, MicroDirection } from './micro';
 import QRCode from 'qrcode';
 import { readApiResponse, userError } from './api';
+import { applyUpdate, getUpdateState, startUpdater, subscribe } from './updater';
 import { monitorConnection } from './connection-monitor';
 import { MIN_RECORDING_MS, recordingMimeTypes, validateRecording } from './recording';
-import { Fragment, ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { defaultMicroKeys, microActions, microColors, microIconOptions, microKeycapAssets, readMicroConfiguration, updateMicroConfiguration, unavailableMicroAction, MicroVoiceGesture } from './micro';
 import type { MicroKeyId, MicroActionId, MicroIconId, MicroKeyConfig } from './micro';
 
@@ -220,6 +221,8 @@ function PanelApp() {
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnostics | null>(null);
   const [diagnosticsError, setDiagnosticsError] = useState('');
   const [connectorRevision, setConnectorRevision] = useState<string | null>(null);
+  const updateState = useSyncExternalStore(subscribe, getUpdateState);
+  useEffect(() => { startUpdater(); }, []);
   const [agentProvider, setAgentProvider] = useState<AgentProviderId>(readAgentProvider);
   const [providers, setProviders] = useState<AgentProviderInfo[]>([]);
   const [microKeys, setMicroKeys] = useState<MicroKeyConfig[]>(readMicroKeys);
@@ -1662,6 +1665,7 @@ function PanelApp() {
             {showSettings && renderSettingsPopover()}
           </div>
           <div className="panel-notices">
+          {updateState.available && <div className="update-banner" role="status" aria-live="polite"><RotateCw size={16} /><span>新版本可用，重新加载后任务记录与配对都会保留。</span><button type="button" onClick={() => applyUpdate()}>重新加载</button></div>}
           {connectionNotice && <div className="error-banner" role="status" aria-live="polite"><Wifi size={16} /><span>{connectionNotice}</span></div>}
           {error && <div className="error-banner" role="alert"><Terminal size={16} /><span>{error}</span>{canImportRecording && <button type="button" className="audio-import-action" onClick={() => audioInputRef.current?.click()}><FileAudio size={15} />系统录音</button>}<button onClick={() => { setError(''); setCanImportRecording(false); }} aria-label="关闭"><X size={15} /></button></div>}
           </div>

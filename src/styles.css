@@ -824,6 +824,10 @@ i.micro-keycap-glyph { background: currentColor; mask-size: contain; mask-positi
 .error-banner span { flex: 1; }
 .error-banner button { width: 32px; height: 32px; border: 0; background: transparent; display: grid; place-items: center; cursor: pointer; }
 .error-banner .audio-import-action { width: auto; min-width: 98px; padding: 0 10px; border: 1px solid currentColor; border-radius: 3px; display: flex; gap: 6px; color: inherit; font-weight: 700; }
+.update-banner { width: min(680px, calc(100% - 24px)); margin: 20px auto 0; min-height: 48px; padding: 8px 10px 8px 14px; border: 1px solid #1c211c; border-radius: 4px; background: #171917; color: #eef1ec; display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.update-banner span { flex: 1; }
+.update-banner button { min-width: 84px; height: 32px; padding: 0 12px; border: 0; border-radius: 3px; background: #ff7651; color: #171917; font-weight: 700; cursor: pointer; }
+.update-banner button:hover { background: #d94f2e; color: #fff; }
 
 .onboarding-backdrop { position: fixed; inset: 0; z-index: 40; padding: 20px; display: grid; place-items: center; background: rgba(12,14,12,0.55); backdrop-filter: blur(7px); }
 .onboarding-card { width: min(460px, 100%); padding: 24px; border: 1px solid #444b45; border-radius: 5px; color: #e6eae5; background: #1b201c; box-shadow: 0 24px 70px rgba(0,0,0,0.42); }
@@ -1105,6 +1109,9 @@ footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto
   .error-banner { margin-top: 10px; flex-wrap: wrap; }
   .error-banner span { min-width: calc(100% - 58px); }
   .error-banner .audio-import-action { flex: 1; }
+  .update-banner { margin-top: 10px; flex-wrap: wrap; }
+  .update-banner span { min-width: calc(100% - 58px); }
+  .update-banner button { flex: 1; }
   .workspace-backdrop { padding: 10px; align-items: end; }
   .workspace-picker { max-height: calc(100dvh - 20px); border-radius: 6px 6px 0 0; }
   .workspace-directory-list { min-height: 210px; }

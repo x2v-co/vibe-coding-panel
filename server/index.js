@@ -27,6 +27,7 @@ import { requestDeduplication } from './request-deduplication.js';
 const deduplication = requestDeduplication();
 import { DesktopController, desktopControllerRouter } from './desktop-controller.js';
 import { LiveSpeech } from './live-speech.js';
+import { releaseCacheHeaders } from './release-headers.js';
 import { ManagedClaude } from './managed-claude.js';
 import { ControllerHub } from './controller-hub.js';
 
@@ -862,9 +863,11 @@ app.post('/api/jobs/:id/follow-up', async (req, res) => {
   }
 });
 
+app.use(releaseCacheHeaders);
 app.use(express.static(path.join(appRoot, 'dist')));
 app.use((req, res, next) => {
   if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
+  res.setHeader('Cache-Control', 'no-cache');
   res.sendFile(path.join(appRoot, 'dist', 'index.html'));
 });
 

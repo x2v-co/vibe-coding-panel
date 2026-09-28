@@ -7,6 +7,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { readCookie, deviceToken } from './pairing.js';
 import { createLimiter } from './relay-limits.js';
 import { relayOrigin, DEFAULT_RELAYS, PRODUCT_ORIGIN } from './relay-config.js';
+import { releaseCacheHeaders } from './release-headers.js';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const hopByHopHeaders = new Set([
@@ -227,9 +228,11 @@ export function createRelayServer(options = {}) {
     res.redirect(pairingCode ? `/app?pair=${encodeURIComponent(pairingCode)}` : '/app');
   });
 
+  app.use(releaseCacheHeaders);
   app.use(express.static(distDir));
   app.use((req, res, next) => {
     if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(distDir, 'index.html'));
   });
 
