@@ -30,3 +30,13 @@ test('non-GET requests get no cache header', () => {
   const { headers } = runMiddleware({ method: 'POST', path: '/sw.js' });
   assert.equal(headers['Cache-Control'], undefined);
 });
+
+test('HEAD requests get the same revalidation header as GET', () => {
+  const { headers } = runMiddleware({ method: 'HEAD', path: '/sw.js' });
+  assert.equal(headers['Cache-Control'], 'no-cache');
+});
+
+test('HEAD version manifest is not stored either', () => {
+  const { headers } = runMiddleware({ method: 'HEAD', path: '/version.json' });
+  assert.equal(headers['Cache-Control'], 'no-store');
+});
