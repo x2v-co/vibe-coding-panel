@@ -1,0 +1,20 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(.18, .8, .25, 1.25)",
+        "createdAt": "2026-09-28T03:57:18.163Z",
+        "reason": "maintainer review: intentional tactile dial motion in the reference hardware control"
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(.2, .9, .25, 1.45)",
+        "createdAt": "2026-09-28T03:57:18.213Z",
+        "reason": "maintainer review: intentional tactile joystick motion in the reference hardware control"
+      }
+    ]
+  }
+}
