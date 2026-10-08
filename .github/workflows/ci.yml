@@ -2,15 +2,29 @@ name: CI
 
 on:
   push:
+    paths-ignore: &docs-ignore
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
   pull_request:
+    paths-ignore: *docs-ignore
+  release:
+    types: [published]
   workflow_dispatch:
+
+# Only the latest commit on a ref needs a run; expensive OS legs must not pile up.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, macos-15-intel, windows-latest]
+        # PRs and non-main pushes get a fast Linux-only leg; main, releases and
+        # manual dispatches run the full cross-platform connector matrix.
+        os: ${{ (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main')) && fromJSON('["ubuntu-latest"]') || fromJSON('["ubuntu-latest","macos-latest","macos-15-intel","windows-latest"]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
