@@ -2,15 +2,30 @@ name: CI
 
 on:
   push:
+    paths-ignore: &docs-ignore
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
   pull_request:
+    paths-ignore: *docs-ignore
+  release:
+    types: [published]
   workflow_dispatch:
 
+# Only the latest commit on a ref needs a run; expensive OS legs must not pile up.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # FULL matrix policy: full cross-platform coverage runs on pushes to main,
+  # release events and manual dispatches. PRs and non-main pushes get a cheap
+  # Linux-only check. `full` below is that boolean, inlined per job.
   test:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, macos-15-intel, windows-latest]
+        os: ${{ (github.event_name == 'release' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && fromJSON('["ubuntu-latest","macos-latest","macos-15-intel","windows-latest"]') || fromJSON('["ubuntu-latest"]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -61,10 +76,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, macos-15-intel, windows-latest]
-        versions:
-          - { codex: '0.152.0', claude: '2.1.265' }
-          - { codex: '0.153.4', claude: '2.1.266' }
+        os: ${{ (github.event_name == 'release' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && fromJSON('["ubuntu-latest","macos-latest","macos-15-intel","windows-latest"]') || fromJSON('["ubuntu-latest"]') }}
+        versions: ${{ (github.event_name == 'release' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && fromJSON('[{"codex":"0.152.0","claude":"2.1.265"},{"codex":"0.153.4","claude":"2.1.266"}]') || fromJSON('[{"codex":"0.153.4","claude":"2.1.266"}]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -79,6 +92,8 @@ jobs:
         run: node scripts/test-real-cli.mjs
 
   windows-terminal:
+    # Windows-only coverage gates releases; skip it on PRs/non-main pushes.
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
