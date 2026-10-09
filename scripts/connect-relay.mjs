@@ -104,11 +104,18 @@ for (const origin of origins) {
   process.stdout.write(`备用手机地址：${origin}/app?relay=${connectorId}\n`);
 }
 
+// Wait (bounded) for the API child to actually exit before we do, so a caller
+// that sees this process exit can rely on the local API port being closed.
+// Exiting right after kill() raced the child's own SIGTERM handler and made
+// controller-launcher.test.js flaky on slower macOS runners.
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => {
     stopped = true;
-    serverProcess?.kill(signal);
     for (const uplink of uplinks) uplink.stop();
-    process.exit(0);
+    const child = serverProcess;
+    if (!child || child.exitCode !== null || child.signalCode !== null) process.exit(0);
+    const force = setTimeout(() => { child.kill('SIGKILL'); process.exit(0); }, 3000);
+    child.once('exit', () => { clearTimeout(force); process.exit(0); });
+    child.kill(signal);
   });
 }
