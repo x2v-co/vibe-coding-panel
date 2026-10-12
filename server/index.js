@@ -16,6 +16,7 @@ import { resolveFfmpeg } from './ffmpeg.js';
 import { decodeRecording } from './audio-decode.js';
 import { createTranscriptCorrector } from './transcript-correction.js';
 const correctTranscript = createTranscriptCorrector();
+import { pushJobEvent } from './job-events.js';
 import { agentProviders, defaultAgentProvider, probeAgentProviders, buildAgentInvocation, normalizeAgentProvider, parseAgentLine } from './agent-providers.js';
 import { releaseInfo, speechDiagnostics, cachedDiagnostics } from './runtime-info.js';
 import { NativeSessions } from './native-sessions.js';
@@ -120,11 +121,7 @@ async function authenticatedDevice(req) {
 }
 
 function push(job, event) {
-  job.revision += 1;
-  const entry = { id: ++job.sequence, revision: job.revision, at: Date.now(), ...event };
-  job.events.push(entry);
-  if (job.events.length > 500) job.events.shift();
-  for (const listener of job.listeners) listener(entry);
+  pushJobEvent(job, event);
 }
 
 function shouldShowStderr(line) {
@@ -240,7 +237,7 @@ async function remoteJson(remote, route, options = {}, timeoutMs = 15000) {
 
 function applyRemoteEvent(job, remoteEvent) {
   const { id: _remoteId, at: _remoteAt, ...event } = remoteEvent;
-  if (event.type === 'message' && event.text) job.result = event.text;
+  if (event.type === 'message' && event.text) job.result = event.delta ? job.result + event.text : event.text;
   if (event.type === 'status' && event.status) {
     job.status = event.status;
     if (event.status === 'running' && !job.startedAt) job.startedAt = Date.now();
@@ -482,7 +479,7 @@ function eventsHandler(req, res) {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
   const after = Number(req.query.after || 0);
-  for (const event of job.events.filter((item) => item.id > after)) res.write(`data: ${JSON.stringify(event)}\n\n`);
+  for (const event of job.events.filter((item) => (after ? item.id >= after : true))) res.write(`data: ${JSON.stringify(event)}\n\n`);
   const listener = (event) => res.write(`data: ${JSON.stringify(event)}\n\n`);
   job.listeners.add(listener);
   const keepAlive = setInterval(() => res.write(': ping\n\n'), 15000);
