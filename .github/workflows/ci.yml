@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run test:acceptance
       - run: npm test
       - run: npm run build
@@ -58,7 +58,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run build
       - run: npm run test:browser
@@ -85,7 +85,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Install official pinned CLIs
         run: npm install --global @openai/codex@${{ matrix.versions.codex }} @anthropic-ai/claude-code@${{ matrix.versions.claude }}
       - name: Real CLI session persistence and resume
@@ -102,7 +102,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm install --no-save --package-lock=false node-pty@1.1.0 @xterm/headless@6.0.0
       - run: npm install --global @openai/codex@0.153.4 @anthropic-ai/claude-code@2.1.266
       - name: Interactive Windows terminal ownership and handoff
@@ -119,7 +119,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: sudo apt-get update && sudo apt-get install -y lsof
       - run: npm install --no-save --package-lock=false node-pty@1.1.0 @xterm/headless@6.0.0
       - run: npm install --global @openai/codex@0.153.4 @anthropic-ai/claude-code@2.1.266

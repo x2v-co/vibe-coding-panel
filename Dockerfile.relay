@@ -3,7 +3,7 @@ ARG VERSION=unknown
 ENV PANEL_BUILD_REVISION=$VERSION
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 COPY index.html tsconfig*.json vite.config.ts VERSION ./
 COPY src ./src
 COPY public ./public
@@ -18,7 +18,7 @@ LABEL org.opencontainers.image.revision=$VERSION
 ENV NODE_ENV=production PANEL_VERSION=$VERSION
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/server ./server
 EXPOSE 8789
