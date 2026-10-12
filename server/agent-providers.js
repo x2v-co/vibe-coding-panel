@@ -103,9 +103,18 @@ export function parseAgentLine(provider, job, line, emit) {
     }
     if (data.type === 'stream_event') {
       const event = data.event || {};
-      if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
-        job.result += event.delta.text || '';
-        emit({ type: 'message', text: job.result });
+      if (event.type === 'message_start') {
+        job.claudeMessageId = event.message?.id || null;
+        // A new assistant message starts a new transcript segment.
+        if (job.result) job.result += '\n\n';
+      } else if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+        const delta = event.delta.text || '';
+        if (!delta) return;
+        job.claudeStreamed ||= new Set();
+        job.claudeStreamed.add(job.claudeMessageId || '*');
+        job.result += delta;
+        // Emit only the new text; the panel appends deltas into one bubble.
+        emit({ type: 'message', text: delta, delta: true });
       } else if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
         emit({ type: 'tool', text: `正在使用 ${toolDescription(event.content_block)}`, status: 'in_progress' });
       }
@@ -114,7 +123,10 @@ export function parseAgentLine(provider, job, line, emit) {
     if (data.type === 'assistant') {
       const blocks = data.message?.content || [];
       const text = contentText(blocks);
-      if (text && text !== job.result) {
+      // With --include-partial-messages the text already arrived as deltas;
+      // the assistant snapshot would only duplicate it.
+      const streamed = job.claudeStreamed?.has(data.message?.id || job.claudeMessageId || '*');
+      if (text && !streamed && text !== job.result) {
         job.result = text;
         emit({ type: 'message', text });
       }
@@ -125,8 +137,9 @@ export function parseAgentLine(provider, job, line, emit) {
     }
     if (data.type === 'result') {
       if (typeof data.result === 'string' && data.result && data.result !== job.result) {
+        const streamed = Boolean(job.claudeStreamed?.size);
         job.result = data.result;
-        emit({ type: 'message', text: data.result });
+        if (!streamed) emit({ type: 'message', text: data.result });
       }
       if (data.is_error) {
         job.agentError = data.result || 'Claude Code 返回错误';

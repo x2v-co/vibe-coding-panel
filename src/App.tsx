@@ -773,7 +773,8 @@ function PanelApp() {
       if (selectedJobRef.current !== jobId) return;
       if (event.revision && event.revision < jobRevisionRef.current) return;
       if (event.revision) jobRevisionRef.current = event.revision;
-      setActivity((items) => items.some((item) => item.id === event.id) ? items : [...items, event]);
+      // Streaming messages reuse one event id and grow in place (typewriter effect).
+      setActivity((items) => items.some((item) => item.id === event.id) ? items.map((item) => item.id === event.id ? event : item) : [...items, event]);
       if (event.type === 'message' && event.text) setResult(event.text);
       if (event.type === 'status' && event.status) {
         const nextStatus = event.status as JobStatus;
