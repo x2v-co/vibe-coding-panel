@@ -39,7 +39,7 @@ export class CodexSessionReader {
   constructor(env = process.env) { this.env = env; this.pending = new Map(); this.seq = 0; }
   async start() { if (this.ready) return this.ready; this.ready = this.boot(); try { await this.ready; } catch (e) { this.close(); throw e; } }
   async boot() {
-    this.child = spawn(this.env.PANEL_CODEX_BIN || 'codex', ['app-server'], { env: this.env, stdio: ['pipe', 'pipe', 'ignore'] });
+    this.child = spawn(this.env.PANEL_CODEX_BIN || 'codex', ['-c', 'features.daemon_auto_start=false', 'app-server'], { env: this.env, stdio: ['pipe', 'pipe', 'ignore'] });
     const disconnected = () => {
       for (const request of this.pending.values()) request.reject(error('Codex 会话服务已断开，请检查 CLI 版本', 502));
       this.pending.clear(); this.ready = null;
