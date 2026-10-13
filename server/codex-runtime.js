@@ -8,7 +8,7 @@ export class CodexRuntime {
   constructor(env = process.env) { this.env = env; this.pending = new Map(); this.listeners = new Map(); this.seq = 0; }
   async start() {
     if (this.child) return;
-    this.child = spawn(this.env.PANEL_CODEX_BIN || 'codex', ['app-server'], { env: this.env, stdio: ['pipe', 'pipe', 'ignore'] });
+    this.child = spawn(this.env.PANEL_CODEX_BIN || 'codex', ['-c', 'features.daemon_auto_start=false', 'app-server'], { env: this.env, stdio: ['pipe', 'pipe', 'ignore'] });
     const child = this.child;
     const failed = () => {
       if (this.child !== child) return;
