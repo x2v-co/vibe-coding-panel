@@ -1372,3 +1372,8 @@ footer { width: min(1280px, calc(100% - 64px)); min-height: 62px; margin: 0 auto
 .task-status-label { display: flex; align-items: center; min-width: 0; white-space: nowrap; }
 .task-status-text { flex: none; }
 .task-agent-label { overflow: hidden; text-overflow: ellipsis; white-space: pre; }
+
+/* WeChat beta group QR (public/community/wechat-group-qr.png, replaced weekly). */
+.site-community { width: min(1180px, calc(100% - 56px)); margin: 0 auto; padding: 0 0 72px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.site-community img { width: 180px; height: 180px; border-radius: 8px; background: #fff; padding: 8px; }
+.site-community p { margin: 0; font-size: 15px; }

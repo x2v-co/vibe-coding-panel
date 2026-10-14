@@ -18,3 +18,7 @@ Voice changes should be tested with a real browser recording when possible. Keep
 ## Commit style
 
 Use a short imperative subject with one of `feat:`, `fix:`, `docs:`, `chore:`, or `refactor:`.
+
+## WeChat group QR code
+
+The beta group QR code lives in one file: `public/community/wechat-group-qr.png`. It expires weekly; replace that file in place (same name, square PNG) and open a PR. No code or README change is needed.

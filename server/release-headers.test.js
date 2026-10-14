@@ -40,3 +40,8 @@ test('HEAD version manifest is not stored either', () => {
   const { headers } = runMiddleware({ method: 'HEAD', path: '/version.json' });
   assert.equal(headers['Cache-Control'], 'no-store');
 });
+
+test('weekly-replaced WeChat group QR code must revalidate', () => {
+  const { headers } = runMiddleware({ path: '/community/wechat-group-qr.png' });
+  assert.equal(headers['Cache-Control'], 'no-cache');
+});
