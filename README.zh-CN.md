@@ -157,3 +157,11 @@ Android PWA 核心流程、两种 Agent 与测试 Mac 的会话接管均已通�
 iPhone Safari 核心流程及部分主屏幕应用检查通过，剩余 iPhone 项目尚未在本次版本重复验收。具体设备、覆盖范围和限制见[已知限制](docs/known-issues.md)。当前为公开预览版本。
 
 发布资料：[变更记录](CHANGELOG.md) · [已知限制](docs/known-issues.md) · [隐私说明](https://vibe.toolkit.fun/privacy/) · [使用条款](https://vibe.toolkit.fun/terms/)。
+
+## 微信内测群
+
+<img src="public/community/wechat-group-qr.png" alt="vibe-panel 微信内测群二维码" width="180" />
+
+加入 vibe-panel 内测群（微信），反馈问题和需求
+
+群二维码每 7 天过期。更换时只需用同名文件覆盖 `public/community/wechat-group-qr.png`，README 和官网都引用这一个文件，官网以 `Cache-Control: no-cache` 提供，浏览器不会长期缓存旧图。

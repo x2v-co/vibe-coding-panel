@@ -1702,7 +1702,7 @@ type SiteLanguage = 'zh' | 'en';
 
 const siteCopy = {
   zh: {
-    preview: '公开预览版', feedback: '反馈问题',
+    preview: '公开预览版', feedback: '反馈问题', wechatGroup: '加入 vibe-panel 内测群（微信），反馈问题和需求', wechatGroupAlt: 'vibe-panel 微信内测群二维码',
     panelNav: '怎么工作', remote: 'Vibe Remote', download: '下载 Connector', openPanel: '打开面板',
     panelHero: '在电脑上，|把 Agent 做成工作流。', panelDescription: '连接本机的 Codex 或 Claude Code，在项目里创建任务、查看过程并继续原生会话。手机遥控由配套的 Vibe Remote 提供。', openPanelCta: '打开 Vibe Panel', downloadCta: '下载 Connector', runsOnComputer: 'Agent 和项目运行在你的电脑上',
     connect: '连接', connectDescription: '发现本机已登录的 Agent 和原生会话', organize: '组织', organizeDescription: '选择项目目录，创建并继续任务', deliver: '交付', deliverDescription: '查看过程、结果和下一步行动',
@@ -1714,7 +1714,7 @@ const siteCopy = {
     oneConnector: 'ONE CONNECTOR / TWO ENTRIES', downloadTitle: '下载 Connector。', downloadDescription: '一个 Connector 同时支持 Vibe Panel 和 Vibe Remote。Agent、项目和配对服务都运行在你的电脑上。', beta: '内测版 · 自带 Node.js 24 和运行依赖 · 解压即可启动', releaseChecks: '版本记录与 SHA256 校验', twoEntries: '两种入口，一次安装', panelWorkspace: 'Vibe Panel · 电脑工作台', remoteCompanion: 'Vibe Remote · 手机配套遥控器', launchControl: '在 Connector 启用控制中心', launchControlDescription: '运行控制中心模式并绑定电脑当前会话，电脑会显示一次性配对二维码。', scanPhone: '手机扫描二维码', scanPhoneDescription: '首次配对后直接打开 Remote；语音和按键追加到电脑草稿，完整过程和回复仍在 Panel 中查看。', packageNote: '便携包尚未签名或公证，不是系统安装器。macOS 可能要求在“隐私与安全性”中允许打开；请遵循电脑的安全策略。Linux 需兼容 Node 24 的 glibc 系统（已测试 Ubuntu）。', fullInstall: '完整安装说明', installForAgent: '让 Agent 安装', noAgent: '还没安装 Agent？', demo: '先用演示模式体验', projectIntro: '项目介绍', openRemoteNav: '打开遥控器', privacy: '隐私', terms: '条款', moreProducts: '更多产品', language: 'EN', languageLabel: '切换到英文',
   },
   en: {
-    preview: 'PUBLIC PREVIEW', feedback: 'Report an issue',
+    preview: 'PUBLIC PREVIEW', feedback: 'Report an issue', wechatGroup: '加入 vibe-panel 内测群（微信），反馈问题和需求', wechatGroupAlt: 'vibe-panel WeChat beta group QR code',
     panelNav: 'How it works', remote: 'Vibe Remote', download: 'Download Connector', openPanel: 'Open Panel',
     panelHero: 'On your computer,|turn your Agent into a workflow.', panelDescription: 'Connect your local Codex or Claude Code, create tasks in a project, follow the work, and continue native sessions. Vibe Remote adds phone input when you step away.', openPanelCta: 'Open Vibe Panel', downloadCta: 'Download Connector', runsOnComputer: 'Your Agent and projects stay on your computer',
     connect: 'Connect', connectDescription: 'Find signed-in Agents and native sessions', organize: 'Organize', organizeDescription: 'Choose a project folder and continue tasks', deliver: 'Deliver', deliverDescription: 'Review progress, results, and next actions',
@@ -1761,6 +1761,7 @@ function LandingPage() {
     <section className="site-proof"><div><strong>01</strong><span>{c.connect}</span><p>{c.connectDescription}</p></div><div><strong>02</strong><span>{c.organize}</span><p>{c.organizeDescription}</p></div><div><strong>03</strong><span>{c.deliver}</span><p>{c.deliverDescription}</p></div></section>
     <section className="site-how" id="how-it-works"><div><p className="site-kicker">{c.threeSteps}</p><h2><SiteHeading text={c.panelHow} /></h2></div><div className="site-steps"><div><b>1</b><strong>{c.startConnector}</strong><p>{c.startConnectorDescription}</p></div><div><b>2</b><strong>{c.connectAgent}</strong><p>{c.connectAgentDescription}</p></div><div><b>3</b><strong>{c.startWork}</strong><p>{c.startWorkDescription}</p></div></div></section>
     <section className="site-cta"><p className="site-kicker">{c.remoteKicker}</p><h2>{c.remoteQuestion}</h2><p>{c.remoteDescription}</p><a className="site-secondary-action" href="/remote">{c.learnRemote} <ArrowRight size={17} /></a></section>
+    <section className="site-community" id="wechat-group"><img src="/community/wechat-group-qr.png" alt={c.wechatGroupAlt} width={180} height={180} loading="lazy" /><p>{c.wechatGroup}</p></section>
   </main><SiteFooter language={language} /></div>;
 }
 
