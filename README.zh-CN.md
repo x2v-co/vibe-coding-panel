@@ -158,10 +158,22 @@ iPhone Safari 核心流程及部分主屏幕应用检查通过，剩余 iPhone �
 
 发布资料：[变更记录](CHANGELOG.md) · [已知限制](docs/known-issues.md) · [隐私说明](https://vibe.toolkit.fun/privacy/) · [使用条款](https://vibe.toolkit.fun/terms/)。
 
-## 微信内测群
+## 内测群
 
-<img src="public/community/wechat-group-qr.png" alt="vibe-panel 微信内测群二维码" width="180" />
+加入 vibe-panel 内测群，反馈问题和需求。
 
-加入 vibe-panel 内测群（微信），反馈问题和需求
-
-群二维码每 7 天过期。更换时只需用同名文件覆盖 `public/community/wechat-group-qr.png`，README 和官网都引用这一个文件，官网以 `Cache-Control: no-cache` 提供，浏览器不会长期缓存旧图。
+<table>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <img src="public/community/feishu-group-qr.png" alt="vibe-panel 飞书群二维码" width="200" /><br />
+      <strong>飞书群（推荐）</strong><br />
+      <a href="https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=395le8df-61fc-4b41-921e-d95e330a5a17">点击加入</a><br />
+      <sub>永久链接，无需每周更换</sub>
+    </td>
+    <td align="center" valign="top" width="50%">
+      <img src="public/community/wechat-group-qr.png" alt="vibe-panel 微信群二维码" width="200" /><br />
+      <strong>微信群</strong><br />
+      <sub>群二维码每 7 天过期。更换时覆盖 <code>public/community/wechat-group-qr.png</code>（请仍只放二维码本体，白底等边距），README 与官网共用该文件。</sub>
+    </td>
+  </tr>
+</table>
