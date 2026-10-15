@@ -184,10 +184,22 @@ provider authentication, and the remaining platform limits are documented below.
 
 Release information: [Changelog](CHANGELOG.md) · [Known limitations](docs/known-issues.md) · [Privacy notice (Chinese)](https://vibe.toolkit.fun/privacy/) · [Terms (Chinese)](https://vibe.toolkit.fun/terms/).
 
-## WeChat beta group
+## Beta groups
 
-<img src="public/community/wechat-group-qr.png" alt="vibe-panel WeChat beta group QR code" width="180" />
+Join a vibe-panel beta group to share feedback and requests.
 
-加入 vibe-panel 内测群（微信），反馈问题和需求
-
-The QR code expires every 7 days. To update it, replace only `public/community/wechat-group-qr.png` (same file name); the README and the website both use that file, and the site serves it with `Cache-Control: no-cache`.
+<table>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <img src="public/community/feishu-group-qr.png" alt="vibe-panel Feishu group QR code" width="200" /><br />
+      <strong>Feishu group (recommended)</strong><br />
+      <a href="https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=395le8df-61fc-4b41-921e-d95e330a5a17">Join</a><br />
+      <sub>Permanent link — no weekly refresh needed</sub>
+    </td>
+    <td align="center" valign="top" width="50%">
+      <img src="public/community/wechat-group-qr.png" alt="vibe-panel WeChat group QR code" width="200" /><br />
+      <strong>WeChat group</strong><br />
+      <sub>Expires every 7 days. Replace <code>public/community/wechat-group-qr.png</code> (QR body only, white square with equal margins). README and website share this file.</sub>
+    </td>
+  </tr>
+</table>
