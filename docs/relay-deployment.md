@@ -60,3 +60,21 @@ For local Whisper, set `PANEL_WHISPER_BIN`, `PANEL_PYTHON_BIN`, or `PANEL_FFMPEG
 - The Relay never exposes a listening port on the computer and never receives filesystem access.
 - A connector id can have only one active WebSocket. A second connection for the same id is rejected, preventing accidental cross-device replacement.
 - Put account-level identity, abuse controls, and persistent metrics in place before operating this as a public multi-tenant service.
+
+## Toolkit account login (approved plan, off by default)
+
+The shared Relay can require a one-time toolkit login on the phone. Local direct
+connection (`server/index.js`) never asks for a login.
+
+| Variable | Purpose |
+| --- | --- |
+| `PANEL_RELAY_ACCOUNT_MODE` | `off` (default) or `required` |
+| `PANEL_RELAY_TOOLKIT_SECRET` | >= 32 chars, same value as toolkit `VIBE_RELAY_SHARED_SECRET` |
+| `PANEL_RELAY_TOOLKIT_ORIGIN` | toolkit origin, default `https://toolkit.fun` |
+| `PANEL_RELAY_SESSION_SECRET` | optional; signs the Relay's own 1-year session cookie (derived from the toolkit secret if unset) |
+| `PANEL_RELAY_PUBLIC_URL` | required in `required` mode; it is the login audience and must be listed in toolkit `VIBE_RELAY_ORIGINS` |
+
+Flow: `/relay/login` -> toolkit `/api/v1/vibe-relay/authorize` (GitHub / WeChat / Google login) ->
+`/relay/callback#assertion=...` -> `POST /relay/session` (state + one-use nonce checked) ->
+`vibe_relay_account` cookie. Proxied `/api/*` without it returns `401 RELAY_LOGIN_REQUIRED`.
+Note: each Relay origin keeps its own cookie, so a phone that moves between regional Relays logs in once per Relay.

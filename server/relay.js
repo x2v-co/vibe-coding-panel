@@ -8,6 +8,7 @@ import { readCookie, deviceToken } from './pairing.js';
 import { createLimiter } from './relay-limits.js';
 import { relayOrigin, DEFAULT_RELAYS, PRODUCT_ORIGIN } from './relay-config.js';
 import { releaseCacheHeaders } from './release-headers.js';
+import { installRelayAccount, relayAccountConfig } from './relay-account.js';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const hopByHopHeaders = new Set([
@@ -131,13 +132,22 @@ export function createRelayServer(options = {}) {
     });
   });
 
+  const accountConfig = relayAccountConfig(options);
+  if (accountConfig.mode === 'required' && !publicUrl) throw new Error('PANEL_RELAY_ACCOUNT_MODE=required needs PANEL_RELAY_PUBLIC_URL (the login audience).');
+  const account = installRelayAccount(app, { config: accountConfig, audience: publicUrl ? relayOrigin(publicUrl) : '', audit, now: options.now });
+  app.get(['/', '/app'], (req, res, next) => {
+    if (accountConfig.mode !== 'required' || account.accountFor(req)) return next();
+    if (req.path === '/' && !req.query.relay) return next();
+    res.set('Cache-Control', 'no-store').redirect(`/relay/login?next=${encodeURIComponent(req.originalUrl)}`);
+  });
+
   const parseBody = express.raw({ type: () => true, limit: maxBodyBytes, inflate: false });
   if (routing) {
     for (const [route, file] of Object.entries({view:'controller.html', 'controller.css':'controller.css', 'live-capture.js':'live-capture.js', 'controller-bootstrap.js':'controller-bootstrap.js', 'relay-transport.js':'relay-transport.js'})) {
       app.get('/api/desktop-controller/' + route, (_req, res) => { res.set('Cache-Control', 'no-store'); res.sendFile(path.join(distDir, file)); });
     }
   }
-  app.use('/api', (req, res, next) => {
+  app.use('/api', account.requireAccount, (req, res, next) => {
     const ip = clientIp(req);
     const connectorId = connectorIdFrom(req);
     const isUpload = req.path === '/transcriptions' || req.path === '/screenshots';
