@@ -78,3 +78,12 @@ Flow: `/relay/login` -> toolkit `/api/v1/vibe-relay/authorize` (GitHub / WeChat 
 `/relay/callback#assertion=...` -> `POST /relay/session` (state + one-use nonce checked) ->
 `vibe_relay_account` cookie. Proxied `/api/*` without it returns `401 RELAY_LOGIN_REQUIRED`.
 Note: each Relay origin keeps its own cookie, so a phone that moves between regional Relays logs in once per Relay.
+
+### Per-account rate limit
+
+Active only with `PANEL_RELAY_ACCOUNT_MODE=required`. `PANEL_RELAY_PER_ACCOUNT_RATE_LIMIT`
+(default 300 requests/min) and `PANEL_RELAY_PER_ACCOUNT_UPLOAD_LIMIT` (default 40 uploads/min)
+per toolkit account; over the limit the phone gets `429 RELAY_ACCOUNT_LIMITED` with a Chinese
+message, `Retry-After`, and `upgradeUrl` (`PANEL_RELAY_UPGRADE_URL`, default
+`https://toolkit.fun/pricing?ref=vibe-relay`). Defaults are provisional until the load test.
+Local direct connection is not routed through the Relay and is never limited.

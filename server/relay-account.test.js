@@ -75,3 +75,22 @@ test('default mode keeps the Relay open (no login) for existing installs', async
 test('required mode refuses to start without a secret', () => {
   assert.throws(() => createRelayServer({ accountMode: 'required', publicUrl: 'http://127.0.0.1' }), /PANEL_RELAY_TOOLKIT_SECRET/);
 });
+
+test('per-account limit returns a clear RELAY_ACCOUNT_LIMITED and isolates accounts', async () => {
+  const relay = createRelayServer({ accountMode: 'required', toolkitSecret: secret, publicUrl: 'http://127.0.0.1', perAccountRate: 2, audit() {} });
+  const port = await listen(relay.server);
+  const sessionSecret = createHmac('sha256', secret).update('vibe-relay-session').digest('base64url');
+  const as = sub => ({ cookie: `${ACCOUNT_COOKIE}=${encodeURIComponent(issueSession({ sub, plan: 'free' }, sessionSecret))}` });
+  const get = (headers, connector) => fetch(`http://127.0.0.1:${port}/api/state`, { headers: { ...headers, 'x-vibe-connector-id': connector } });
+  try {
+    for (const c of ['c', 'd']) assert.equal((await get(as('a'.repeat(43)), c.repeat(43))).status, 503);
+    const limited = await get(as('a'.repeat(43)), 'e'.repeat(43));
+    assert.equal(limited.status, 429);
+    const body = await limited.json();
+    assert.equal(body.code, 'RELAY_ACCOUNT_LIMITED');
+    assert.match(body.error, /本地直连/);
+    assert.match(body.upgradeUrl, /ref=vibe-relay/);
+    assert.ok(Number(limited.headers.get('retry-after')) >= 1);
+    assert.equal((await get(as('b'.repeat(43)), 'c'.repeat(43))).status, 503, 'another account is unaffected');
+  } finally { relay.server.close(); }
+});

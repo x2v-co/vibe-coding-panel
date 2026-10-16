@@ -76,6 +76,13 @@ export function createRelayServer(options = {}) {
   const pairLimiter = createLimiter({ windowMs: 10 * 60000 });
   const connectorLimiter = createLimiter({ windowMs: options.rateWindowMs || 60000 });
   const connectorUploadLimiter = createLimiter({ windowMs: 60000 });
+  // Per toolkit account (only when PANEL_RELAY_ACCOUNT_MODE=required). Thresholds
+  // are provisional until the load test settles them.
+  const perAccountRate = positiveInteger(options.perAccountRate ?? process.env.PANEL_RELAY_PER_ACCOUNT_RATE_LIMIT, 300);
+  const perAccountUploadRate = positiveInteger(options.perAccountUploadRate ?? process.env.PANEL_RELAY_PER_ACCOUNT_UPLOAD_LIMIT, 40);
+  const upgradeUrl = String(options.upgradeUrl ?? process.env.PANEL_RELAY_UPGRADE_URL ?? 'https://toolkit.fun/pricing?ref=vibe-relay');
+  const accountLimiter = createLimiter({ windowMs: options.rateWindowMs || 60000 });
+  const accountUploadLimiter = createLimiter({ windowMs: 60000 });
   const trustProxy = options.trustProxy ?? process.env.PANEL_RELAY_TRUST_PROXY;
   const audit = options.audit || ((event) => console.log(JSON.stringify({ at: new Date().toISOString(), ...event })));
   const clientIp = req => {
@@ -156,6 +163,19 @@ export function createRelayServer(options = {}) {
       || (pairing && (pairLimiter(`pair:${ip}`, pairLimit) || pairLimiter(`target:${connectorIdFrom(req)}`, pairLimit * 3)));
     const connectorRetry = connectorId && connectorLimiter(`connector:${connectorId}`, perConnectorRate);
     const uploadRetry = isUpload && connectorId && connectorUploadLimiter(`upload:${connectorId}`, perConnectorUploadRate);
+    const accountId = req.relayAccount?.sub;
+    const accountRetry = accountId && (accountLimiter(`account:${accountId}`, perAccountRate)
+      || (isUpload && accountUploadLimiter(`account-upload:${accountId}`, perAccountUploadRate)));
+    if (accountRetry && !retry && !connectorRetry && !uploadRetry) {
+      audit({ event: 'account_rate_limit', upload: isUpload });
+      return res.set('Retry-After', String(accountRetry)).status(429).json({
+        code: 'RELAY_ACCOUNT_LIMITED',
+        error: `你的 toolkit 账号使用中继的请求已达上限（每分钟 ${isUpload ? perAccountUploadRate + ' 次上传' : perAccountRate + ' 次'}），请 ${accountRetry} 秒后重试。同一网络下可改用本地直连，不受此限制。`,
+        retryAfter: accountRetry,
+        limit: isUpload ? perAccountUploadRate : perAccountRate,
+        upgradeUrl,
+      });
+    }
     if (retry || connectorRetry || uploadRetry) {
       audit({ event: 'rate_limit', pairing });
       return res.set('Retry-After', String(Math.max(retry || 0, connectorRetry || 0, uploadRetry || 0))).status(429).json({ code: 'RATE_LIMITED', error: 'Too many requests. Please retry later.' });
