@@ -141,7 +141,13 @@ export async function runCodexCliCorrection(text, instructions, { env = process.
     child.stdin.end(`${instructions}\n\n${JSON.stringify({ transcript: text })}`);
   });
   } finally {
-    await rm(cwd, { recursive: true, force: true });
-    if (isolatedHome) await rm(isolatedHome, { recursive: true, force: true });
+    // Windows: a just-killed codex.exe may still hold its cwd for a moment
+    // (EBUSY). Cleanup is best-effort and must never mask the real result.
+    await removeTempDir(cwd);
+    if (isolatedHome) await removeTempDir(isolatedHome);
   }
+}
+
+async function removeTempDir(dir) {
+  await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(() => {});
 }
