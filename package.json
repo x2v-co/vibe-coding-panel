@@ -22,6 +22,7 @@
     "test": "node --test server/*.test.js scripts/release-plugin.test.mjs",
     "doctor": "node scripts/launch.mjs --doctor",
     "check:regional": "node scripts/check-regional-capacity.mjs",
+    "loadtest:relay": "node scripts/relay-loadtest.mjs",
     "test:acceptance": "node --test scripts/acceptance.test.mjs",
     "controller": "node scripts/controller.mjs",
     "test:browser": "playwright test"
