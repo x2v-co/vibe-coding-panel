@@ -87,3 +87,7 @@ per toolkit account; over the limit the phone gets `429 RELAY_ACCOUNT_LIMITED` w
 message, `Retry-After`, and `upgradeUrl` (`PANEL_RELAY_UPGRADE_URL`, default
 `https://toolkit.fun/pricing?ref=vibe-relay`). Defaults are provisional until the load test.
 Local direct connection is not routed through the Relay and is never limited.
+
+## Community QR codes
+
+The Relay homepage hides the WeChat beta-group QR (`/community/*` returns 404 and the landing section disappears) unless `PANEL_RELAY_SHOW_COMMUNITY_QR=1` is set. Default: hidden.

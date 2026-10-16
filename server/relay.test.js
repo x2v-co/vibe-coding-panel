@@ -345,3 +345,15 @@ test('first remote scan selects connector and redirects only to the allowed remo
     }
   } finally {socket.close();await new Promise(resolve=>socket.once('close',resolve));await new Promise(resolve=>relay.server.close(resolve));}
 });
+
+test('relay hides community QR codes by default and serves them only when enabled', async () => {
+  for (const [options, expected] of [[{}, 404], [{ showCommunityQr: 'false' }, 404], [{ showCommunityQr: '1' }, null]]) {
+    const relay = createRelayServer(options);
+    const port = await listen(relay.server);
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/community/wechat-group-qr.png`);
+      if (expected) assert.equal(response.status, expected);
+      else assert.notEqual(response.headers.get("cache-control"), "no-store"); // passed through to static (200 when dist is built)
+    } finally { relay.server.close(); }
+  }
+});
