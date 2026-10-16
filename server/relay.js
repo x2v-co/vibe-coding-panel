@@ -258,6 +258,13 @@ export function createRelayServer(options = {}) {
     res.redirect(pairingCode ? `/app?pair=${encodeURIComponent(pairingCode)}` : '/app');
   });
 
+  // Community QR codes (e.g. the WeChat beta group) are hidden on the Relay
+  // homepage unless explicitly enabled; the boss paused QR codes on 10-14.
+  const showCommunityQr = /^(1|true|yes)$/i.test(String(options.showCommunityQr ?? process.env.PANEL_RELAY_SHOW_COMMUNITY_QR ?? ''));
+  app.use('/community', (req, res, next) => {
+    if (showCommunityQr) return next();
+    res.set('Cache-Control', 'no-store').status(404).type('text/plain').send('Not found');
+  });
   app.use(releaseCacheHeaders);
   app.use(express.static(distDir));
   app.use((req, res, next) => {

@@ -1755,13 +1755,15 @@ function SiteFooter({ language, remote = false }: { language: SiteLanguage; remo
 function SiteHeading({ text }: { text: string }) { const [first, second] = text.split('|'); return <><>{first}<br /><em>{second}</em></></>; }
 
 function LandingPage() {
+  // Hidden unless the server actually serves the QR (Relay: PANEL_RELAY_SHOW_COMMUNITY_QR=1).
+  const [communityQr, setCommunityQr] = useState(true);
   const [language, toggleLanguage] = useSiteLanguage(); const c = siteCopy[language];
   return <div className="site-shell"><SiteHeader language={language} toggleLanguage={toggleLanguage} /><main>
     <section className="site-hero"><div className="site-hero-copy"><p className="site-kicker">VIBE PANEL / AGENT WORKSPACE <span className="site-preview-badge">{c.preview}</span></p><h1><SiteHeading text={c.panelHero} /></h1><p>{c.panelDescription}</p><div className="site-hero-actions"><a className="site-primary-action" href="/app">{c.openPanelCta} <ArrowRight size={17} /></a><a className="site-secondary-action" href="/download">{c.downloadCta}</a></div><span className="site-note"><ShieldCheck size={14} />{c.runsOnComputer}</span></div><div className="site-hero-device"><div className="site-device-label">VIBE PANEL / WORKSPACE</div><img src="/screenshots/runtime/panel-desktop.png" alt="Vibe Panel workspace" /></div></section>
     <section className="site-proof"><div><strong>01</strong><span>{c.connect}</span><p>{c.connectDescription}</p></div><div><strong>02</strong><span>{c.organize}</span><p>{c.organizeDescription}</p></div><div><strong>03</strong><span>{c.deliver}</span><p>{c.deliverDescription}</p></div></section>
     <section className="site-how" id="how-it-works"><div><p className="site-kicker">{c.threeSteps}</p><h2><SiteHeading text={c.panelHow} /></h2></div><div className="site-steps"><div><b>1</b><strong>{c.startConnector}</strong><p>{c.startConnectorDescription}</p></div><div><b>2</b><strong>{c.connectAgent}</strong><p>{c.connectAgentDescription}</p></div><div><b>3</b><strong>{c.startWork}</strong><p>{c.startWorkDescription}</p></div></div></section>
     <section className="site-cta"><p className="site-kicker">{c.remoteKicker}</p><h2>{c.remoteQuestion}</h2><p>{c.remoteDescription}</p><a className="site-secondary-action" href="/remote">{c.learnRemote} <ArrowRight size={17} /></a></section>
-    <section className="site-community" id="wechat-group"><img src="/community/wechat-group-qr.png" alt={c.wechatGroupAlt} width={180} height={180} loading="lazy" /><p>{c.wechatGroup}</p></section>
+    {communityQr && <section className="site-community" id="wechat-group"><img src="/community/wechat-group-qr.png" alt={c.wechatGroupAlt} width={180} height={180} onError={() => setCommunityQr(false)} /><p>{c.wechatGroup}</p></section>}
   </main><SiteFooter language={language} /></div>;
 }
 
