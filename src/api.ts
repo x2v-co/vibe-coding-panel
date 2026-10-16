@@ -28,6 +28,11 @@ export async function readApiResponse(response: Response) {
       RELAY_CAPACITY_REACHED: '连接服务当前已达到容量上限，请稍后重试。',
       BODY_TOO_LARGE: '上传内容过大。请缩短录音或压缩图片，单次文件尽量小于 7 MB。',
     };
+    if (code === 'RELAY_LOGIN_REQUIRED' && typeof window !== 'undefined') {
+      const next = window.location.pathname + window.location.search;
+      window.location.assign(`/relay/login?next=${encodeURIComponent(next)}`);
+      throw new Error('使用中继连接需要登录一次 toolkit 账号（支持 GitHub / 微信），正在跳转登录…');
+    }
     if (code === 'RATE_LIMITED' || response.status === 429) {
       const header = response.headers.get('Retry-After') || '';
       const seconds = /^\d+$/.test(header) ? Math.min(3600, Math.max(1, Number(header))) : null;
