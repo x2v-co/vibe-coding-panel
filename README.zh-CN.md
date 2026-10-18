@@ -38,7 +38,7 @@ Vibe Panel 是电脑端 Agent 工作台：连接本机的 Codex、Claude App 或
 
 ## 从源码安装：先用 Panel，再启用 Remote
 
-**准备好：**macOS、Windows 10/11 或 Linux 电脑，安装 [Node.js 24 LTS](https://nodejs.org/zh-cn/download)。准备好并登录 Codex、Claude App 或 [Claude Code](https://code.claude.com/docs/zh-CN/setup)，先在对应客户端发送一句话，确认能正常回复。
+**准备好：**macOS、Windows 10/11 或 Linux 电脑，安装 [Node.js 24 LTS](https://nodejs.org/zh-cn/download)。准备好并登录 Codex、Claude App 或 [Claude Code](https://code.claude.com/docs/zh-CN/setup)，先在对应客户端发送一句话，确认能正常回复。 凭据只放在本机 CLI 登录或本机环境变量里；不要把官方 API Key 存进第三方托管控制台的 BYOK（例如 OpenCode Console）。OpenCode 于 2026-10-17 称约 1.4% 已关联外部供应商的 Console 用户受影响，用户侧亦报告 BYOK Key 可能暴露；开源 CLI 宣称未受影响（[来源](https://x.com/opencode/status/2111519637049319818)）。
 
 1. **下载并解压**[项目 ZIP](https://github.com/x2v-co/vibe-coding-panel/archive/refs/heads/main.zip)。打开解压后的文件夹，不要直接在压缩包里运行。
 2. **在电脑上启动**下表对应文件。第一次启动会自动安装 Node 依赖。
