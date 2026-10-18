@@ -55,7 +55,7 @@ codex exec --skip-git-repo-check "Reply only PANEL_INSTALL_OK. Do not use tools 
 claude -p "Reply only PANEL_INSTALL_OK. Do not use tools or modify files."
 ```
 
-Do not print tokens or copy credentials. If both CLIs are ready, follow the user's choice; otherwise use the one verified working CLI. If choosing Claude, create or merge `.vibe-panel/connector.json` with this value using your file editing tool:
+Do not print tokens or copy credentials. Keep provider keys in the local CLI login or machine-local environment variables only. Do not guide the user to paste official API keys into a third-party hosted console BYOK form (including OpenCode Console). On 2026-10-17 OpenCode reported that about 1.4% of Console users with linked external providers were affected, and users reported possible BYOK key exposure; the open-source CLI was stated as unaffected (https://x.com/opencode/status/2111519637049319818). If both CLIs are ready, follow the user's choice; otherwise use the one verified working CLI. If choosing Claude, create or merge `.vibe-panel/connector.json` with this value using your file editing tool:
 
 ```json
 {"agentProvider":"claude"}

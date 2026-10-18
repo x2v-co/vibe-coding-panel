@@ -41,7 +41,7 @@ permission to me. Do not report success until you have checked the service.
 
 ## Install from source
 
-**Before you start:** use macOS, Windows 10/11, or Linux with [Node.js 24 LTS](https://nodejs.org/en/download). Install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/) or [Claude Code](https://code.claude.com/docs/en/setup). Send a short text request in that CLI first to confirm it works.
+**Before you start:** use macOS, Windows 10/11, or Linux with [Node.js 24 LTS](https://nodejs.org/en/download). Install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/) or [Claude Code](https://code.claude.com/docs/en/setup). Send a short text request in that CLI first to confirm it works. Keep those credentials in the local CLI or machine-local environment variables; do not store official provider API keys in a third-party hosted console BYOK form such as OpenCode Console ([OpenCode Console incident, 2026-10-17](https://x.com/opencode/status/2111519637049319818); CLI stated unaffected).
 
 1. **Download and extract** the [project ZIP](https://github.com/x2v-co/vibe-coding-panel/archive/refs/heads/main.zip). Open the extracted folder, not the ZIP.
 2. **Start on your computer** using the launcher below. It installs Node dependencies on first launch.
