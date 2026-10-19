@@ -21,6 +21,8 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/server ./server
+# Mount point for the metrics volume; a fresh named volume inherits this owner.
+RUN mkdir -p /data/metrics && chown node:node /data/metrics
 EXPOSE 8789
 USER node
 CMD ["npm", "run", "relay"]

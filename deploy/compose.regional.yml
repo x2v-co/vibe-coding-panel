@@ -16,6 +16,26 @@ services:
       PANEL_RELAY_MAX_CONNECTORS: 50
       PANEL_RELAY_MAX_INFLIGHT: 50
       PANEL_RELAY_MAX_UPLOADS: 4
+      # Anonymous daily metrics, connection events and alerts (docs/relay-metrics.md). Empty values keep them off.
+      PANEL_RELAY_METRICS_DIR: ${PANEL_RELAY_METRICS_DIR:-}
+      PANEL_RELAY_METRICS_SALT: ${PANEL_RELAY_METRICS_SALT:-}
+      PANEL_RELAY_METRICS_TOKEN: ${PANEL_RELAY_METRICS_TOKEN:-}
+      PANEL_RELAY_EVENT_RETENTION_DAYS: ${PANEL_RELAY_EVENT_RETENTION_DAYS:-30}
+      PANEL_RELAY_REGION: ${PANEL_RELAY_REGION:-}
+      PANEL_RELAY_ALERT_TG_BOT_TOKEN: ${PANEL_RELAY_ALERT_TG_BOT_TOKEN:-}
+      PANEL_RELAY_ALERT_TG_CHAT_ID: ${PANEL_RELAY_ALERT_TG_CHAT_ID:-}
+      PANEL_RELAY_ALERT_WEBHOOK: ${PANEL_RELAY_ALERT_WEBHOOK:-}
+      PANEL_RELAY_ALERT_PROXY: ${PANEL_RELAY_ALERT_PROXY:-}
+      PANEL_RELAY_ALERT_WINDOW_MIN: ${PANEL_RELAY_ALERT_WINDOW_MIN:-10}
+      PANEL_RELAY_ALERT_ABNORMAL_RATIO: ${PANEL_RELAY_ALERT_ABNORMAL_RATIO:-0.3}
+      PANEL_RELAY_ALERT_CONNECT_FAIL_RATIO: ${PANEL_RELAY_ALERT_CONNECT_FAIL_RATIO:-0.3}
+      PANEL_RELAY_ALERT_MIN_EVENTS: ${PANEL_RELAY_ALERT_MIN_EVENTS:-10}
+      PANEL_RELAY_ALERT_COOLDOWN_MIN: ${PANEL_RELAY_ALERT_COOLDOWN_MIN:-60}
+    # Lets PANEL_RELAY_ALERT_PROXY=http://host.docker.internal:<port> reach a host-local proxy.
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    volumes:
+      - vibe_metrics:/data/metrics
     networks:
       proxy:
         aliases: [vibe-regional]
@@ -29,6 +49,8 @@ services:
     logging:
       driver: json-file
       options: { max-size: '10m', max-file: '3' }
+volumes:
+  vibe_metrics:
 networks:
   proxy:
     external: true

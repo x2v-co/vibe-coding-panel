@@ -9,6 +9,8 @@ import { createLimiter } from './relay-limits.js';
 import { relayOrigin, DEFAULT_RELAYS, PRODUCT_ORIGIN } from './relay-config.js';
 import { releaseCacheHeaders } from './release-headers.js';
 import { installRelayAccount, relayAccountConfig } from './relay-account.js';
+import { createRelayMetrics, installMetricsRoute, metricsConfig } from './relay-metrics.js';
+import { alertConfig, createAlerter, createConnectionMonitor, createEventLog, regionFrom } from './relay-quality.js';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const hopByHopHeaders = new Set([
@@ -91,6 +93,15 @@ export function createRelayServer(options = {}) {
     if (trustProxy && peer === trustProxy) return String(req.headers['x-forwarded-for'] || peer).split(',').at(-1).trim();
     return peer;
   };
+  const metricsSettings = metricsConfig(options);
+  const metrics = options.metrics || createRelayMetrics({ ...metricsSettings, now: options.now });
+  const region = regionFrom(options);
+  const alerts = alertConfig(options);
+  const monitor = createConnectionMonitor({
+    metrics, region, alerts, now: options.now,
+    events: createEventLog({ dir: metrics.enabled ? metricsSettings.dir : '', retentionDays: Number(options.eventRetentionDays ?? process.env.PANEL_RELAY_EVENT_RETENTION_DAYS ?? 30) || 30, now: options.now }),
+    alerter: options.alerter || createAlerter(alerts, { region, now: options.now }),
+  });
   const app = express();
   const server = http.createServer(app);
   const sockets = new WebSocketServer({ noServer: true, maxPayload: 14 * 1024 * 1024 });
@@ -134,10 +145,14 @@ export function createRelayServer(options = {}) {
       version: process.env.PANEL_VERSION || 'development',
       connectors: connectors.size,
       inflight: pending.size,
+      region,
+      connections: { current: connectors.size, ...monitor.health() },
       capacity: { connectors: maxConnectors, inflight: maxInflight },
       admission: admissionMode,
     });
   });
+
+  installMetricsRoute(app, metrics, { limit, clientIp, now: options.now });
 
   const accountConfig = relayAccountConfig(options);
   if (accountConfig.mode === 'required' && !publicUrl) throw new Error('PANEL_RELAY_ACCOUNT_MODE=required needs PANEL_RELAY_PUBLIC_URL (the login audience).');
@@ -216,7 +231,9 @@ export function createRelayServer(options = {}) {
       if (connector.readyState === WebSocket.OPEN) connector.send(JSON.stringify({ type: 'cancel', requestId }));
     }, req.path.endsWith('/events') ? streamTimeoutMs : requestTimeoutMs);
 
-    pending.set(requestId, { connectorId, res, timer, started: false });
+    // Kept only in memory for this request, so the response can be attributed
+    // to anonymous daily metrics (see relay-metrics.js).
+    pending.set(requestId, { connectorId, res, timer, started: false, sentAt: performance.now(), pairing: /^\/pair\/?$/i.test(req.path), counted: req.path !== '/health', device: deviceToken(req.headers.cookie) });
     connector.send(JSON.stringify({
       type: 'request',
       requestId,
@@ -278,7 +295,9 @@ export function createRelayServer(options = {}) {
     try { url = new URL(req.url, 'http://relay.local'); } catch { socket.destroy(); return; }
     if (url.pathname !== '/relay/connect') { socket.destroy(); return; }
 
+    monitor.attempt();
     if (limit(`upgrade:${clientIp(req)}`, 30)) {
+      monitor.rejected(null, 429, 'rate_limited');
       socket.end('HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\n\r\n');
       return;
     }
@@ -289,28 +308,33 @@ export function createRelayServer(options = {}) {
       || !/^[A-Za-z0-9_-]{64}$/.test(credential)
       || connectorIdForCredential(credential) !== connectorId) {
       audit({ event: 'connector_auth_rejected' });
+      monitor.rejected(null, 401, 'auth');
       socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
       socket.destroy();
       return;
     }
     if (connectors.has(connectorId)) {
+      monitor.rejected(connectorId, 409, 'conflict');
       socket.write('HTTP/1.1 409 Conflict\r\nConnection: close\r\n\r\n');
       socket.destroy();
       return;
     }
     if (admissionMode === 'paused') {
+      monitor.rejected(connectorId, 503, 'admission_paused');
       socket.write('HTTP/1.1 503 Service Unavailable\r\nRetry-After: 60\r\nConnection: close\r\n\r\nRELAY_ADMISSION_PAUSED');
       socket.destroy();
       audit({ event: 'connector_admission_rejected', mode: admissionMode });
       return;
     }
     if (admissionMode === 'limited') {
+      monitor.rejected(connectorId, 503, 'admission_limited');
       socket.write('HTTP/1.1 503 Service Unavailable\r\nRetry-After: 60\r\nConnection: close\r\n\r\nRELAY_ADMISSION_CLOSED');
       socket.destroy();
       audit({ event: 'connector_admission_rejected', mode: admissionMode });
       return;
     }
     if (!connectors.has(connectorId) && connectors.size >= maxConnectors) {
+      monitor.rejected(connectorId, 503, 'capacity');
       socket.write('HTTP/1.1 503 Service Unavailable\r\nRetry-After: 60\r\nConnection: close\r\n\r\nRELAY_CAPACITY_REACHED');
       socket.destroy();
       return;
@@ -322,8 +346,13 @@ export function createRelayServer(options = {}) {
   sockets.on('connection', (socket, req) => {
     const connectorId = req.connectorId;
     connectors.set(connectorId, socket);
+    const quality = socket.quality = monitor.opened(connectorId);
     socket.isAlive = true;
-    socket.on('pong', () => { socket.isAlive = true; });
+    socket.on('pong', () => {
+      socket.isAlive = true;
+      if (socket.pingAt !== undefined) monitor.pong(quality, Math.round(performance.now() - socket.pingAt));
+      socket.pingAt = undefined;
+    });
     socket.send(JSON.stringify({ type: 'ready', connectorId, publicUrl }));
 
     socket.on('message', (raw) => {
@@ -351,6 +380,14 @@ export function createRelayServer(options = {}) {
             }
           }
           active.started = true;
+          monitor.latency(quality, Math.round(performance.now() - active.sentAt));
+          if (status >= 200 && status < 300) {
+            // Pairing succeeds only on the computer; its 2xx is the signal. A
+            // device counts as active once the computer accepted a request
+            // carrying its cookie (/api/health answers anyone, so it is skipped).
+            if (active.pairing) metrics.recordPairing();
+            else if (active.counted && active.device) metrics.recordDevice(active.device);
+          }
           res.status(status);
           for (const [name, value] of Object.entries(headers)) res.setHeader(name, value);
           res.flushHeaders();
@@ -376,9 +413,10 @@ export function createRelayServer(options = {}) {
       }
     });
 
-    socket.on('error', () => socket.terminate());
+    socket.on('error', (error) => { monitor.error(quality, error); socket.terminate(); });
 
-    socket.on('close', () => {
+    socket.on('close', (code, reason) => {
+      monitor.closed(quality, code, reason);
       if (connectors.get(connectorId) === socket) connectors.delete(connectorId);
       for (const [requestId, active] of pending) {
         if (active.connectorId !== connectorId) continue;
@@ -392,8 +430,9 @@ export function createRelayServer(options = {}) {
 
   const heartbeat = setInterval(() => {
     for (const socket of connectors.values()) {
-      if (!socket.isAlive) { socket.terminate(); continue; }
+      if (!socket.isAlive) { monitor.heartbeatTimeout(socket.quality); socket.terminate(); continue; }
       socket.isAlive = false;
+      socket.pingAt = performance.now();
       socket.ping();
     }
   }, 30_000);
@@ -401,16 +440,20 @@ export function createRelayServer(options = {}) {
 
   server.on('close', () => {
     clearInterval(heartbeat);
-    for (const socket of connectors.values()) socket.close(1001, 'Relay shutting down');
+    for (const socket of connectors.values()) { monitor.shuttingDown(socket.quality); socket.close(1001, 'Relay shutting down'); }
+    monitor.close();
+    metrics.close();
   });
 
-  return { app, server, connectors, pending, get uploading() { return uploading; } };
+  return { app, server, connectors, pending, metrics, monitor, get uploading() { return uploading; } };
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   const port = positiveInteger(process.env.PANEL_RELAY_PORT, 8789);
   const host = process.env.PANEL_RELAY_HOST || '0.0.0.0';
-  const { server } = createRelayServer();
-  server.listen(port, host, () => console.log(`Vibe Panel Relay: http://${host}:${port}`));
+  const { server, metrics } = createRelayServer();
+  server.listen(port, host, () => console.log(`Vibe Panel Relay: http://${host}:${port}${metrics.enabled ? ' (daily metrics on)' : ''}`));
+  // Flush today's metrics on container stop so a redeploy loses nothing.
+  for (const signal of ['SIGTERM', 'SIGINT']) process.once(signal, () => { metrics.close(); process.exit(0); });
 }

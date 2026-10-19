@@ -2,6 +2,11 @@
 
 ## Unreleased — integrated controller and regional Relay
 
+- Relay: optional anonymous daily metrics (pairings, active/new devices by keyed
+  HMAC, sessions) as Beijing-day CSV plus a bearer-token `GET /metrics/daily`;
+  connection-quality event log (30-day JSONL), daily quality aggregates,
+  `/healthz` connection counters and Telegram/webhook threshold alerts. Off unless
+  `PANEL_RELAY_METRICS_DIR` / alert variables are set. See docs/relay-metrics.md.
 - Add an in-app update mechanism: each build emits `version.json` and pins the
   service worker cache to the Git revision, so installed desktop PWAs detect a
   new release, show a "reload to update" banner and activate the waiting worker
