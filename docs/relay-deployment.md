@@ -91,3 +91,5 @@ Local direct connection is not routed through the Relay and is never limited.
 ## Community QR codes
 
 The Relay homepage hides the WeChat beta-group QR (`/community/*` returns 404 and the landing section disappears) unless `PANEL_RELAY_SHOW_COMMUNITY_QR=1` is set. Default: hidden.
+
+Anonymous usage metrics, connection-quality logs and alerts are documented in [relay-metrics.md](relay-metrics.md) (off by default).

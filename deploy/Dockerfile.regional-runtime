@@ -7,6 +7,8 @@ ENV NODE_ENV=production PANEL_VERSION=$VERSION
 LABEL org.opencontainers.image.revision=$VERSION
 WORKDIR /app
 COPY . /app
+# Mount point for the metrics volume; a fresh named volume inherits this owner.
+RUN mkdir -p /data/metrics && chown node:node /data/metrics
 USER node
 EXPOSE 8789
 CMD ["node", "server/relay.js"]
