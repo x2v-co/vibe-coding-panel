@@ -173,7 +173,7 @@ iPhone Safari 核心流程及部分主屏幕应用检查通过，剩余 iPhone �
     <td align="center" valign="top" width="50%">
       <img src="public/community/wechat-group-qr.png" alt="vibe-panel 微信群二维码" width="200" /><br />
       <strong>微信群</strong><br />
-      <sub>群二维码每 7 天过期。更换时覆盖 <code>public/community/wechat-group-qr.png</code>（请仍只放二维码本体，白底等边距），README 与官网共用该文件。</sub>
+      <sub>群二维码每 7 天过期。更换时覆盖 <code>public/community/wechat-group-qr.png</code>（直接放微信群卡片原图），官网默认不显示（#24）。</sub>
     </td>
   </tr>
 </table>

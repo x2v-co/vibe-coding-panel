@@ -21,4 +21,4 @@ Use a short imperative subject with one of `feat:`, `fix:`, `docs:`, `chore:`, o
 
 ## WeChat group QR code
 
-The beta group QR code lives in one file: `public/community/wechat-group-qr.png`. It expires weekly; replace that file in place (same name, square PNG) and open a PR. No code or README change is needed.
+The beta group QR code lives in one file: `public/community/wechat-group-qr.png`. It expires weekly; replace that file in place (same name, the original WeChat group card image as-is) and open a PR. No code or README change is needed.

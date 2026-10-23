@@ -199,7 +199,7 @@ Join a vibe-panel beta group to share feedback and requests.
     <td align="center" valign="top" width="50%">
       <img src="public/community/wechat-group-qr.png" alt="vibe-panel WeChat group QR code" width="200" /><br />
       <strong>WeChat group</strong><br />
-      <sub>Expires every 7 days. Replace <code>public/community/wechat-group-qr.png</code> (QR body only, white square with equal margins). README and website share this file.</sub>
+      <sub>Expires every 7 days. Replace <code>public/community/wechat-group-qr.png</code> with the original WeChat group card image as-is. The website hides it by default (#24).</sub>
     </td>
   </tr>
 </table>
