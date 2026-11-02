@@ -91,9 +91,39 @@ Evaluated every minute over a sliding window. An alert fires when, with at least
 `MIN_EVENTS` samples, the abnormal-disconnect ratio or the connect-failure ratio
 exceeds its threshold; it repeats after the cooldown while still high, and one
 `recovered` message is sent afterwards. Messages are prefixed `[vibe-relay] <region>`.
-Channels follow the existing aeeis notify pattern: Telegram bot + chat id, optional
-generic JSON webhook, optional HTTP CONNECT proxy for hosts that reach Telegram only
-through a proxy.
+Configure a webhook, a Telegram bot + chat id, or both. Both configured channels
+are attempted independently, so Telegram can still deliver when the webhook fails.
+Generic webhooks receive `{"text":"[vibe-relay] ..."}`. Webhooks whose hostname is
+exactly `open.feishu.cn` or `open.larksuite.com`, or whose
+`PANEL_RELAY_ALERT_WEBHOOK_FORMAT` is `feishu`, receive the Feishu/Lark text format:
+
+```json
+{"msg_type":"text","content":{"text":"[vibe-relay] cn ..."}}
+```
+
+Feishu/Lark delivery requires both HTTP 2xx and a JSON response with numeric
+`code: 0`. A nonzero/missing code, invalid JSON, or HTTP/transport error is a
+delivery failure and is logged without the webhook URL, credentials, or remote
+error message. Generic webhooks require HTTP 2xx.
+
+`PANEL_RELAY_ALERT_PROXY` is used **only for Telegram**. Webhooks connect directly
+unless their separate `PANEL_RELAY_ALERT_WEBHOOK_PROXY` is configured. Both proxy
+settings use an HTTP CONNECT proxy.
+
+### Manual delivery test
+
+With alert variables already available in the process environment, run:
+
+```sh
+node server/relay-quality.js --test-alert
+```
+
+This sends one message per configured channel, prefixed `【x2v 告警·测试】`, and
+exits without starting the Relay server or monitoring timers. Exit status is 0
+only if every configured channel succeeds; any delivery failure or no configured
+channels returns status 1, even if the other channel delivered successfully. The
+command does not load `.env` files. Treat it as a real send to the configured
+destinations; the automated tests use only local fake HTTP servers or mocked sends.
 
 ## Environment variables
 
@@ -105,8 +135,10 @@ through a proxy.
 | `PANEL_RELAY_EVENT_RETENTION_DAYS` | 30 | Event log retention (minimum 30). |
 | `PANEL_RELAY_REGION` | from public URL | `global` or `cn`, written into events, alerts and `/healthz`. |
 | `PANEL_RELAY_ALERT_TG_BOT_TOKEN` / `PANEL_RELAY_ALERT_TG_CHAT_ID` | unset | Telegram target (both required). |
-| `PANEL_RELAY_ALERT_WEBHOOK` | unset | Optional JSON `{"text":...}` webhook. |
-| `PANEL_RELAY_ALERT_PROXY` | unset | `http://host:port` CONNECT proxy for alert delivery (cn). |
+| `PANEL_RELAY_ALERT_WEBHOOK` | unset | Optional webhook; Feishu/Lark hosts are detected automatically, otherwise JSON `{"text":...}`. |
+| `PANEL_RELAY_ALERT_WEBHOOK_FORMAT` | unset (auto) | `feishu` forces the Feishu/Lark text format and `code: 0` acknowledgment check, including for custom hosts. |
+| `PANEL_RELAY_ALERT_WEBHOOK_PROXY` | unset (direct) | Optional `http://host:port` CONNECT proxy for the webhook only. |
+| `PANEL_RELAY_ALERT_PROXY` | unset | `http://host:port` CONNECT proxy for Telegram only (cn). |
 | `PANEL_RELAY_ALERT_WINDOW_MIN` | 10 | Sliding window. |
 | `PANEL_RELAY_ALERT_ABNORMAL_RATIO` | 0.3 | Abnormal disconnects / disconnects. |
 | `PANEL_RELAY_ALERT_CONNECT_FAIL_RATIO` | 0.3 | Refused upgrades / attempts. |
