@@ -13,6 +13,7 @@ import http from 'node:http';
 import https from 'node:https';
 import path from 'node:path';
 import tls from 'node:tls';
+import { fileURLToPath } from 'node:url';
 import { shanghaiDate } from './relay-metrics.js';
 
 const MINUTE = 60_000;
@@ -83,35 +84,67 @@ export function alertConfig(options = {}, env = process.env) {
     tgToken: String(options.alertTgToken ?? env.PANEL_RELAY_ALERT_TG_BOT_TOKEN ?? ''),
     tgChatId: String(options.alertTgChatId ?? env.PANEL_RELAY_ALERT_TG_CHAT_ID ?? ''),
     webhook: String(options.alertWebhook ?? env.PANEL_RELAY_ALERT_WEBHOOK ?? ''),
+    webhookFormat: String(options.alertWebhookFormat ?? env.PANEL_RELAY_ALERT_WEBHOOK_FORMAT ?? '').trim().toLowerCase(),
+    webhookProxy: String(options.alertWebhookProxy ?? env.PANEL_RELAY_ALERT_WEBHOOK_PROXY ?? ''),
     proxy: String(options.alertProxy ?? env.PANEL_RELAY_ALERT_PROXY ?? ''),
   };
 }
 
-// POST JSON, optionally through an HTTP CONNECT proxy (the CN hosts reach
-// Telegram only via their egress proxy, same as the existing notify scripts).
-export function postJson(target, payload, { proxy = '', timeoutMs = 15000 } = {}) {
+// Only these locally generated errors are safe to log. Transport errors and
+// remote response messages can contain credentials or webhook URLs.
+class AlertDeliveryError extends Error {}
+
+// POST JSON, optionally through a channel-specific HTTP CONNECT proxy.
+export function postJson(target, payload, { proxy = '', timeoutMs = 15000, requireCodeZero = false } = {}) {
   return new Promise((resolve, reject) => {
     const url = new URL(target);
+    if (!['http:', 'https:'].includes(url.protocol)) throw new AlertDeliveryError('unsupported protocol');
+    const transport = url.protocol === 'http:' ? http : https;
+    const port = url.port || (url.protocol === 'http:' ? 80 : 443);
     const body = Buffer.from(JSON.stringify(payload));
-    const options = { method: 'POST', hostname: url.hostname, port: url.port || 443, path: url.pathname + url.search,
+    const options = { method: 'POST', hostname: url.hostname, port, path: url.pathname + url.search,
       headers: { 'content-type': 'application/json', 'content-length': body.length }, timeout: timeoutMs };
     const send = createConnection => {
-      const request = (url.protocol === 'http:' && !createConnection ? http : https).request({ ...options, ...(createConnection ? { createConnection } : {}) }, response => {
-        response.resume();
-        response.on('end', () => (response.statusCode < 300 ? resolve(response.statusCode) : reject(new Error(`HTTP ${response.statusCode}`))));
+      const request = transport.request({ ...options, ...(createConnection ? { createConnection } : {}) }, response => {
+        const chunks = [];
+        let bytes = 0;
+        response.on('error', reject);
+        if (requireCodeZero) {
+          response.on('data', chunk => {
+            bytes += chunk.length;
+            if (bytes > 64 * 1024) {
+              response.destroy(new AlertDeliveryError('response too large'));
+              return;
+            }
+            chunks.push(chunk);
+          });
+        } else response.resume();
+        response.on('end', () => {
+          if (response.statusCode < 200 || response.statusCode >= 300) return reject(new AlertDeliveryError(`HTTP ${response.statusCode}`));
+          if (requireCodeZero) {
+            let result;
+            try { result = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+            catch { return reject(new AlertDeliveryError('invalid Feishu JSON response')); }
+            if (result?.code !== 0) {
+              const reason = Number.isFinite(result?.code) ? `Feishu response code ${result.code}` : 'Feishu response missing numeric code';
+              return reject(new AlertDeliveryError(reason));
+            }
+          }
+          resolve(response.statusCode);
+        });
       });
-      request.on('timeout', () => request.destroy(new Error('timeout')));
+      request.on('timeout', () => request.destroy(new AlertDeliveryError('timeout')));
       request.on('error', reject);
       request.end(body);
     };
     if (!proxy) return send();
     const p = new URL(proxy);
-    const connect = http.request({ host: p.hostname, port: p.port || 80, method: 'CONNECT', path: `${url.hostname}:${url.port || 443}`, timeout: timeoutMs });
+    const connect = http.request({ host: p.hostname, port: p.port || 80, method: 'CONNECT', path: `${url.hostname}:${port}`, timeout: timeoutMs });
     connect.on('connect', (response, socket) => {
-      if (response.statusCode !== 200) { socket.destroy(); return reject(new Error(`proxy ${response.statusCode}`)); }
-      send(() => tls.connect({ socket, servername: url.hostname }));
+      if (response.statusCode !== 200) { socket.destroy(); return reject(new AlertDeliveryError(`proxy HTTP ${response.statusCode}`)); }
+      send(() => url.protocol === 'http:' ? socket : tls.connect({ socket, servername: url.hostname }));
     });
-    connect.on('timeout', () => connect.destroy(new Error('proxy timeout')));
+    connect.on('timeout', () => connect.destroy(new AlertDeliveryError('proxy timeout')));
     connect.on('error', reject);
     connect.end();
   });
@@ -119,18 +152,29 @@ export function postJson(target, payload, { proxy = '', timeoutMs = 15000 } = {}
 
 export function createAlerter(config, { region, now = Date.now, send = postJson, log = console.error } = {}) {
   const channels = [];
-  if (config.tgToken && config.tgChatId) {
-    channels.push(text => send(`https://api.telegram.org/bot${config.tgToken}/sendMessage`, { chat_id: config.tgChatId, text: `[vibe-relay] ${text}`, disable_web_page_preview: true }, { proxy: config.proxy }));
+  if (config.webhook) {
+    let feishu = config.webhookFormat === 'feishu';
+    try { feishu ||= ['open.feishu.cn', 'open.larksuite.com'].includes(new URL(config.webhook).hostname); } catch { /* Report invalid URLs on delivery. */ }
+    channels.push({ name: 'webhook', deliver: text => send(config.webhook,
+      feishu ? { msg_type: 'text', content: { text } } : { text },
+      { proxy: config.webhookProxy || '', requireCodeZero: feishu }) });
   }
-  if (config.webhook) channels.push(text => send(config.webhook, { text: `[vibe-relay] ${text}` }, { proxy: config.proxy }));
+  if (config.tgToken && config.tgChatId) {
+    channels.push({ name: 'telegram', deliver: text => send(`https://api.telegram.org/bot${config.tgToken}/sendMessage`, { chat_id: config.tgChatId, text, disable_web_page_preview: true }, { proxy: config.proxy }) });
+  }
   const firing = new Map(); // kind -> last sent at
   return {
     enabled: channels.length > 0,
-    async notify(text) {
+    async notify(text, { prefix = '[vibe-relay]' } = {}) {
+      let delivered = channels.length > 0;
       for (const channel of channels) {
-        // Never log the URL: it contains the bot token.
-        try { await channel(text); } catch (error) { log(`[relay-alerts] delivery failed: ${String(error.message).replace(/bot[^/\s]+/g, 'bot***')}`); }
+        try { await channel.deliver(`${prefix} ${text}`); } catch (error) {
+          delivered = false;
+          const reason = error instanceof AlertDeliveryError ? error.message : 'request failed';
+          log(`[relay-alerts] ${channel.name} delivery failed: ${reason}`);
+        }
       }
+      return delivered;
     },
     // Fires once when a ratio crosses its threshold (repeats after the
     // cooldown while it stays high) and sends one recovery message.
@@ -270,4 +314,18 @@ export function createConnectionMonitor({ metrics, events, alerter, alerts = ale
     evaluate,
     close() { clearInterval(timer); },
   };
+}
+
+// This entry point imports no server and starts no monitoring timers.
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain && process.argv.includes('--test-alert')) {
+  const alerter = createAlerter(alertConfig(), { region: regionFrom() });
+  if (!alerter.enabled) {
+    console.error('[relay-alerts] no alert channels configured');
+    process.exitCode = 1;
+  } else if (await alerter.notify(`${regionFrom()} alert delivery test`, { prefix: '【x2v 告警·测试】' })) {
+    console.log('[relay-alerts] test alert delivered to all configured channels');
+  } else {
+    process.exitCode = 1;
+  }
 }
